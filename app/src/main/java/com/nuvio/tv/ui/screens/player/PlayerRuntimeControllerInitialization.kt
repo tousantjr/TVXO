@@ -842,8 +842,8 @@ internal fun PlayerRuntimeController.initializePlayer(
             isMapDv7ToHevcActiveForCurrentPlayback = mapDv7ToHevcEnabled
             val convertToDv81Active = !mapDv7ToHevcEnabled &&
                     dv7AutoResult?.decision == DolbyVisionBaseLayerPolicy.Decision.CONVERT_TO_DV81
-            val codecSelector = createDolbyVisionFallbackCodecSelector(
-                convertToDv81Active = convertToDv81Active
+            val codecSelector = hardwareFirstVideoCodecSelector(
+                createDolbyVisionFallbackCodecSelector(convertToDv81Active = convertToDv81Active)
             )
             // Bluetooth media sink (A2DP / LE Audio): Media3 only advertises PCM. Do not attempt
             // optical/HDMI passthrough — decode to PCM and let the BT stack encode SBC/AAC/aptX/LDAC.
@@ -1744,7 +1744,9 @@ internal fun PlayerRuntimeController.initializePlayer(
                         )
                         Log.i(
                             PlayerRuntimeController.TAG,
-                            "VIDEO_DECODER: name=$decoderName initMs=$initializationDurationMs host=${currentStreamUrl.safeHost()}"
+                            "VIDEO_DECODER: name=$decoderName " +
+                                "software=${isSoftwareVideoDecoderName(decoderName, softwareOnlyDecoderNames)} " +
+                                "initMs=$initializationDurationMs host=${currentStreamUrl.safeHost()}"
                         )
                     }
 
