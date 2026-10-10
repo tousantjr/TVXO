@@ -2,9 +2,11 @@ package com.nuvio.tv.ui.screens.player
 
 import android.media.MediaCodecList
 import android.os.Build
+import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 
 private val HARDWARE_FIRST_VIDEO_TYPES = setOf(
     MimeTypes.VIDEO_H264,
@@ -16,25 +18,35 @@ private val HARDWARE_FIRST_VIDEO_TYPES = setOf(
 
 private val SOFTWARE_DECODER_PREFIXES = listOf("omx.google.", "c2.android.", "c2.google.", "omx.ffmpeg.")
 
-/** Android's software decoders stay in the list only when the box has no hardware decoder for the type. */
+/**
+ * Android's software decoders are left out only when a hardware decoder supports this exact format
+ * (profile, level, size), so a stream beyond the hardware still plays in software.
+ */
 internal fun <T> hardwareFirstVideoDecoders(
-    mimeType: String,
+    mimeType: String?,
     decoders: List<T>,
     isSoftware: (T) -> Boolean,
+    supportsFormat: (T) -> Boolean,
 ): List<T> {
     if (mimeType !in HARDWARE_FIRST_VIDEO_TYPES) return decoders
     val hardware = decoders.filterNot(isSoftware)
-    return if (hardware.isEmpty()) decoders else hardware
+    return if (hardware.any(supportsFormat)) hardware else decoders
 }
 
-internal fun hardwareFirstVideoCodecSelector(delegate: MediaCodecSelector): MediaCodecSelector =
-    MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-        hardwareFirstVideoDecoders(
-            mimeType,
-            delegate.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder),
-            ::isSoftwareDecoder,
-        )
+internal fun hardwareFirstVideoDecoders(format: Format, decoders: List<MediaCodecInfo>): List<MediaCodecInfo> =
+    hardwareFirstVideoDecoders(format.sampleMimeType, decoders, ::isSoftwareDecoder) {
+        runCatching { it.isFormatSupported(format) }.getOrDefault(false)
     }
+
+/** The platform video renderer with [hardwareFirstVideoDecoders] applied to its decoder list. */
+internal class HardwareFirstVideoRenderer(builder: MediaCodecVideoRenderer.Builder) : MediaCodecVideoRenderer(builder) {
+    override fun getDecoderInfos(
+        mediaCodecSelector: MediaCodecSelector,
+        format: Format,
+        requiresSecureDecoder: Boolean,
+    ): List<MediaCodecInfo> =
+        hardwareFirstVideoDecoders(format, super.getDecoderInfos(mediaCodecSelector, format, requiresSecureDecoder))
+}
 
 internal fun isSoftwareDecoder(info: MediaCodecInfo): Boolean =
     info.softwareOnly || hasSoftwareDecoderName(info.name)
