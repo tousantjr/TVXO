@@ -434,27 +434,27 @@ fun SettingsScreen(
                 }
             }
 
+            var focusedTabCategory by remember { mutableStateOf<SettingsCategory?>(null) }
+            val selectFocusedTab: (SettingsCategory) -> Unit = { category ->
+                if (selectedCategory != category) {
+                    if (category == SettingsCategory.INTEGRATION) {
+                        integrationSection = IntegrationSettingsSection.Hub
+                    }
+                    allowDetailAutofocus = false
+                    selectedCategory = category
+                }
+            }
+
+            LaunchedEffect(focusedTabCategory) {
+                val category = focusedTabCategory ?: return@LaunchedEffect
+                delay(SETTINGS_TAB_FOCUS_SELECT_DELAY_MS)
+                selectFocusedTab(category)
+            }
+
             if (isHorizonStyle) {
                 var topBarCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 var focusedTabBounds by remember { mutableStateOf<Rect?>(null) }
                 val density = LocalDensity.current
-
-                var focusedTabCategory by remember { mutableStateOf<SettingsCategory?>(null) }
-                val selectFocusedTab: (SettingsCategory) -> Unit = { category ->
-                    if (selectedCategory != category) {
-                        if (category == SettingsCategory.INTEGRATION) {
-                            integrationSection = IntegrationSettingsSection.Hub
-                        }
-                        allowDetailAutofocus = false
-                        selectedCategory = category
-                    }
-                }
-
-                LaunchedEffect(focusedTabCategory) {
-                    val category = focusedTabCategory ?: return@LaunchedEffect
-                    delay(SETTINGS_TAB_FOCUS_SELECT_DELAY_MS)
-                    selectFocusedTab(category)
-                }
 
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -685,8 +685,16 @@ fun SettingsScreen(
                                 }
                                 val toDetailKey = if (isRtl) Key.DirectionLeft else Key.DirectionRight
                                 if (event.type == KeyEventType.KeyDown && event.key == toDetailKey) {
-                                    allowDetailAutofocus = true
-                                    false
+                                    val pendingSection = focusedTabCategory
+                                        ?.takeIf { it != selectedCategory || !allowDetailAutofocus }
+                                        ?.let { category -> visibleSections.firstOrNull { it.category == category } }
+                                    if (pendingSection != null) {
+                                        onSectionClick(pendingSection)
+                                        true
+                                    } else {
+                                        allowDetailAutofocus = true
+                                        false
+                                    }
                                 } else {
                                     false
                                 }
@@ -713,6 +721,9 @@ fun SettingsScreen(
                                             railFocusCategoryName = section.category.name
                                         } else if (restoringTo == null) {
                                             railFocusCategoryName = section.category.name
+                                        }
+                                        if (section.destination == SettingsSectionDestination.Inline) {
+                                            focusedTabCategory = section.category
                                         }
                                     },
                                     title = section.title,
