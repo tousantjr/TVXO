@@ -898,7 +898,7 @@ internal fun PlayerRuntimeController.switchToSourceStream(
     resetLoadingOverlayForNewStream()
 
     _uiState.update {
-        it.copy(
+        it.clearFrameRateDetection().copy(
             isBuffering = true,
             error = null,
             currentStreamName = stream.name ?: stream.addonName,
@@ -1010,7 +1010,7 @@ private fun PlayerRuntimeController.switchToTorrentSourceStream(
     pendingRestoredAddonSubtitle = null
     lastSavedPosition = 0L
     _uiState.update {
-        it.copy(
+        it.clearFrameRateDetection().copy(
             isBuffering = true,
             error = null,
             currentStreamName = stream.name ?: stream.addonName,
@@ -1498,7 +1498,7 @@ internal fun PlayerRuntimeController.switchToEpisodeStream(
     lastSavedPosition = 0L
 
     _uiState.update {
-        it.copy(
+        it.clearFrameRateDetection().copy(
             isBuffering = true,
             error = null,
             currentSeason = currentSeason,
@@ -1611,7 +1611,7 @@ private fun PlayerRuntimeController.switchToEpisodeStreamCommon(
     resetLoadingOverlayForNewStream()
 
     _uiState.update {
-        it.copy(
+        it.clearFrameRateDetection().copy(
             isBuffering = true,
             error = null,
             currentSeason = currentSeason,
