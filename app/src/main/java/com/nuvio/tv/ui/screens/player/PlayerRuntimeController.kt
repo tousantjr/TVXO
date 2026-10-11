@@ -35,6 +35,8 @@ import com.nuvio.tv.data.local.StreamLinkCacheDataStore
 import com.nuvio.tv.data.local.StreamBadgeSettingsDataStore
 import com.nuvio.tv.data.local.BingeGroupCacheDataStore
 import com.nuvio.tv.data.local.StreamAutoPlayMode
+import com.nuvio.tv.data.mediaserver.ServerPlayback
+import com.nuvio.tv.data.mediaserver.ServerStreams
 import com.nuvio.tv.data.repository.ParentalGuideRepository
 import com.nuvio.tv.data.repository.PlaybackIssueErrorInput
 import com.nuvio.tv.data.repository.PlaybackIssueReportRepository
@@ -101,6 +103,8 @@ class PlayerRuntimeController(
     internal val streamBadgePresentation: com.nuvio.tv.core.streams.StreamBadgePresentation,
     internal val playbackIssueReportRepository: PlaybackIssueReportRepository,
     internal val tvRecommendationManager: com.nuvio.tv.core.recommendations.TvRecommendationManager,
+    internal val serverPlayback: ServerPlayback,
+    internal val serverStreams: ServerStreams,
     internal val profileId: Int,
     savedStateHandle: SavedStateHandle,
     internal val scope: CoroutineScope
@@ -190,11 +194,6 @@ class PlayerRuntimeController(
     internal val cloudSessionToken: String? = navigationArgs.cloudSessionToken
     internal val mediaSourceFactory = PlayerMediaSourceFactory(context.applicationContext)
 
-    // Resolved per sample so it follows the player across rebuilds.
-    private val bufferedAheadProvider: () -> Long = {
-        _exoPlayer?.let { player -> player.bufferedPosition - player.currentPosition } ?: -1L
-    }
-
     // The file rate is the only one every container reports, so the playhead is placed in the
     // file by how far through it is rather than by any declared bitrate.
     private val vodCachePlayheadBytesProvider: () -> Long = {
@@ -208,9 +207,11 @@ class PlayerRuntimeController(
     }
 
     init {
-        PlayerMemoryReporter.bufferedAheadProvider = bufferedAheadProvider
         PlayerMediaSourceFactory.vodCachePlayheadBytesProvider = vodCachePlayheadBytesProvider
     }
+
+    // Closed on exit (stopAndRelease) or when the ViewModel is cleared, whichever comes first.
+    private val playerSession = com.nuvio.tv.core.player.PlayerSessionTracker.open()
 
     internal var currentVideoHash: String? = navigationArgs.videoHash
     internal var currentVideoSize: Long? = navigationArgs.videoSize
@@ -226,6 +227,8 @@ class PlayerRuntimeController(
     internal var currentVideoHeight: Int? = null
     internal var currentVideoBitrate: Int? = null
     internal var currentStreamUrl: String
+    internal var reportedServerUrl: String? = null
+    internal var serverAudioChosenByUser = false
     internal var currentStreamResponseHeaders: Map<String, String> = emptyMap()
     internal var currentStreamCacheKey: String? = null
     internal var currentStreamMimeType: String?
@@ -273,18 +276,15 @@ class PlayerRuntimeController(
             }
         }
         mediaSourceFactory.logVodCacheStats()
-        PlayerMemoryReporter.stopSampling(context)
         releaseProcessWideReferences()
         mediaSourceFactory.evictCachedSession()
         releasePlayer()
+        playerSession.close()
     }
 
     // These are process wide, so without this the exited player stays reachable until the next one
     // replaces them; the identity checks keep a player that has already started from losing its own.
     private fun releaseProcessWideReferences() {
-        if (PlayerMemoryReporter.bufferedAheadProvider === bufferedAheadProvider) {
-            PlayerMemoryReporter.bufferedAheadProvider = null
-        }
         if (PlayerMediaSourceFactory.vodCachePlayheadBytesProvider === vodCachePlayheadBytesProvider) {
             PlayerMediaSourceFactory.vodCachePlayheadBytesProvider = null
         }
@@ -349,6 +349,9 @@ class PlayerRuntimeController(
         isLive: Boolean = _playbackTimeline.value.isLive,
         watchedDurationMs: Long = _playbackTimeline.value.watchedDurationMs
     ) {
+        if (_uiState.value.isLive != isLive) {
+            _uiState.update { it.copy(isLive = isLive) }
+        }
         _playbackTimeline.update {
             it.copy(
                 currentPosition = currentPosition.coerceAtLeast(0L),
@@ -394,6 +397,9 @@ class PlayerRuntimeController(
         livePlaybackLatched = false
         liveWatchClock.reset()
         pendingPreviewSeekPosition = null
+        if (_uiState.value.isLive) {
+            _uiState.update { it.copy(isLive = false) }
+        }
         _playbackTimeline.value = PlaybackTimelineState()
     }
 
@@ -762,6 +768,8 @@ class PlayerRuntimeController(
     }
 
     fun onCleared() {
+        playerSession.close()
+        stopServerPlayback()
         releasePlayer()
         stopTorrentStream()
         torrentService.shutdown()
