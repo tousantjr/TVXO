@@ -4,19 +4,22 @@
 // Used by .github/workflows/dev-unit-tests.yml and reproducible locally:
 //   ./gradlew :app:testFullDebugUnitTest -I .github/ci/quarantine-tests.init.gradle.kts
 //
-// These three fail on the merged upstream tree (recorded in ACCESSIBILITY_HANDOVER.md):
-//   *LocalhostZeroCopyDataSourceTest.testHttpError404            (vendored media3)
-//   *DefaultAllocatorTest.testLateReleasedAllocationsMemoryLeak  (vendored media3)
-//   *TraktAuthServiceTest.refresh token 400 ...                  (app, mock verification)
+// The two remaining entries test classes that live in the prebuilt engine /
+// datasource AARs (not in app/src/main) and assert a fixed behaviour those
+// binaries do not ship (trim-on-release; InvalidResponseCodeException). They
+// cannot pass until the AARs are rebuilt, so they are excluded here rather than
+// rewritten to assert the current, buggy behaviour.
+//   *LocalhostZeroCopyDataSourceTest.testHttpError404
+//   *DefaultAllocatorTest.testLateReleasedAllocationsMemoryLeak
 //
-// Remove an entry here when the test is fixed; delete the file when the list is empty.
+// Remove an entry here when the underlying binary is fixed; delete the file
+// when the list is empty.
 
 allprojects {
     tasks.withType(org.gradle.api.tasks.testing.Test::class.java).configureEach {
         filter {
             excludeTestsMatching("*LocalhostZeroCopyDataSourceTest.testHttpError404")
             excludeTestsMatching("*DefaultAllocatorTest.testLateReleasedAllocationsMemoryLeak")
-            excludeTestsMatching("*TraktAuthServiceTest.refresh token 400*")
         }
     }
 }

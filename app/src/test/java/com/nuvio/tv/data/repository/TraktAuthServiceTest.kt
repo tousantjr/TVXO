@@ -1,6 +1,7 @@
 package com.nuvio.tv.data.repository
 
 import android.content.Context
+import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktAuthState
@@ -11,12 +12,21 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import retrofit2.Response
 
 class TraktAuthServiceTest {
     @Test
     fun `refresh token 400 clears credentials and prevents another refresh`() = runTest {
+        // refreshTokenIfNeeded() returns early when the build has no Trakt
+        // credentials, and those come from local.properties via BuildConfig.
+        // Skip when they are absent (as in CI) instead of failing.
+        assumeTrue(
+            "requires Trakt credentials in the build",
+            BuildConfig.TRAKT_CLIENT_ID.isNotBlank() && BuildConfig.TRAKT_CLIENT_SECRET.isNotBlank()
+        )
+
         val traktApi = mockk<TraktApi>()
         val traktAuthDataStore = mockk<TraktAuthDataStore>()
         val authSessionNoticeDataStore = mockk<AuthSessionNoticeDataStore>()
