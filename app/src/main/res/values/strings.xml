@@ -1180,6 +1180,7 @@
     <string name="layout_custom_poster_screen_library">Library</string>
     <string name="layout_custom_poster_screen_search">Search</string>
     <string name="layout_custom_poster_screen_details">Details Screen</string>
+    <string name="layout_custom_poster_screen_tv_recommendations">TV Recommendations</string>
 
     <!-- Custom Poster Web Page -->
     <string name="layout_always_show_landscape_clearlogo">Always Backdrop with Logo for Landscape Posters</string>
