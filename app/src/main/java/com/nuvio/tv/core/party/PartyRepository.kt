@@ -19,9 +19,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -78,6 +82,25 @@ class PartyRepository @Inject constructor(
     private val _available = MutableStateFlow(serverConfiguration.capabilities.watchParty)
     val available: StateFlow<Boolean> = _available.asStateFlow()
 
+    val canUse: StateFlow<Boolean> = combine(_available, authManager.authState) { available, auth ->
+        available && auth is AuthState.FullAccount
+    }.stateIn(scope, SharingStarted.Eagerly, false)
+
+    val profile: StateFlow<PartyProfile> = combine(profileManager.profiles, profileManager.activeProfileId) { profiles, activeId ->
+        profiles.firstOrNull { it.id == activeId }
+    }.mapLatest { profile ->
+        PartyProfile(
+            name = profile?.name.orEmpty(),
+            imageUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() }
+                ?: profile?.avatarId?.let { id ->
+                    avatarRepository.getAvatarImageUrl(id, runCatching { avatarRepository.getAvatarCatalog() }.getOrDefault(emptyList()))
+                },
+            color = profile?.avatarColorHex,
+        )
+    }.stateIn(scope, SharingStarted.WhileSubscribed(5_000), PartyProfile(name = "", imageUrl = null, color = null))
+
+    private val storageUrl = "${serverConfiguration.backendUrl.trimEnd('/')}/storage/v1/object/"
+
     private var channel: PartyChannel? = null
     private var sessionScope: CoroutineScope? = null
     private var sessionJob: Job? = null
@@ -98,9 +121,6 @@ class PartyRepository @Inject constructor(
             }
         }
     }
-
-    val canUse: Boolean
-        get() = available.value && authManager.authState.value is AuthState.FullAccount
 
     fun nowMs(): Long = clock.nowMs()
 
@@ -215,8 +235,8 @@ class PartyRepository @Inject constructor(
     }
 
     private suspend fun start(request: suspend (PartyIdentity) -> PartySnapshot): PartyError? {
-        if (!available.value) return PartyError.Unavailable
-        if (!canUse) return PartyError.SignInRequired
+        if (!_available.value) return PartyError.Unavailable
+        if (authManager.authState.value !is AuthState.FullAccount) return PartyError.SignInRequired
         return withContext(dispatcher) {
             mutex.withLock {
                 _state.update { it.copy(busy = true) }
@@ -430,13 +450,14 @@ class PartyRepository @Inject constructor(
             else -> return
         }
         val info = snapshot.party ?: return
+        val members = snapshot.members.withSafeAvatars()
         updateParty { current ->
             current.copy(
-                members = snapshot.members,
+                members = members,
                 hostMemberId = info.hostMemberId,
                 maxMembers = info.maxMembers,
                 hostOnly = info.hostOnly,
-                presence = current.presence.filterKeys { key -> snapshot.members.any { it.id == key } },
+                presence = current.presence.filterKeys { key -> members.any { it.id == key } },
             )
         }
         if (info.media.key != _state.value.party?.media?.key) applyMedia(info.media, info.playback)
@@ -647,6 +668,9 @@ class PartyRepository @Inject constructor(
     private fun <T> decode(element: JsonElement, serializer: KSerializer<T>): T? =
         runCatching { PartyApi.json.decodeFromJsonElement(serializer, element) }.getOrNull()
 
+    private fun List<PartyMember>.withSafeAvatars(): List<PartyMember> =
+        map { member -> member.copy(avatarUrl = member.avatarUrl?.takeIf { it.startsWith(storageUrl) }) }
+
     private fun JsonObject.string(key: String): String? =
         (get(key) as? JsonPrimitive)?.contentOrNull
 
@@ -658,7 +682,7 @@ class PartyRepository @Inject constructor(
             code = info.code,
             memberId = self,
             hostMemberId = info.hostMemberId,
-            members = members,
+            members = members.withSafeAvatars(),
             presence = emptyMap(),
             media = info.media,
             maxMembers = info.maxMembers,

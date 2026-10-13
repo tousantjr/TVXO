@@ -212,3 +212,9 @@ data class PartyNotice(
     val positionMs: Long,
     val rate: Float,
 )
+
+data class PartyProfile(
+    val name: String,
+    val imageUrl: String?,
+    val color: String?,
+)
