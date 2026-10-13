@@ -998,6 +998,12 @@ open class MainActivity : ComponentActivity() {
                                     launchSingleTop = true
                                 }
                             }
+                            is AppDeepLink.Party -> {
+                                pendingDeepLinkUrl.value = null
+                                navController.navigate(Screen.WatchParty.createRoute(deepLink.code)) {
+                                    launchSingleTop = true
+                                }
+                            }
                             is AppDeepLink.AddonInstall -> {
                                 navController.navigate(Screen.AddonManager.route) {
                                     launchSingleTop = true
