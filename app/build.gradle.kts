@@ -539,6 +539,7 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
+    implementation(libs.supabase.realtime)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.sentry.android)
 
