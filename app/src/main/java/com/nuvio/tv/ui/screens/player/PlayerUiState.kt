@@ -156,7 +156,8 @@ data class PlayerUiState(
     val episodeStreamsEpisode: Int? = null,
     val episodeStreamsTitle: String? = null,
     val showPartyPanel: Boolean = false,
-    val partySelfPaused: Boolean = false,
+    val partyBehind: Boolean = false,
+    val partyBehindMs: Long? = null,
     // Stream sources side panel (for switching streams during playback)
     val showSourcesPanel: Boolean = false,
     val isLoadingSourceStreams: Boolean = false,

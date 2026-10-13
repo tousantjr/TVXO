@@ -60,6 +60,7 @@ import com.nuvio.tv.core.party.ActiveParty
 import com.nuvio.tv.core.party.PartyMember
 import com.nuvio.tv.core.qr.QrCodeGenerator
 import com.nuvio.tv.ui.components.NuvioDialog
+import com.nuvio.tv.ui.screens.detail.formatPlaybackTime
 import com.nuvio.tv.ui.screens.detail.requestFocusAfterFrames
 import com.nuvio.tv.ui.screens.settings.SettingsActionRow
 import com.nuvio.tv.ui.screens.settings.SettingsDialogActionButton
@@ -114,6 +115,7 @@ internal fun MembersSection(
     ringColor: Color,
     onRemove: (PartyMember) -> Unit,
     modifier: Modifier = Modifier,
+    selfBehindMs: Long? = null,
 ) {
     val initialIds = remember { party.members.map { it.id }.toSet() }
     var memberToRemove by remember { mutableStateOf<PartyMember?>(null) }
@@ -149,6 +151,7 @@ internal fun MembersSection(
                         } else {
                             null
                         },
+                        selfBehindMs = selfBehindMs,
                     )
                 }
             }
@@ -188,6 +191,7 @@ private fun MemberRow(
     member: PartyMember,
     ringColor: Color,
     onRemove: (() -> Unit)?,
+    selfBehindMs: Long?,
 ) {
     val content: @Composable RowScope.() -> Unit = {
         PartyAvatar(
@@ -226,7 +230,12 @@ private fun MemberRow(
                     )
                 }
             }
-            val status = stringResource(party.statusRes(member))
+            val behindMs = if (member.id == party.memberId) selfBehindMs else party.behindMs(member)
+            val status = if (behindMs != null) {
+                stringResource(R.string.party_behind, formatPlaybackTime(behindMs))
+            } else {
+                stringResource(party.statusRes(member))
+            }
             AnimatedContent(
                 targetState = status,
                 transitionSpec = {

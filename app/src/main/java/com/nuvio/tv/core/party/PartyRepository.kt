@@ -218,10 +218,10 @@ class PartyRepository @Inject constructor(
         }
     }
 
-    fun setLocalStatus(status: PartyMemberStatus, mediaKey: String?) {
+    fun setLocalStatus(status: PartyMemberStatus, mediaKey: String?, behindMs: Long? = null) {
         scope.launch {
             val party = _state.value.party ?: return@launch
-            val next = PartyPresence(memberId = party.memberId, status = status, mediaKey = mediaKey)
+            val next = PartyPresence(memberId = party.memberId, status = status, mediaKey = mediaKey, behindMs = behindMs)
             if (next == localPresence) return@launch
             localPresence = next
             if (status == PartyMemberStatus.Ready) ignoredWaiting.remove(party.memberId)

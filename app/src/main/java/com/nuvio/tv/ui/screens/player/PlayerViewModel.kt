@@ -170,6 +170,8 @@ class PlayerViewModel @Inject constructor(
 
     fun startParty() = controller.startParty()
 
+    fun catchUpParty() = controller.catchUpParty()
+
     fun playForParty() = controller.party.publishMedia(controller.currentPartyMedia(), controller.currentPlaybackPositionMs() ?: 0L)
 
     fun currentPartyStream() = controller.currentPartyStream()

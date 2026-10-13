@@ -5,6 +5,7 @@
 
 package com.nuvio.tv.ui.screens.player
 
+import com.nuvio.tv.ui.screens.detail.formatPlaybackTime
 import com.nuvio.tv.ui.theme.NuvioMotion
 
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -1489,8 +1490,9 @@ fun PlayerScreen(
                 emptyList()
             }
             val noticeText = partyNotice?.let { notice -> partyNoticeText(notice) }
+            val partyPausedBehind = uiState.partyBehind && !uiState.isPlaying && !uiState.isBuffering
             PartyStatusPill(
-                visible = (uiState.showControls || waitingNames.isNotEmpty() || !party.connected || noticeText != null || uiState.partySelfPaused) &&
+                visible = (uiState.showControls || waitingNames.isNotEmpty() || !party.connected || noticeText != null || partyPausedBehind) &&
                     !uiState.showPartyPanel && uiState.error == null,
                 members = party.members,
                 message = when {
@@ -1498,7 +1500,8 @@ fun PlayerScreen(
                     waitingNames.isNotEmpty() -> stringResource(R.string.party_waiting_for, waitingNames.joinToString())
                     partyPlayback?.waiting == true -> stringResource(R.string.party_waiting)
                     noticeText != null -> noticeText
-                    uiState.partySelfPaused -> stringResource(R.string.party_paused_for_you)
+                    partyPausedBehind -> stringResource(R.string.party_paused_for_you)
+                    uiState.partyBehind -> uiState.partyBehindMs?.let { stringResource(R.string.party_behind, formatPlaybackTime(it)) }
                     else -> null
                 },
                 modifier = Modifier
@@ -1717,6 +1720,11 @@ fun PlayerScreen(
                     onRemove = { member -> viewModel.party.removeMember(member.id) },
                     onHostOnlyChange = { enabled -> viewModel.party.setHostOnly(enabled) },
                     onSharingChange = { enabled -> viewModel.party.setSharing(enabled) },
+                    behindMs = if (uiState.partyBehind) uiState.partyBehindMs ?: 0L else null,
+                    onCatchUp = {
+                        viewModel.catchUpParty()
+                        viewModel.onEvent(PlayerEvent.OnDismissPartyPanel)
+                    },
                     onClose = { viewModel.onEvent(PlayerEvent.OnDismissPartyPanel) },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )

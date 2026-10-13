@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.screens.player
 
 import androidx.media3.exoplayer.SeekParameters
 import com.nuvio.tv.R
+import com.nuvio.tv.core.party.OwnSeek
 import com.nuvio.tv.core.party.PartyCorrection
 import com.nuvio.tv.core.party.PartyEvent
 import com.nuvio.tv.core.party.PartyMedia
@@ -76,16 +77,39 @@ internal fun PlayerRuntimeController.dismissPartyPanel() {
     scheduleHideControls()
 }
 
-internal fun PlayerRuntimeController.togglePartySelfPause() {
+internal fun PlayerRuntimeController.toggleOwnPlayback() {
     when {
-        _uiState.value.partySelfPaused -> setPartySelfPaused(false)
         hasActivePlayIntent() -> {
-            setPartySelfPaused(true)
+            setPartyBehind(true)
             applyPartyPaused(paused = true, force = true)
         }
+        _uiState.value.partyBehind -> applyPartyPaused(paused = false, force = true)
         else -> partyBlocksControl()
     }
     showControlsTemporarily()
+}
+
+internal fun PlayerRuntimeController.ownSeekTarget(targetMs: Long): Long? {
+    val playback = party.playback.value ?: return targetMs
+    val partyPositionMs = PartySync.expectedPositionMs(playback, party.nowMs(), currentPlaybackDurationMs().coerceAtLeast(0L))
+    return when (val seek = PartySync.ownSeek(targetMs, partyPositionMs, _uiState.value.partyBehind)) {
+        is OwnSeek.Behind -> {
+            setPartyBehind(true)
+            seek.positionMs
+        }
+        OwnSeek.CatchUp -> {
+            setPartyBehind(false)
+            null
+        }
+        OwnSeek.Blocked -> {
+            partyBlocksControl()
+            null
+        }
+    }
+}
+
+internal fun PlayerRuntimeController.catchUpParty() {
+    setPartyBehind(false)
 }
 
 internal fun PlayerRuntimeController.currentPartyMedia(): PartyMedia = PartyMedia(
@@ -175,7 +199,7 @@ internal fun PlayerRuntimeController.bindParty() {
             .collectLatest { partyId ->
                 if (partyId == null) {
                     clearPartyNudge()
-                    setPartySelfPaused(false)
+                    setPartyBehind(false)
                 } else {
                     runPartySync()
                 }
@@ -188,8 +212,10 @@ internal fun PlayerRuntimeController.bindParty() {
     }
 }
 
-private fun PlayerRuntimeController.setPartySelfPaused(paused: Boolean) {
-    if (_uiState.value.partySelfPaused != paused) _uiState.update { it.copy(partySelfPaused = paused) }
+private fun PlayerRuntimeController.setPartyBehind(behind: Boolean) {
+    if (_uiState.value.partyBehind != behind) {
+        _uiState.update { it.copy(partyBehind = behind, partyBehindMs = it.partyBehindMs.takeIf { behind }) }
+    }
 }
 
 private fun PlayerRuntimeController.applyPartyPaused(paused: Boolean, force: Boolean) {
@@ -242,14 +268,14 @@ private suspend fun PlayerRuntimeController.runPartySync() {
     var lastSeek: TimeMark? = null
     var lastCorrection: TimeMark? = null
     var lastSeq: Pair<Long, String?>? = null
-    var lastStatus: Pair<PartyMemberStatus, String>? = null
+    var lastStatus: Triple<PartyMemberStatus, String, Long?>? = null
     var lastShared: PartyStream? = null
     var wasInBackground = false
     var wasRendered = false
     var publishedInitial = false
     var seekLeadMs = 0L
     var measureSeekLead = false
-    var wasSelfPaused = false
+    var wasBehind = false
     try {
         while (currentCoroutineContext().isActive) {
             delay(PARTY_TICK)
@@ -260,7 +286,7 @@ private suspend fun PlayerRuntimeController.runPartySync() {
             val previousKey = partyPreviousKey
             if (previousKey != key) {
                 partyPreviousKey = key
-                setPartySelfPaused(false)
+                setPartyBehind(false)
                 if (previousKey != null && current.media.key == previousKey) party.publishMedia(currentPartyMedia(), positionMs = 0L)
             }
 
@@ -277,8 +303,16 @@ private suspend fun PlayerRuntimeController.runPartySync() {
             if (rendered && !wasRendered) lastSeq = null
             wasRendered = rendered
             val loading = state.isBuffering || state.showLoadingOverlay
+            val behindGap = party.playback.value
+                ?.takeIf { state.partyBehind && current.media.key == key }
+                ?.let { playbackNow ->
+                    currentPlaybackPositionMs()?.let { local ->
+                        PartySync.expectedPositionMs(playbackNow, party.nowMs(), currentPlaybackDurationMs().coerceAtLeast(0L)) - local
+                    }
+                }
             val status = when {
                 state.error != null || isInBackground -> PartyMemberStatus.Browsing
+                behindGap != null -> PartyMemberStatus.Behind
                 !hasRenderedFirstFrame -> PartyMemberStatus.Loading
                 loading && !state.playbackEnded -> {
                     val since = bufferingSince ?: clock.markNow().also { bufferingSince = it }
@@ -289,10 +323,14 @@ private suspend fun PlayerRuntimeController.runPartySync() {
                     PartyMemberStatus.Ready
                 }
             }
-            val reportedStatus = status to key
+            val reportedStatus = Triple(
+                status,
+                key,
+                behindGap?.takeIf { status == PartyMemberStatus.Behind }?.let(PartySync::reportedGapMs),
+            )
             if (reportedStatus != lastStatus) {
                 lastStatus = reportedStatus
-                party.setLocalStatus(status, key)
+                party.setLocalStatus(status, key, reportedStatus.third)
             }
 
             val positionMs = currentPlaybackPositionMs()
@@ -311,26 +349,26 @@ private suspend fun PlayerRuntimeController.runPartySync() {
             }
             publishedInitial = true
             if (!hasRenderedFirstFrame) continue
-            if (_uiState.value.partySelfPaused && current.canControl) setPartySelfPaused(false)
-            if (_uiState.value.partySelfPaused) {
+            if (_uiState.value.partyBehind && current.canControl) setPartyBehind(false)
+            if (_uiState.value.partyBehind) {
                 clearPartyNudge(playback)
-                if (isPlaybackCurrentlyPlaying() && !loading) {
-                    val since = mismatchSince ?: clock.markNow().also { mismatchSince = it }
-                    if (since.elapsedNow() > OUTSIDE_TOGGLE_DELAY) {
-                        mismatchSince = null
-                        setPartySelfPaused(false)
-                    }
+                mismatchSince = null
+                val gap = PartySync.expectedPositionMs(playback, party.nowMs(), durationMs) - positionMs
+                if (PartySync.shouldRejoin(gap, playing = hasActivePlayIntent() && !loading)) {
+                    setPartyBehind(false)
                 } else {
-                    mismatchSince = null
+                    val shown = _uiState.value.partyBehindMs
+                    if (shown == null || abs(gap - shown) >= BEHIND_DISPLAY_STEP_MS) {
+                        _uiState.update { it.copy(partyBehindMs = gap.coerceAtLeast(0L)) }
+                    }
+                    wasBehind = true
+                    continue
                 }
             }
-            if (_uiState.value.partySelfPaused) {
-                wasSelfPaused = true
-                continue
-            }
-            if (wasSelfPaused) {
-                wasSelfPaused = false
+            if (wasBehind) {
+                wasBehind = false
                 lastSeq = null
+                if (!current.canControl) showPartyMessage(context.getString(R.string.party_caught_up))
             }
 
             val expected = PartySync.expectedPositionMs(playback, party.nowMs(), durationMs)
@@ -363,7 +401,7 @@ private suspend fun PlayerRuntimeController.runPartySync() {
                     when {
                         current.canControl -> party.publishPlayback(paused = !playing, positionMs = positionMs, rate = playback.rate)
                         playing -> applyPartyPaused(playback.paused, force = true)
-                        else -> setPartySelfPaused(true)
+                        else -> setPartyBehind(true)
                     }
                 }
                 continue
@@ -407,3 +445,4 @@ private val OUTSIDE_TOGGLE_DELAY = 1_200.milliseconds
 private val SEEK_SETTLE = 2_500.milliseconds
 private val CORRECTION_INTERVAL = 500.milliseconds
 private const val MAX_SEEK_LEAD_MS = 3_000L
+private const val BEHIND_DISPLAY_STEP_MS = 1_000L

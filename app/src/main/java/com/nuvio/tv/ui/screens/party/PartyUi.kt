@@ -319,9 +319,14 @@ internal fun ActiveParty.presenceState(member: PartyMember): PartyPresenceState 
     return when (presence.status) {
         PartyMemberStatus.Ready -> PartyPresenceState.Watching
         PartyMemberStatus.Loading, PartyMemberStatus.Buffering -> PartyPresenceState.Busy
-        PartyMemberStatus.Browsing -> PartyPresenceState.Away
+        PartyMemberStatus.Browsing, PartyMemberStatus.Behind -> PartyPresenceState.Away
     }
 }
+
+internal fun ActiveParty.behindMs(member: PartyMember): Long? =
+    presenceOf(member)
+        ?.takeIf { it.status == PartyMemberStatus.Behind && it.mediaKey == media.key }
+        ?.let { it.behindMs ?: 0L }
 
 @get:StringRes
 internal val PartyError.messageRes: Int
@@ -347,7 +352,7 @@ internal fun ActiveParty.statusRes(member: PartyMember): Int {
         }
     }
     return when (presence.status) {
-        PartyMemberStatus.Ready -> R.string.party_status_ready
+        PartyMemberStatus.Ready, PartyMemberStatus.Behind -> R.string.party_status_ready
         PartyMemberStatus.Buffering -> R.string.party_status_buffering
         PartyMemberStatus.Loading -> R.string.party_status_loading
         PartyMemberStatus.Browsing -> R.string.party_status_choosing

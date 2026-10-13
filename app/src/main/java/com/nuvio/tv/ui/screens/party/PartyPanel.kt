@@ -28,7 +28,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +50,7 @@ import com.nuvio.tv.core.party.ActiveParty
 import com.nuvio.tv.core.party.PartyMember
 import com.nuvio.tv.core.party.PartyProfile
 import com.nuvio.tv.core.party.PartyUiState
+import com.nuvio.tv.ui.screens.detail.formatPlaybackTime
 import com.nuvio.tv.ui.screens.detail.requestFocusAfterFrames
 import com.nuvio.tv.ui.screens.player.DialogButton
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -67,6 +71,8 @@ fun PartyPanel(
     onRemove: (PartyMember) -> Unit,
     onHostOnlyChange: (Boolean) -> Unit,
     onSharingChange: (Boolean) -> Unit,
+    behindMs: Long?,
+    onCatchUp: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,6 +121,8 @@ fun PartyPanel(
                         party = party,
                         playerMediaKey = playerMediaKey,
                         canShareStream = canShareStream,
+                        behindMs = behindMs,
+                        onCatchUp = onCatchUp,
                         onPlayForEveryone = onPlayForEveryone,
                         onWatchWithParty = onWatchWithParty,
                         onLeave = onLeave,
@@ -188,6 +196,8 @@ private fun PartyContent(
     party: ActiveParty,
     playerMediaKey: String,
     canShareStream: Boolean,
+    behindMs: Long?,
+    onCatchUp: () -> Unit,
     onPlayForEveryone: () -> Unit,
     onWatchWithParty: () -> Unit,
     onLeave: () -> Unit,
@@ -205,6 +215,8 @@ private fun PartyContent(
             party = party,
             playerMediaKey = playerMediaKey,
             canShareStream = canShareStream,
+            behindMs = behindMs,
+            onCatchUp = onCatchUp,
             onPlayForEveryone = onPlayForEveryone,
             onWatchWithParty = onWatchWithParty,
             onLeave = onLeave,
@@ -224,6 +236,8 @@ private fun PartyDetailsList(
     party: ActiveParty,
     playerMediaKey: String,
     canShareStream: Boolean,
+    behindMs: Long?,
+    onCatchUp: () -> Unit,
     onPlayForEveryone: () -> Unit,
     onWatchWithParty: () -> Unit,
     onLeave: () -> Unit,
@@ -240,6 +254,27 @@ private fun PartyDetailsList(
             .padding(bottom = NuvioTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
+        var lastBehindMs by remember { mutableStateOf(0L) }
+        if (behindMs != null) lastBehindMs = behindMs
+        AnimatedVisibility(
+            visible = behindMs != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = stringResource(R.string.party_behind_title, formatPlaybackTime(lastBehindMs)),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = NuvioTheme.colors.TextPrimary,
+                )
+                DialogButton(
+                    text = stringResource(R.string.party_catch_up),
+                    onClick = onCatchUp,
+                    isPrimary = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         AnimatedVisibility(
             visible = playerMediaKey != party.media.key,
             enter = fadeIn() + expandVertically(),
@@ -271,6 +306,7 @@ private fun PartyDetailsList(
             party = party,
             ringColor = NuvioTheme.colors.BackgroundElevated,
             onRemove = onRemove,
+            selfBehindMs = behindMs,
         )
         if (party.isHost) {
             HostSettings(
