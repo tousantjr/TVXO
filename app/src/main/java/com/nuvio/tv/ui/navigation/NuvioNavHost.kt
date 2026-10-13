@@ -1102,6 +1102,7 @@ private fun PlaybackNavHost(
                         playOnLoad = false
                     )
                 },
+                onOpenPartyMedia = ::openPartyMedia,
                 onPlaybackErrorBack = {
                     val returnedToStream = popBackToStream()
                     if (!returnedToStream) {

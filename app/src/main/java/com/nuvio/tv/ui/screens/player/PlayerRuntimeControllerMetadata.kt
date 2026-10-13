@@ -490,7 +490,8 @@ internal fun PlayerRuntimeController.updateActiveSkipInterval(positionMs: Long) 
         if (
             segmentType != null &&
             segmentType in autoSkipSegmentTypes &&
-            activeKey !in autoSkippedIntervalKeys
+            activeKey !in autoSkippedIntervalKeys &&
+            !isPartyControlLocked
         ) {
             autoSkippedIntervalKeys.add(activeKey)
             skipInterval(active)
