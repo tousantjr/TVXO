@@ -65,6 +65,7 @@ import com.nuvio.tv.ui.screens.settings.SettingsDetailHeader
 import com.nuvio.tv.ui.screens.settings.SettingsGroupCard
 import com.nuvio.tv.ui.screens.settings.SettingsStandaloneScaffold
 import com.nuvio.tv.ui.screens.settings.SettingsVerticalScrollIndicators
+import com.nuvio.tv.ui.screens.settings.settingsHeaderInset
 import com.nuvio.tv.ui.theme.NuvioTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -128,7 +129,8 @@ fun PartyScreen(
             label = "partyScreenMode",
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(start = settingsHeaderInset()),
         ) { target ->
             when (target) {
                 PartyScreenMode.Join -> JoinContent(
