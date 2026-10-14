@@ -28,6 +28,7 @@ class BingeGroupCacheDataStore @Inject constructor(
         factory.get(profileId, FEATURE)
 
     private fun prefKey(contentId: String) = stringPreferencesKey("bg_$contentId")
+    private fun filenamePrefKey(contentId: String) = stringPreferencesKey("bg_fn_$contentId")
 
     suspend fun save(contentId: String, bingeGroup: String) {
         store().edit { prefs ->
@@ -35,7 +36,7 @@ class BingeGroupCacheDataStore @Inject constructor(
         }
     }
 
-    suspend fun replace(contentId: String, bingeGroup: String?) {
+    suspend fun replace(contentId: String, bingeGroup: String?, filename: String? = null) {
         store().edit { prefs ->
             val value = bingeGroup?.takeIf { it.isNotBlank() }
             if (value == null) {
@@ -43,11 +44,21 @@ class BingeGroupCacheDataStore @Inject constructor(
             } else {
                 prefs[prefKey(contentId)] = value
             }
+            val fn = filename?.takeIf { it.isNotBlank() }
+            if (fn == null) {
+                prefs.remove(filenamePrefKey(contentId))
+            } else {
+                prefs[filenamePrefKey(contentId)] = fn
+            }
         }
     }
 
     suspend fun get(contentId: String): String? {
         return store().data.first()[prefKey(contentId)]
+    }
+
+    suspend fun getFilename(contentId: String): String? {
+        return store().data.first()[filenamePrefKey(contentId)]
     }
 
     suspend fun remove(contentId: String) {

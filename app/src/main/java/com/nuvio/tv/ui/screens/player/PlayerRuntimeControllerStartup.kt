@@ -22,8 +22,9 @@ internal fun PlayerRuntimeController.startInitialPlaybackIfNeeded() {
     val bg = navigationArgs.bingeGroup
     val cid = contentId
     if (cid != null) {
+        val fn = navigationArgs.filename
         scope.launch(kotlinx.coroutines.NonCancellable) {
-            bingeGroupCacheDataStore.replace(cid, bg)
+            bingeGroupCacheDataStore.replace(cid, bg, fn)
         }
     }
 
