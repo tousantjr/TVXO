@@ -170,8 +170,6 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         cacheKey: String? = null
     ): MediaSource {
         val sanitizedHeaders = sanitizeHeaders(headers)
-        val httpDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, sanitizedHeaders)
-
         val resolvedMimeType = mimeTypeOverride ?: inferMimeType(
             url = url,
             filename = filename,
@@ -179,6 +177,17 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         )
         val isHls = resolvedMimeType == MimeTypes.APPLICATION_M3U8
         val isDash = resolvedMimeType == MimeTypes.APPLICATION_MPD
+        // HLS/DASH only need HTTP. DefaultDataSource is for local/file fallback and is the
+        // progressive path. Using the pure OkHttp factory matches Mobile and keeps
+        // proxyHeaders (Referer/Origin) on every playlist and segment request.
+        val httpDataSourceFactory = if (isHls || isDash) {
+            PlayerPlaybackNetworking.createHttpDataSourceFactory(
+                sanitizedHeaders,
+                useLongReadTimeout = isLoopbackUrl(url),
+            )
+        } else {
+            PlayerPlaybackNetworking.createDataSourceFactory(context, sanitizedHeaders)
+        }
 
         val mediaItemBuilder = MediaItem.Builder().setUri(url)
         resolvedMimeType?.let(mediaItemBuilder::setMimeType)
