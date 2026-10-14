@@ -139,6 +139,18 @@ class PartyRepository @Inject constructor(
     suspend fun join(code: String): PartyError? =
         start { identity -> api.join(normalizePartyCode(code), identity) }
 
+    suspend fun preview(code: String): PartyPreview =
+        withContext(dispatcher) {
+            try {
+                api.preview(normalizePartyCode(code))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.w(TAG, "Watch party preview failed", error)
+                PartyPreview(error = "network")
+            }
+        }
+
     fun leave() {
         scope.launch {
             mutex.withLock {

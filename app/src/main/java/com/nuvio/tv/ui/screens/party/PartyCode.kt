@@ -32,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -168,9 +167,9 @@ internal fun CodeKeypad(
     onDelete: () -> Unit,
     onSubmit: () -> Unit,
     firstKeyFocusRequester: FocusRequester,
+    submitFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
-    val deleteFocusRequester = remember { FocusRequester() }
     Column(
         modifier = modifier.onPreviewKeyEvent { event ->
             val native = event.nativeKeyEvent
@@ -217,16 +216,11 @@ internal fun CodeKeypad(
                 }
             }
         }
-        Row(
-            modifier = Modifier.settingsOptionRow(deleteFocusRequester),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             KeypadButton(
                 onClick = onDelete,
                 enabled = enabled,
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(deleteFocusRequester),
+                modifier = Modifier.weight(1f),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.Backspace,
@@ -238,7 +232,9 @@ internal fun CodeKeypad(
                 onClick = onSubmit,
                 enabled = enabled && canSubmit && !busy,
                 primary = true,
-                modifier = Modifier.weight(3f),
+                modifier = Modifier
+                    .weight(3f)
+                    .focusRequester(submitFocusRequester),
             ) {
                 Text(
                     text = stringResource(R.string.party_join_action),

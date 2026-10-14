@@ -36,6 +36,11 @@ class PartyApi @Inject constructor(
             putIdentity(identity)
         })
 
+    internal suspend fun preview(code: String): PartyPreview {
+        val body = postgrest.rpc("watch_party_preview", buildJsonObject { put("p_code", code) }).data
+        return json.decodeFromString(PartyPreview.serializer(), body)
+    }
+
     internal suspend fun heartbeat(partyId: String, deviceId: String): PartySnapshot =
         call("watch_party_heartbeat", buildJsonObject {
             put("p_party_id", partyId)

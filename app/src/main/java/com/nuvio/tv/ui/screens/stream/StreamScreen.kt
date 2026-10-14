@@ -551,7 +551,7 @@ fun StreamScreen(
 }
 
 @Composable
-private fun StreamBackdrop(
+internal fun StreamBackdrop(
     backdrop: String?,
     isLoading: Boolean,
     modifier: Modifier = Modifier
