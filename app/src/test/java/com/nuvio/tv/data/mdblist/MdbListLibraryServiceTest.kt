@@ -129,6 +129,61 @@ class MdbListLibraryServiceTest {
     }
 
     @Test
+    fun `dynamic lists become read-only tabs that can be hidden`() = runTest {
+        val h = MdbListSyncTestHarness(backgroundScope)
+        h.http.reply(body = """[{"id":12,"user_id":42,"type":"dynamic","dynamic":true,"name":"Top Horror","last_updated_at":"d1"}]""")
+        h.http.reply(body = MDBLIST_EMPTY_LIBRARY_PAGE)
+        h.http.reply(body = MDBLIST_LIBRARY_MOVIE_PAGE)
+        h.http.reply(body = "[]")
+        val service = h.libraryService(backgroundScope)
+        service.refresh(TrackingRefreshIntent.USER_INITIATED)
+        assertEquals(listOf("/lists/user", "/watchlist/items", "/lists/12/items", "/external/lists/user"),
+            h.http.engine.requests.map { it.path })
+        val dynamic = service.tabs.first().single { it.key == "mdblist:dynamic:12" }
+        assertEquals(LibraryListTab.Type.EXTERNAL, dynamic.type)
+        assertEquals("Top Horror", dynamic.title)
+        assertFalse(dynamic.supportsMembershipFor("movie"))
+        assertEquals(listOf(setOf("mdblist:dynamic:12")), service.items.first().map { it.listKeys.toSet() })
+
+        service.applyMembershipChanges(LibraryEntryInput("tt0111161", "movie", "Shawshank"),
+            ListMembershipChanges(mapOf("mdblist:dynamic:12" to false)))
+        assertEquals(4, h.http.engine.requests.size)
+
+        assertEquals(MdbListLibraryListOption("mdblist:dynamic:12", "Top Horror", true), service.listOptions.first().last())
+        service.setListVisible("mdblist:dynamic:12", false)
+        assertEquals(listOf(MDBLIST_WATCHLIST_KEY), service.tabs.first().map { it.key })
+
+        h.http.reply(body = """[{"id":12,"user_id":42,"type":"dynamic","dynamic":true,"name":"Top Horror","last_updated_at":"d2"}]""")
+        h.http.reply(body = MDBLIST_EMPTY_LIBRARY_PAGE)
+        h.http.reply(body = "[]")
+        service.refresh(TrackingRefreshIntent.USER_INITIATED)
+        assertEquals(listOf("/lists/user", "/watchlist/items", "/external/lists/user"),
+            h.http.engine.requests.drop(4).map { it.path })
+        assertEquals(setOf("mdblist:dynamic:12"), h.repository.currentSnapshot()!!.library!!.hiddenListKeys)
+    }
+
+    @Test
+    fun `unchanged dynamic lists reuse their cache`() = runTest {
+        val h = MdbListSyncTestHarness(backgroundScope)
+        val movie = decodeMdbListLibraryPage(MDBLIST_LIBRARY_MOVIE_PAGE).items
+        h.seedLibrary(mdbListLibrarySnapshot(h.http.now).copy(
+            dynamicLists = listOf(MdbListDynamicList(12, "Top Horror", updatedAt = "d1")),
+            itemsByList = mapOf(MDBLIST_WATCHLIST_KEY to emptyList(), MDBLIST_TEST_LIST_KEY to emptyList(), "mdblist:dynamic:12" to movie)
+        ))
+        val service = h.libraryService(backgroundScope)
+        h.http.now += MdbListSyncRepository.AUTOMATIC_INTERVAL_MS
+        h.http.reply(body = """[
+            {"id":7,"user_id":42,"name":"Favourites","type":"static","private":true,"last_updated_at":"v1"},
+            {"id":12,"user_id":42,"name":"Top Horror","type":"dynamic","dynamic":true,"last_updated_at":"d1"}
+        ]""")
+        h.http.reply(body = MDBLIST_EMPTY_LIBRARY_PAGE)
+        h.http.reply(body = "[]")
+        service.refresh(TrackingRefreshIntent.AUTOMATIC)
+        assertEquals(listOf("/lists/user", "/watchlist/items", "/external/lists/user"), h.http.engine.requests.map { it.path })
+        assertEquals(movie, h.repository.currentSnapshot()!!.library!!.itemsByList["mdblist:dynamic:12"])
+    }
+
+    @Test
     fun `external list failures keep the cached external lists without failing the refresh`() = runTest {
         val h = MdbListSyncTestHarness(backgroundScope)
         val movie = decodeMdbListLibraryPage(MDBLIST_LIBRARY_MOVIE_PAGE).items
@@ -291,7 +346,7 @@ class MdbListLibraryServiceTest {
         val h = MdbListSyncTestHarness(backgroundScope)
         val movie = decodeMdbListLibraryPage(MDBLIST_LIBRARY_MOVIE_PAGE).items
         h.seedLibrary(mdbListLibrarySnapshot(h.http.now).copy(itemsByList = mapOf(MDBLIST_TEST_LIST_KEY to movie)))
-        h.http.reply(body = """[{"id":7,"type":"dynamic","name":"Changed"}]""")
+        h.http.reply(body = """[{"id":7,"type":"feed","dynamic":false,"name":"Changed"}]""")
         h.http.reply(body = MDBLIST_EMPTY_LIBRARY_PAGE)
         h.http.reply(body = "[]")
         val service = h.libraryService(backgroundScope)

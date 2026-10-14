@@ -14,24 +14,26 @@ internal class MdbListLibraryRemote(private val api: MdbListApiClient, private v
         now: Long,
         reloadItems: Boolean = false
     ): MdbListLibrarySnapshot {
-        val lists = decodeMdbListLibraryLists(api.get("/lists/user", mapOf("unified" to "false", "sort" to "ranked"), scope).body, accountId)
+        val userLists = api.get("/lists/user", mapOf("unified" to "false", "sort" to "ranked"), scope).body
+        val lists = decodeMdbListLibraryLists(userLists, accountId)
+        val dynamicLists = decodeMdbListDynamicLists(userLists, accountId)
         val items = linkedMapOf(MDBLIST_WATCHLIST_KEY to items(MDBLIST_WATCHLIST_KEY))
         val reuseItems = !reloadItems && previous?.itemsOrder == MDBLIST_ITEMS_ORDER
-        val previousLists = previous?.lists.orEmpty().associateBy { it.id }
+        val previousUpdatedAt = previous?.lists.orEmpty().associate { it.key to it.updatedAt } +
+            previous?.dynamicLists.orEmpty().associate { it.key to it.updatedAt }
         val addedOrders = previous?.addedOrders.orEmpty().toMutableMap().apply { remove(MDBLIST_WATCHLIST_KEY) }
         val hidden = previous?.hiddenListKeys.orEmpty()
-        for (list in lists) {
+        for ((key, updatedAt) in lists.map { it.key to it.updatedAt } + dynamicLists.map { it.key to it.updatedAt }) {
             // Hidden lists are not shown anywhere, so skip downloading their items.
-            if (list.key in hidden) {
-                addedOrders.remove(list.key)
+            if (key in hidden) {
+                addedOrders.remove(key)
                 continue
             }
-            items[list.key] = cachedOrFetched(previous, list.key, list.updatedAt, previousLists[list.id]?.updatedAt,
-                reuseItems, addedOrders)
+            items[key] = cachedOrFetched(previous, key, updatedAt, previousUpdatedAt[key], reuseItems, addedOrders)
         }
         val externalLists = synchronizeExternal(previous, hidden, reuseItems, items, addedOrders)
         val snapshot = MdbListLibrarySnapshot(lists, items, now, addedOrders = addedOrders.filterKeys { it in items },
-            itemsOrder = MDBLIST_ITEMS_ORDER, externalLists = externalLists)
+            itemsOrder = MDBLIST_ITEMS_ORDER, externalLists = externalLists, dynamicLists = dynamicLists)
         // Drop hidden keys of lists that were deleted in MDBList.
         return snapshot.copy(hiddenListKeys = hidden intersect snapshot.tabs().mapTo(mutableSetOf()) { it.key })
     }
@@ -119,11 +121,18 @@ internal class MdbListLibraryRemote(private val api: MdbListApiClient, private v
 internal fun mdbListLibraryItemsPath(key: String): String = when {
     key == MDBLIST_WATCHLIST_KEY -> "/watchlist/items"
     key.startsWith(MDBLIST_EXTERNAL_LIST_KEY_PREFIX) -> "/external/lists/${mdbListExternalListId(key)}/items"
+    key.startsWith(MDBLIST_DYNAMIC_LIST_KEY_PREFIX) -> "/lists/${mdbListPrefixedListId(key, MDBLIST_DYNAMIC_LIST_KEY_PREFIX)}/items"
     else -> "/lists/${mdbListPersonalListId(key)}/items"
 }
 
-internal fun mdbListExternalListId(key: String): Long =
-    requireNotNull(key.removePrefix(MDBLIST_EXTERNAL_LIST_KEY_PREFIX).toLongOrNull()?.takeIf { it > 0 }) { "Invalid MDBList list" }
+internal fun mdbListExternalListId(key: String): Long = mdbListPrefixedListId(key, MDBLIST_EXTERNAL_LIST_KEY_PREFIX)
+
+/** External and dynamic lists are read-only: items are never added to or removed from them. */
+internal fun isMdbListReadOnlyListKey(key: String): Boolean =
+    key.startsWith(MDBLIST_EXTERNAL_LIST_KEY_PREFIX) || key.startsWith(MDBLIST_DYNAMIC_LIST_KEY_PREFIX)
+
+private fun mdbListPrefixedListId(key: String, prefix: String): Long =
+    requireNotNull(key.removePrefix(prefix).toLongOrNull()?.takeIf { it > 0 }) { "Invalid MDBList list" }
 
 internal fun mdbListPersonalListId(key: String): Long {
     require(key.startsWith(MDBLIST_LIST_KEY_PREFIX)) { "Invalid MDBList list" }
