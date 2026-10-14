@@ -79,7 +79,7 @@ internal fun CodeSection(
     modifier: Modifier = Modifier,
     slotHeight: Dp = 48.dp,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)) {
         AnimatedContent(
             targetState = connected,
             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
@@ -93,7 +93,7 @@ internal fun CodeSection(
                 )
             } else {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PulsingDot()
@@ -124,7 +124,7 @@ internal fun MembersSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 6.dp),
+                .padding(bottom = NuvioTheme.spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -202,10 +202,10 @@ private fun MemberRow(
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -267,8 +267,8 @@ private fun MemberRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 18.dp, vertical = NuvioTheme.spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
         )
@@ -291,8 +291,8 @@ private fun PartyRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 18.dp, vertical = NuvioTheme.spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
         )
@@ -301,7 +301,7 @@ private fun PartyRow(
 
 @Composable
 private fun SeatDots(filled: Int, total: Int) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)) {
         repeat(total) { index ->
             val color by animateColorAsState(
                 targetValue = if (index < filled) NuvioTheme.colors.Secondary else NuvioTheme.colors.Border,
@@ -346,8 +346,8 @@ internal fun HostSettings(
 @Composable
 internal fun HostOnlyNote(modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.padding(horizontal = 18.dp, vertical = NuvioTheme.spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -449,7 +449,7 @@ private fun InviteDialog(
         width = 640.dp,
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xl),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (qr != null) {
@@ -463,7 +463,7 @@ private fun InviteDialog(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
             ) {
                 Text(
                     text = stringResource(R.string.party_invite_scan),

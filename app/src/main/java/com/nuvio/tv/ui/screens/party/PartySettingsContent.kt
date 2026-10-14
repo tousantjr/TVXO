@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.tv.R
@@ -19,7 +18,7 @@ import com.nuvio.tv.core.party.formatPartyCode
 import com.nuvio.tv.ui.screens.settings.SettingsActionRow
 import com.nuvio.tv.ui.screens.settings.SettingsDetailHeader
 import com.nuvio.tv.ui.screens.settings.SettingsGroupCard
-import com.nuvio.tv.ui.screens.settings.SettingsNote
+import com.nuvio.tv.ui.theme.NuvioTheme
 
 @Composable
 fun PartySettingsContent(
@@ -34,7 +33,7 @@ fun PartySettingsContent(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
     ) {
         SettingsDetailHeader(
             title = stringResource(R.string.party_title),
@@ -53,13 +52,10 @@ fun PartySettingsContent(
             } else {
                 SettingsActionRow(
                     title = stringResource(R.string.party_join_title),
-                    subtitle = stringResource(R.string.party_join_description),
+                    subtitle = stringResource(if (canUse) R.string.party_join_description else R.string.party_sign_in_required),
                     onClick = onOpen,
                     leadingIcon = Icons.Rounded.Groups,
                     modifier = rowModifier,
-                )
-                SettingsNote(
-                    text = stringResource(if (canUse) R.string.party_host_hint else R.string.party_sign_in_required),
                 )
             }
         }

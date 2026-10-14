@@ -155,13 +155,13 @@ private fun StartContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(bottom = NuvioTheme.spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
     ) {
         SeatsHero(
             profile = profile,
             size = 56.dp,
             ringColor = NuvioTheme.colors.BackgroundElevated,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = NuvioTheme.spacing.sm),
         )
         Text(
             text = stringResource(R.string.party_start_title),
@@ -184,7 +184,7 @@ private fun StartContent(
                 enabled = !busy,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = NuvioTheme.spacing.sm)
                     .focusRequester(startFocusRequester),
             )
         }
@@ -210,7 +210,7 @@ private fun PartyContent(
     LaunchedEffect(Unit) { contentFocusRequester.requestFocusAfterFrames() }
     Column(modifier = Modifier.fillMaxSize()) {
         CodeSection(code = party.code, connected = party.connected)
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(NuvioTheme.spacing.sidePanel.inner))
         PartyDetailsList(
             party = party,
             playerMediaKey = playerMediaKey,
@@ -252,7 +252,7 @@ private fun PartyDetailsList(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(bottom = NuvioTheme.spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sidePanel.inner),
     ) {
         var lastBehindMs by remember { mutableStateOf(0L) }
         if (behindMs != null) lastBehindMs = behindMs
@@ -261,7 +261,7 @@ private fun PartyDetailsList(
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically(),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)) {
                 Text(
                     text = stringResource(R.string.party_behind_title, formatPlaybackTime(lastBehindMs)),
                     style = MaterialTheme.typography.bodyLarge,
@@ -280,7 +280,7 @@ private fun PartyDetailsList(
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically(),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)) {
                 Text(
                     text = stringResource(R.string.party_now_watching, party.media.displayTitle()),
                     style = MaterialTheme.typography.bodyLarge,
@@ -346,7 +346,7 @@ fun PartyStatusPill(
     ) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(NuvioTheme.radii.full))
                 .background(Color.Black.copy(alpha = 0.6f))
                 .animateContentSize()
                 .padding(start = 6.dp, top = 6.dp, bottom = 6.dp, end = if (message != null) 16.dp else 6.dp),

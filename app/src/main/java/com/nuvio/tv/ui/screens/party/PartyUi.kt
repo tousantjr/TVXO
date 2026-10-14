@@ -151,7 +151,7 @@ private fun PresenceDot(
                     when (state) {
                         PartyPresenceState.Watching, PartyPresenceState.Busy -> Modifier.background(accent)
                         PartyPresenceState.Away -> Modifier.background(NuvioTheme.colors.TextTertiary)
-                        PartyPresenceState.Offline -> Modifier.border(1.5.dp, NuvioTheme.colors.TextTertiary, CircleShape)
+                        PartyPresenceState.Offline -> Modifier.border(NuvioTheme.strokes.thin, NuvioTheme.colors.TextTertiary, CircleShape)
                     },
                 ),
         )
@@ -223,7 +223,7 @@ private fun StackSlot(
                 scaleX = scale.value
                 scaleY = scale.value
             }
-            .border(2.dp, ringColor, CircleShape),
+            .border(NuvioTheme.strokes.medium, ringColor, CircleShape),
     ) {
         content()
     }
@@ -243,7 +243,7 @@ internal fun OpenSeat(
                     color = outline,
                     radius = this.size.minDimension / 2f - 1.dp.toPx(),
                     style = Stroke(
-                        width = 1.5.dp.toPx(),
+                        width = NuvioTheme.strokes.thin.toPx(),
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx())),
                     ),
                 )
@@ -277,7 +277,7 @@ internal fun SeatsHero(
             size = size,
             modifier = Modifier
                 .zIndex(1f)
-                .border(3.dp, ringColor, CircleShape),
+                .border(NuvioTheme.strokes.heavy, ringColor, CircleShape),
         )
     }
 }

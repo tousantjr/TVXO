@@ -68,7 +68,7 @@ internal fun CodeSlots(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
     ) {
         repeat(PARTY_CODE_LENGTH) { index ->
             CodeSlot(
@@ -99,7 +99,7 @@ private fun CodeSlot(
         animationSpec = tween(180),
         label = "codeSlotLine",
     )
-    val lineHeight by animateDpAsState(if (active) 3.dp else 2.dp, tween(180), label = "codeSlotLineHeight")
+    val lineHeight by animateDpAsState(if (active) NuvioTheme.strokes.heavy else NuvioTheme.strokes.medium, tween(180), label = "codeSlotLineHeight")
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -151,7 +151,7 @@ private fun Caret() {
     )
     Box(
         modifier = Modifier
-            .width(2.dp)
+            .width(NuvioTheme.strokes.medium)
             .height(26.dp)
             .alpha(alpha)
             .background(NuvioTheme.colors.Secondary),
@@ -187,14 +187,14 @@ internal fun CodeKeypad(
                 else -> false
             }
         },
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
     ) {
         Column(
             modifier = Modifier.settingsOptionRow(firstKeyFocusRequester),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
         ) {
             PARTY_CODE_ALPHABET.chunked(KEYPAD_COLUMNS).forEachIndexed { rowIndex, row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)) {
                     row.forEachIndexed { columnIndex, character ->
                         KeypadButton(
                             onClick = { onKey(character) },
@@ -216,7 +216,7 @@ internal fun CodeKeypad(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)) {
             KeypadButton(
                 onClick = onDelete,
                 enabled = enabled,
