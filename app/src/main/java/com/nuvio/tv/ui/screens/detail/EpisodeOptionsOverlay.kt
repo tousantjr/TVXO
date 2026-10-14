@@ -74,6 +74,7 @@ import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import com.nuvio.tv.ui.util.toAbsoluteAlignment
 import kotlinx.coroutines.launch
 import java.util.Locale
+import com.nuvio.tv.ui.screens.ambient.AmbientDialogEffect
 
 private data class EpisodeOverlayAction(
     val label: String,
@@ -257,6 +258,7 @@ internal fun EpisodeOptionsOverlay(
             decorFitsSystemWindows = false
         )
     ) {
+        AmbientDialogEffect(onDismiss)
         Box(
             modifier = Modifier
                 .fillMaxSize()
