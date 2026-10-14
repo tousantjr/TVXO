@@ -181,7 +181,7 @@ internal fun MembersSection(
         )
     }
     if (inviting) {
-        InviteDialog(code = party.code, onDismiss = { inviting = false })
+        InviteDialog(code = party.code, link = party.inviteLink, onDismiss = { inviting = false })
     }
 }
 
@@ -435,11 +435,12 @@ private fun ConfirmDialog(
 @Composable
 private fun InviteDialog(
     code: String,
+    link: String,
     onDismiss: () -> Unit,
 ) {
     val closeFocusRequester = remember { FocusRequester() }
-    val qr = remember(code) {
-        runCatching { QrCodeGenerator.generate("nuvio://party/$code", 420, margin = 1) }.getOrNull()
+    val qr = remember(link) {
+        runCatching { QrCodeGenerator.generate(link, 420, margin = 1) }.getOrNull()
     }
     LaunchedEffect(Unit) { closeFocusRequester.requestFocusAfterFrames() }
     NuvioDialog(
