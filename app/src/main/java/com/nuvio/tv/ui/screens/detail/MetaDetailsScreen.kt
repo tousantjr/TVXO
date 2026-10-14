@@ -2316,7 +2316,9 @@ private fun MetaDetailsContent(
 
         // Single scrollable column with hero + content
         CompositionLocalProvider(
-            LocalBringIntoViewSpec provides if (suppressRestoreBringIntoView) {
+            // The hero grows to full height during a trailer; keep the list from
+            // scrolling to follow the focused hero while it resizes.
+            LocalBringIntoViewSpec provides if (suppressRestoreBringIntoView || isTrailerPlaying) {
                 restoreNoScrollBringIntoViewSpec
             } else {
                 detailPageBringIntoViewSpec
