@@ -485,7 +485,8 @@ class StreamScreenViewModel @Inject constructor(
                                 fileIdx = cached.fileIdx,
                                 sources = cached.sources,
                                 contentLanguage = cached.contentLanguage ?: contentLanguage,
-                                audioDelayMs = cached.audioDelayMs
+                                audioDelayMs = cached.audioDelayMs,
+                                audioDelayLanguage = cached.audioDelayLanguage
                             ),
                             showDirectAutoPlayOverlay = showOverlay || it.showDirectAutoPlayOverlay,
                             isDirectAutoPlayFlow = showOverlay || it.isDirectAutoPlayFlow
@@ -1561,7 +1562,8 @@ class StreamScreenViewModel @Inject constructor(
             fileIdx = stream.getEffectiveFileIdx(),
             sources = stream.sources,
             contentLanguage = contentLanguage,
-            audioDelayMs = stream.behaviorHints?.audioDelayMs
+            audioDelayMs = stream.behaviorHints?.audioDelayMs,
+            audioDelayLanguage = stream.behaviorHints?.audioDelayLanguage
         )
         StreamSidecarSubtitles.set(playbackUrlFor(playbackInfo), stream.subtitles)
 
@@ -1579,7 +1581,8 @@ class StreamScreenViewModel @Inject constructor(
                     bingeGroup = playbackInfo.bingeGroup,
                     contentLanguage = contentLanguage,
                     year = year,
-                    audioDelayMs = playbackInfo.audioDelayMs
+                    audioDelayMs = playbackInfo.audioDelayMs,
+                    audioDelayLanguage = playbackInfo.audioDelayLanguage
                 )
             }
         }
@@ -2096,6 +2099,7 @@ data class StreamPlaybackInfo(
     val sources: List<String>? = null,
     val contentLanguage: String? = null,
     val audioDelayMs: Int? = null,
+    val audioDelayLanguage: String? = null,
     val isServerStream: Boolean = false
 )
 
