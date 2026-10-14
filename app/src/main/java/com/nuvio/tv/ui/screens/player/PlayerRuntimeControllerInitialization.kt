@@ -2417,6 +2417,12 @@ private class CueNormalizingTextOutput(
         if (cue.bitmap != null || cue.verticalType != Cue.TYPE_UNSET || cue.line == Cue.DIMEN_UNSET) {
             return cue
         }
+        if (cue.lineType == Cue.LINE_TYPE_FRACTION && cue.line < 0.5f) {
+            return cue
+        }
+        if (cue.lineType == Cue.LINE_TYPE_NUMBER && cue.line >= 0f && cue.line < 5f) {
+            return cue
+        }
         return cue.buildUpon()
             .setLine(Cue.DIMEN_UNSET, Cue.TYPE_UNSET)
             .setLineAnchor(Cue.TYPE_UNSET)
