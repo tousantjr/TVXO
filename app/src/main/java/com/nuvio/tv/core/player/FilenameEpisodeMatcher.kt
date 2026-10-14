@@ -81,7 +81,7 @@ object FilenameEpisodeMatcher {
     }
 
     private val seasonXepisode = object : EpisodePattern {
-        private val regex = Regex("""(\d{1,3})[xX](\d{1,4})""")
+        private val regex = Regex("""(?<!\d)(\d{1,2})[xX](\d{1,4})""")
 
         override fun replace(
             filename: String,
@@ -138,7 +138,7 @@ object FilenameEpisodeMatcher {
             return season to episode
         }
         // 01x03 pattern
-        Regex("""(\d{1,3})[xX](\d{1,4})""").find(filename)?.let { match ->
+        Regex("""(?<!\d)(\d{1,2})[xX](\d{1,4})""").find(filename)?.let { match ->
             val season = match.groupValues[1].toIntOrNull()
             val episode = match.groupValues[2].toIntOrNull() ?: return null
             return season to episode
