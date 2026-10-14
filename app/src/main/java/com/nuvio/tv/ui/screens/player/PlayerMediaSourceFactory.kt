@@ -177,9 +177,6 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         )
         val isHls = resolvedMimeType == MimeTypes.APPLICATION_M3U8
         val isDash = resolvedMimeType == MimeTypes.APPLICATION_MPD
-        // HLS/DASH only need HTTP. DefaultDataSource is for local/file fallback and is the
-        // progressive path. Using the pure OkHttp factory matches Mobile and keeps
-        // proxyHeaders (Referer/Origin) on every playlist and segment request.
         val httpDataSourceFactory = if (isHls || isDash) {
             PlayerPlaybackNetworking.createHttpDataSourceFactory(
                 sanitizedHeaders,
