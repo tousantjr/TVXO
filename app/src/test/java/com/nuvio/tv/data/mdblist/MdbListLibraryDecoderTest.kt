@@ -101,6 +101,28 @@ class MdbListLibraryDecoderTest {
     }
 
     @Test
+    fun `liked lists skip the account's own lists and page by offset`() = runTest {
+        val page = decodeMdbListLikedLists("""{"lists":[
+          {"id":79776,"user_id":41631,"user_name":"dinkysniff","name":"Best New Shows","description":"Rated over 60",
+           "mediatype":"show","type":"static","dynamic":false,"last_updated_at":"2026-10-14T00:00:00Z","liked_at":"2026-10-14T10:00:00Z"},
+          {"id":5,"user_id":42,"name":"Mine"},
+          {"id":6,"user_id":43,"name":"Episodes","mediatype":"episode"}
+        ],"pagination":{"page":1,"limit":3,"offset":0,"total":5,"has_more":true}}""", 42)
+        assertEquals(listOf(MdbListLikedList(79776, "Best New Shows", "Rated over 60", MdbListItemType.SHOW, "2026-10-14T00:00:00Z")),
+            page.items)
+        assertEquals(3, page.nextOffset)
+        val tab = page.items.single().tab()
+        assertEquals("mdblist:liked:79776", tab.key)
+        assertEquals(LibraryListTab.Type.EXTERNAL, tab.type)
+        assertEquals(setOf("series"), tab.supportedContentTypes)
+        assertFalse(tab.isMembershipDestination)
+        assertEquals("/lists/79776/items", mdbListLibraryItemsPath(tab.key))
+        for (body in listOf("[]", """{"pagination":{}}""", """{"lists":[{"user_id":43,"name":"Missing ID"}]}""")) {
+            expectMdbListFailure<MdbListDecodingException> { decodeMdbListLikedLists(body, 42) }
+        }
+    }
+
+    @Test
     fun `external lists decode their source and update time`() {
         val lists = decodeMdbListExternalLists("""[{"id":168202,"user_id":261168,"name":"IMDb Watchlist",
           "updated":"2026-09-29T12:32:29.000Z","items":1115,"source":"imdbwatchlist","private":false}]""")
