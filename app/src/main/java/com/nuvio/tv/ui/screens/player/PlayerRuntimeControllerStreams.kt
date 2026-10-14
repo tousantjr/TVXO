@@ -676,9 +676,9 @@ private fun PlayerRuntimeController.persistBingeGroup(bingeGroup: String?) {
 /**
  * Moves the stream metadata onto the release an addon redirected playback to.
  *
- * Usenet addons such as StreamNZB fail over by redirecting the player to the next release they
- * listed, and the player follows that silently, so without this the stream info, the filename
- * hints and the saved link keep describing the release that never opened. The target is looked up
+ * Some addons fail over by redirecting the player to the next stream they listed, and the player
+ * follows that silently, so without this the stream info, the filename hints and the saved link
+ * keep describing the stream that never opened. The target is looked up
  * only among streams already in memory: a search started here would compete with playback.
  */
 internal fun PlayerRuntimeController.handleStreamRedirect(requestedUrl: String, resolvedUrl: String) {

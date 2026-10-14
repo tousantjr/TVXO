@@ -61,12 +61,11 @@ internal class RedirectReportingDataSource(
 /**
  * Finds the listed stream a redirect landed on.
  *
- * Usenet addons such as StreamNZB answer a release that will not open by redirecting the player to
- * the next release in the same list, so the stream the player was launched with no longer describes
- * what plays. A redirect only identifies a stream when its target is another url the same addon
- * listed: a debrid link redirecting to its CDN lands on nothing listed and is left alone. StreamNZB
- * carries the requested url's query across the hop, so a target may also be a listed url plus that
- * query.
+ * Some addons answer a stream that will not open by redirecting the player to the next stream in
+ * the same list, so the stream the player was launched with no longer describes what plays. A
+ * redirect only identifies a stream when its target is another url the same addon listed: a debrid
+ * link redirecting to its CDN lands on nothing listed and is left alone. An addon may carry the
+ * requested url's query across the hop, so a target may also be a listed url plus that query.
  */
 internal fun findRedirectTargetStream(
     streams: List<Stream>,
