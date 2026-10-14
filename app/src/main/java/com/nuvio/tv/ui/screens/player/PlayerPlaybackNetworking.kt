@@ -106,10 +106,6 @@ internal object PlayerPlaybackNetworking {
         if (useLongReadTimeout) {
             builder.readTimeout(LOOPBACK_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         }
-        // Re-apply addon proxyHeaders on every hop (playlist host -> CDN segment host).
-        // OkHttp already re-attaches Authorization across hosts below; Referer/Origin/UA
-        // must also survive for HLS CDNs that reject segment requests without them
-        // (HTTP 403 on Android TV ExoPlayer while the same stream works on Mobile).
         val proxyHeaders = defaultHeaders.filterKeys { key ->
             !key.equals("Range", ignoreCase = true)
         }
@@ -133,7 +129,6 @@ internal object PlayerPlaybackNetworking {
         defaultHeaders: Map<String, String> = emptyMap(),
         useLongReadTimeout: Boolean = false
     ): DataSource.Factory {
-        // Drop empty / Range keys so OkHttp + Media3 do not send a broken Range on every segment.
         val requestHeaders = defaultHeaders.mapNotNull { (rawKey, rawValue) ->
             val key = rawKey.trim()
             val value = rawValue.trim()
