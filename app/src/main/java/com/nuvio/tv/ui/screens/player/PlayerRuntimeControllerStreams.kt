@@ -665,15 +665,14 @@ private fun PlayerRuntimeController.applyStreamMetadata(stream: Stream) {
     currentVideoWidth = null
     currentVideoHeight = null
     currentVideoBitrate = null
-    persistBingeGroup(stream.behaviorHints?.bingeGroup)
+    persistBingeGroup(stream.behaviorHints?.bingeGroup, stream.behaviorHints?.filename)
 }
 
 // Persist binge group per content so subsequent episode plays
 // (from CW, Details, or next-episode) can reuse the same source group.
-private fun PlayerRuntimeController.persistBingeGroup(bingeGroup: String?) {
+private fun PlayerRuntimeController.persistBingeGroup(bingeGroup: String?, filename: String? = null) {
     val cid = contentId
     if (cid != null) {
-        val filename = currentFilename
         scope.launch(kotlinx.coroutines.NonCancellable) {
             bingeGroupCacheDataStore.replace(cid, bingeGroup, filename)
         }
