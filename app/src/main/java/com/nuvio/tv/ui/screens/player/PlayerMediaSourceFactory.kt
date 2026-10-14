@@ -69,6 +69,9 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
     @Volatile private var currentVodCacheResolvedUrl: String? = null
     @Volatile private var currentVodCacheActive: Boolean = false
 
+    // Called on a loader thread with the url a progressive stream opened at after a redirect.
+    @Volatile var onStreamRedirected: ((requestedUrl: String, resolvedUrl: String) -> Unit)? = null
+
     // Takes the caller's context because this factory only holds the application one, which ignores the in-app language.
     fun vodCacheStateLabel(context: Context): String = when {
         currentVodCacheActive ->
@@ -214,7 +217,7 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         )
         val useChunkSessionSource = useParallelConnections && !isHls && !isDash
         parallelStartupPrefetchUnlocked.set(!useChunkSessionSource)
-        val progressiveUpstreamFactory: DataSource.Factory = if (useChunkSessionSource) {
+        val networkProgressiveFactory: DataSource.Factory = if (useChunkSessionSource) {
             val sessionConnections = parallelConnectionCount
             val okHttpFactory = OkHttpDataSource.Factory(playbackHttpClient).apply {
                 setDefaultRequestProperties(sanitizedHeaders)
@@ -244,6 +247,10 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         } else {
             httpDataSourceFactory
         }
+        val progressiveUpstreamFactory: DataSource.Factory =
+            RedirectReportingDataSource.Factory(networkProgressiveFactory, url) { resolvedUrl ->
+                onStreamRedirected?.invoke(url, resolvedUrl)
+            }
 
         // 2. VOD disk cache (opt-in).
         val useVodCache = ENABLE_VOD_CACHE && vodCacheEnabled && !isHls && !isDash && shouldUseVodCache(url)
