@@ -1,6 +1,5 @@
 package com.nuvio.tv.ui.screens.player
 
-import android.os.SystemClock
 import android.util.Log
 import androidx.media3.exoplayer.SeekParameters
 import com.nuvio.tv.data.local.InternalPlayerEngine
@@ -11,13 +10,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 private const val MPV_RESUME_SEEK_TOLERANCE_MS = 1500L
-internal const val MPV_TRACK_REFRESH_FALLBACK_MS = 5_000L
-
-internal fun shouldRefreshMpvTracks(
-    generation: Long,
-    refreshedGeneration: Long,
-    sinceLastRefreshMs: Long
-): Boolean = generation != refreshedGeneration || sinceLastRefreshMs >= MPV_TRACK_REFRESH_FALLBACK_MS
 
 internal fun PlayerRuntimeController.attachMpvView(view: NuvioMpvSurfaceView?) {
     if (mpvView === view) return
@@ -300,20 +292,18 @@ internal fun PlayerRuntimeController.resumeForLifecycle() {
     }
 }
 
+/** Makes the next progress tick re-read the mpv track list. Safe to call from any thread. */
+internal fun PlayerRuntimeController.markMpvTracksStale() {
+    mpvTrackRefreshGate.markStale()
+}
+
 /**
  * Progress-tick variant: reading the track list costs about a dozen synchronous mpv property
- * reads per track on the main thread, so the tick only re-reads it after mpv reports a
- * track-list change, with a slow fallback refresh as a safety net.
+ * reads per track on the main thread, so the tick only re-reads it once something marked it
+ * stale, the same way the ExoPlayer path only reads tracks from onTracksChanged.
  */
-internal fun PlayerRuntimeController.updateMpvAvailableTracksIfChanged() {
-    if (!shouldRefreshMpvTracks(
-            generation = mpvTrackListGeneration.get(),
-            refreshedGeneration = mpvTrackListRefreshedGeneration,
-            sinceLastRefreshMs = SystemClock.elapsedRealtime() - mpvTrackListRefreshedAtMs
-        )
-    ) {
-        return
-    }
+internal fun PlayerRuntimeController.updateMpvAvailableTracksIfStale() {
+    if (!mpvTrackRefreshGate.isStale) return
     updateMpvAvailableTracks()
 }
 
@@ -322,9 +312,7 @@ internal fun PlayerRuntimeController.updateMpvAvailableTracks() {
     if (mpvTrackRefreshInProgress) return
     val view = mpvView ?: return
     val streamUrlAtRefresh = currentStreamUrl
-    // Read before the snapshot so a change that lands mid-read triggers another refresh.
-    mpvTrackListRefreshedGeneration = mpvTrackListGeneration.get()
-    mpvTrackListRefreshedAtMs = SystemClock.elapsedRealtime()
+    mpvTrackRefreshGate.onRefreshStarted()
     mpvTrackRefreshInProgress = true
     mpvTrackRefreshJob = scope.launch {
         try {

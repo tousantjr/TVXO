@@ -101,7 +101,7 @@ internal class MpvEventRelay(
     override fun eventProperty(property: String) {
         if (property != MPV_TRACK_LIST_PROPERTY) return
         if (!active.get() || epoch != controller.mpvEventRelayEpoch) return
-        controller.mpvTrackListGeneration.incrementAndGet()
+        controller.markMpvTracksStale()
     }
 
     override fun eventProperty(property: String, value: Long) = Unit
@@ -120,7 +120,7 @@ internal fun PlayerRuntimeController.registerMpvEventRelay(view: NuvioMpvSurface
     mpvLastFileError = null
     resetMpvStartupWatchdog()
     // Changes that happened before the relay was attached are not replayed.
-    mpvTrackListGeneration.incrementAndGet()
+    markMpvTracksStale()
     val relay = MpvEventRelay(this, mpvEventRelayEpoch)
     mpvEventRelay = relay
     runCatching { view.mpv.addObserver(relay) }
