@@ -143,8 +143,8 @@ object FilenameEpisodeMatcher {
             val episode = match.groupValues[2].toIntOrNull() ?: return null
             return season to episode
         }
-        // E03, EP03 pattern (no season)
-        Regex("""(?i)\bE[Pp]?\s?(\d{1,4})\b""").find(filename)?.let { match ->
+        // E03, EP03, EP.03 pattern (no season)
+        Regex("""(?i)\bE[Pp]?[.\s]?(\d{1,4})\b""").find(filename)?.let { match ->
             val episode = match.groupValues[1].toIntOrNull() ?: return null
             return null to episode
         }
