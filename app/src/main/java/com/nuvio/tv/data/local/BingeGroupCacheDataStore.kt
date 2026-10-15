@@ -29,6 +29,7 @@ class BingeGroupCacheDataStore @Inject constructor(
 
     private fun prefKey(contentId: String) = stringPreferencesKey("bg_$contentId")
     private fun filenamePrefKey(contentId: String) = stringPreferencesKey("bg_fn_$contentId")
+    private fun infoHashPrefKey(contentId: String) = stringPreferencesKey("bg_ih_$contentId")
 
     suspend fun save(contentId: String, bingeGroup: String) {
         store().edit { prefs ->
@@ -36,7 +37,7 @@ class BingeGroupCacheDataStore @Inject constructor(
         }
     }
 
-    suspend fun replace(contentId: String, bingeGroup: String?, filename: String? = null) {
+    suspend fun replace(contentId: String, bingeGroup: String?, filename: String? = null, infoHash: String? = null) {
         store().edit { prefs ->
             val value = bingeGroup?.takeIf { it.isNotBlank() }
             if (value == null) {
@@ -50,6 +51,12 @@ class BingeGroupCacheDataStore @Inject constructor(
             } else {
                 prefs[filenamePrefKey(contentId)] = fn
             }
+            val ih = infoHash?.takeIf { it.isNotBlank() }
+            if (ih == null) {
+                prefs.remove(infoHashPrefKey(contentId))
+            } else {
+                prefs[infoHashPrefKey(contentId)] = ih
+            }
         }
     }
 
@@ -59,6 +66,10 @@ class BingeGroupCacheDataStore @Inject constructor(
 
     suspend fun getFilename(contentId: String): String? {
         return store().data.first()[filenamePrefKey(contentId)]
+    }
+
+    suspend fun getInfoHash(contentId: String): String? {
+        return store().data.first()[infoHashPrefKey(contentId)]
     }
 
     suspend fun remove(contentId: String) {

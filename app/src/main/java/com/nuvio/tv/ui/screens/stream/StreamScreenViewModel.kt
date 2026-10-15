@@ -490,6 +490,9 @@ class StreamScreenViewModel @Inject constructor(
             val persistedFilename = if (persistedBingeGroup != null) {
                 contentId?.let { bingeGroupCacheDataStore.getFilename(it) }
             } else null
+            val persistedInfoHash = if (persistedBingeGroup != null) {
+                contentId?.let { bingeGroupCacheDataStore.getInfoHash(it) }
+            } else null
 
             fun applySuccess(addonStreamGroups: List<AddonStreams>, isAllLoaded: Boolean) {
                 val orderedAddonStreams = StreamAutoPlaySelector.orderAddonStreams(
@@ -553,8 +556,16 @@ class StreamScreenViewModel @Inject constructor(
                                 )
                         }
                     } else null
+                    // Try binge group + infoHash when filename match failed or was unavailable
+                    val bingeAndInfoHash = if (bingeAndFilename == null && persistedInfoHash != null) {
+                        allStreams.firstOrNull { stream ->
+                            !stream.isExternal() &&
+                                stream.behaviorHints?.bingeGroup == persistedBingeGroup &&
+                                stream.infoHash?.equals(persistedInfoHash, ignoreCase = true) == true
+                        }
+                    } else null
                     // Fall back to binge group alone
-                    bingeAndFilename ?: StreamAutoPlaySelector.selectAutoPlayStream(
+                    bingeAndFilename ?: bingeAndInfoHash ?: StreamAutoPlaySelector.selectAutoPlayStream(
                         streams = allStreams,
                         mode = playerSettings.streamAutoPlayMode,
                         regexPattern = playerSettings.streamAutoPlayRegex,
@@ -1549,15 +1560,16 @@ class StreamScreenViewModel @Inject constructor(
 
     private suspend fun persistBingeGroupForPlayback(playbackInfo: StreamPlaybackInfo) {
         val cid = playbackInfo.contentId?.takeIf { it.isNotBlank() } ?: return
-        bingeGroupCacheDataStore.replace(cid, playbackInfo.bingeGroup, playbackInfo.filename)
+        bingeGroupCacheDataStore.replace(cid, playbackInfo.bingeGroup, playbackInfo.filename, playbackInfo.infoHash)
     }
 
     fun persistBingeGroupForStream(stream: Stream) {
         val cid = contentId?.takeIf { it.isNotBlank() } ?: return
         val bg = stream.behaviorHints?.bingeGroup
         val fn = stream.behaviorHints?.filename
+        val ih = stream.infoHash
         viewModelScope.launch {
-            bingeGroupCacheDataStore.replace(cid, bg, fn)
+            bingeGroupCacheDataStore.replace(cid, bg, fn, ih)
         }
     }
 

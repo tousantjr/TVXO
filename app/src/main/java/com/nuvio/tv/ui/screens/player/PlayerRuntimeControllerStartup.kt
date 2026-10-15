@@ -22,7 +22,8 @@ internal fun PlayerRuntimeController.startInitialPlaybackIfNeeded() {
     if (cid != null && bg != null) {
         scope.launch(kotlinx.coroutines.NonCancellable) {
             val existingFilename = bingeGroupCacheDataStore.getFilename(cid)
-            bingeGroupCacheDataStore.replace(cid, bg, existingFilename)
+            val existingInfoHash = bingeGroupCacheDataStore.getInfoHash(cid)
+            bingeGroupCacheDataStore.replace(cid, bg, existingFilename, existingInfoHash)
         }
     }
 
