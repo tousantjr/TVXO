@@ -298,13 +298,33 @@ internal fun PlayerRuntimeController.markMpvTracksStale() {
 }
 
 /**
- * Progress-tick variant: reading the track list costs about a dozen synchronous mpv property
- * reads per track on the main thread, so the tick only re-reads it once something marked it
- * stale, the same way the ExoPlayer path only reads tracks from onTracksChanged.
+ * Progress-tick entry point. Reading the track list costs about a dozen synchronous mpv property
+ * reads per track on the main thread, so the tick only re-reads it after mpv reports a
+ * track-list change. The track decisions still run on every tick, on the tracks already known:
+ * some of them wait on things that are not track-list changes, such as the first frame or
+ * add-on subtitles arriving one add-on at a time.
  */
-internal fun PlayerRuntimeController.updateMpvAvailableTracksIfStale() {
-    if (!mpvTrackRefreshGate.isStale) return
-    updateMpvAvailableTracks()
+internal fun PlayerRuntimeController.updateMpvTracksOnTick() {
+    if (mpvTrackRefreshGate.isStale) {
+        updateMpvAvailableTracks()
+        return
+    }
+    if (!isUsingMpvEngine() || mpvTrackRefreshInProgress || mpvView == null) return
+    val state = _uiState.value
+    markMpvTextTracksScannedIfReady(hasInternalSubtitleTracks = state.subtitleTracks.isNotEmpty())
+    maybeRestorePendingAudioSelectionAfterSubtitleRefresh(state.audioTracks)
+    applyPersistedTrackPreference(
+        audioTracks = state.audioTracks,
+        subtitleTracks = state.subtitleTracks
+    )
+    tryAutoSelectPreferredSubtitleFromAvailableTracks()
+}
+
+/** A file without embedded subtitles only counts as text-scanned once the first frame is up. */
+private fun PlayerRuntimeController.markMpvTextTracksScannedIfReady(hasInternalSubtitleTracks: Boolean) {
+    if (hasInternalSubtitleTracks || hasRenderedFirstFrame) {
+        hasScannedTextTracksOnce = true
+    }
 }
 
 internal fun PlayerRuntimeController.updateMpvAvailableTracks() {
@@ -388,9 +408,7 @@ private fun PlayerRuntimeController.applyMpvTrackSnapshot(snapshot: MpvTrackSnap
             "mappedInternalSubtitleCount=${internalSubtitleTracks.size}"
     )
 
-    if (internalSubtitleTracks.isNotEmpty() || hasRenderedFirstFrame) {
-        hasScannedTextTracksOnce = true
-    }
+    markMpvTextTracksScannedIfReady(hasInternalSubtitleTracks = internalSubtitleTracks.isNotEmpty())
     maybeRestorePendingAudioSelectionAfterSubtitleRefresh(audioTracks)
 
     _uiState.update { state ->
