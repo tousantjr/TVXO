@@ -48,6 +48,11 @@ internal object PlayerSubtitleUtils {
             return "ms"
         }
 
+        if (containsAny("hbs")) {
+            val tokenizedNoHBS = tokenized.replace("hbs","").trim()
+            LANGUAGE_OVERRIDES[tokenizedNoHBS]?.lowercase()?.let { return it }
+        }
+
         resolveLanguageNameAlias(tokenized)?.let { return it }
 
         // LANGUAGE_OVERRIDES uses pt-BR (mixed case) — normalize to lowercase for consistency
