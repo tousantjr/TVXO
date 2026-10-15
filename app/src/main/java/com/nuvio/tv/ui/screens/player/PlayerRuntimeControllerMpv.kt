@@ -1,5 +1,6 @@
 package com.nuvio.tv.ui.screens.player
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.media3.exoplayer.SeekParameters
 import com.nuvio.tv.data.local.InternalPlayerEngine
@@ -10,6 +11,13 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 private const val MPV_RESUME_SEEK_TOLERANCE_MS = 1500L
+internal const val MPV_TRACK_REFRESH_FALLBACK_MS = 5_000L
+
+internal fun shouldRefreshMpvTracks(
+    generation: Long,
+    refreshedGeneration: Long,
+    sinceLastRefreshMs: Long
+): Boolean = generation != refreshedGeneration || sinceLastRefreshMs >= MPV_TRACK_REFRESH_FALLBACK_MS
 
 internal fun PlayerRuntimeController.attachMpvView(view: NuvioMpvSurfaceView?) {
     if (mpvView === view) return
@@ -292,11 +300,31 @@ internal fun PlayerRuntimeController.resumeForLifecycle() {
     }
 }
 
+/**
+ * Progress-tick variant: reading the track list costs about a dozen synchronous mpv property
+ * reads per track on the main thread, so the tick only re-reads it after mpv reports a
+ * track-list change, with a slow fallback refresh as a safety net.
+ */
+internal fun PlayerRuntimeController.updateMpvAvailableTracksIfChanged() {
+    if (!shouldRefreshMpvTracks(
+            generation = mpvTrackListGeneration.get(),
+            refreshedGeneration = mpvTrackListRefreshedGeneration,
+            sinceLastRefreshMs = SystemClock.elapsedRealtime() - mpvTrackListRefreshedAtMs
+        )
+    ) {
+        return
+    }
+    updateMpvAvailableTracks()
+}
+
 internal fun PlayerRuntimeController.updateMpvAvailableTracks() {
     if (!isUsingMpvEngine()) return
     if (mpvTrackRefreshInProgress) return
     val view = mpvView ?: return
     val streamUrlAtRefresh = currentStreamUrl
+    // Read before the snapshot so a change that lands mid-read triggers another refresh.
+    mpvTrackListRefreshedGeneration = mpvTrackListGeneration.get()
+    mpvTrackListRefreshedAtMs = SystemClock.elapsedRealtime()
     mpvTrackRefreshInProgress = true
     mpvTrackRefreshJob = scope.launch {
         try {

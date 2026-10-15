@@ -594,6 +594,9 @@ class PlayerRuntimeController(
     internal var mpvMediaLoadPrepared: Boolean = false
     internal var mpvTrackRefreshJob: Job? = null
     internal var mpvTrackRefreshInProgress: Boolean = false
+    internal val mpvTrackListGeneration = AtomicLong(0L)
+    internal var mpvTrackListRefreshedGeneration: Long = -1L
+    internal var mpvTrackListRefreshedAtMs: Long = 0L
     internal var pendingMpvHardRestartOnNextAttach: Boolean = false
     internal var mpvEventRelay: MpvEventRelay? = null
     internal var mpvEventRelayEpoch: Long = 0
