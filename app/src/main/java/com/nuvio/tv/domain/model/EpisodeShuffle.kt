@@ -48,7 +48,8 @@ class EpisodeShuffle @Inject constructor() {
         picker.inheritHistoryFrom(session.picker)
         if (current != null && (session.picker == null || session.current != current)) picker.recordPlayed(current)
         session.picker = picker
-        if (session.current != current || session.visit != visit) session.selected = null
+        val newerVisit = visit > session.visit
+        if (session.current != current || newerVisit) session.selected = null
         session.current = current
         session.visit = visit
         session.selected = session.selected?.let { picker.find(it.id, includeWatched, current) }
