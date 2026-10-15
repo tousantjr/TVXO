@@ -1552,6 +1552,15 @@ class StreamScreenViewModel @Inject constructor(
         bingeGroupCacheDataStore.replace(cid, playbackInfo.bingeGroup, playbackInfo.filename)
     }
 
+    fun persistBingeGroupForStream(stream: Stream) {
+        val cid = contentId?.takeIf { it.isNotBlank() } ?: return
+        val bg = stream.behaviorHints?.bingeGroup
+        val fn = stream.behaviorHints?.filename
+        viewModelScope.launch {
+            bingeGroupCacheDataStore.replace(cid, bg, fn)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         if (isTorrentStreamStarted) {
