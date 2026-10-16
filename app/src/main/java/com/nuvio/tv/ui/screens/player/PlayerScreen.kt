@@ -1726,12 +1726,12 @@ fun PlayerScreen(
                 PartyPanel(
                     state = partyState,
                     profile = partyProfile,
-                    playerMediaKey = viewModel.partyKey,
+                    playerMedia = viewModel.partyMedia,
                     isSupported = partyAvailable,
                     canStart = partyCanUse,
                     canShareStream = viewModel.currentPartyStream() != null,
                     onStart = { viewModel.startParty() },
-                    onPlayForEveryone = { viewModel.playForParty() },
+                    onSwitchParty = { viewModel.switchParty() },
                     onWatchWithParty = {
                         partyState.party?.media?.let { media ->
                             viewModel.onEvent(PlayerEvent.OnDismissPartyPanel)

@@ -47,6 +47,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.R
 import com.nuvio.tv.core.party.ActiveParty
+import com.nuvio.tv.core.party.PartyMedia
 import com.nuvio.tv.core.party.PartyMember
 import com.nuvio.tv.core.party.PartyProfile
 import com.nuvio.tv.core.party.PartyUiState
@@ -59,12 +60,12 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 fun PartyPanel(
     state: PartyUiState,
     profile: PartyProfile,
-    playerMediaKey: String,
+    playerMedia: PartyMedia,
     isSupported: Boolean,
     canStart: Boolean,
     canShareStream: Boolean,
     onStart: () -> Unit,
-    onPlayForEveryone: () -> Unit,
+    onSwitchParty: () -> Unit,
     onWatchWithParty: () -> Unit,
     onLeave: () -> Unit,
     onEnd: () -> Unit,
@@ -119,11 +120,11 @@ fun PartyPanel(
                 } else {
                     PartyContent(
                         party = party,
-                        playerMediaKey = playerMediaKey,
+                        playerMedia = playerMedia,
                         canShareStream = canShareStream,
                         behindMs = behindMs,
                         onCatchUp = onCatchUp,
-                        onPlayForEveryone = onPlayForEveryone,
+                        onSwitchParty = onSwitchParty,
                         onWatchWithParty = onWatchWithParty,
                         onLeave = onLeave,
                         onEnd = onEnd,
@@ -195,11 +196,11 @@ private fun StartContent(
 @Composable
 private fun PartyContent(
     party: ActiveParty,
-    playerMediaKey: String,
+    playerMedia: PartyMedia,
     canShareStream: Boolean,
     behindMs: Long?,
     onCatchUp: () -> Unit,
-    onPlayForEveryone: () -> Unit,
+    onSwitchParty: () -> Unit,
     onWatchWithParty: () -> Unit,
     onLeave: () -> Unit,
     onEnd: () -> Unit,
@@ -214,11 +215,11 @@ private fun PartyContent(
         Spacer(modifier = Modifier.height(NuvioTheme.spacing.sidePanel.inner))
         PartyDetailsList(
             party = party,
-            playerMediaKey = playerMediaKey,
+            playerMedia = playerMedia,
             canShareStream = canShareStream,
             behindMs = behindMs,
             onCatchUp = onCatchUp,
-            onPlayForEveryone = onPlayForEveryone,
+            onSwitchParty = onSwitchParty,
             onWatchWithParty = onWatchWithParty,
             onLeave = onLeave,
             onEnd = onEnd,
@@ -235,11 +236,11 @@ private fun PartyContent(
 @Composable
 private fun PartyDetailsList(
     party: ActiveParty,
-    playerMediaKey: String,
+    playerMedia: PartyMedia,
     canShareStream: Boolean,
     behindMs: Long?,
     onCatchUp: () -> Unit,
-    onPlayForEveryone: () -> Unit,
+    onSwitchParty: () -> Unit,
     onWatchWithParty: () -> Unit,
     onLeave: () -> Unit,
     onEnd: () -> Unit,
@@ -248,6 +249,7 @@ private fun PartyDetailsList(
     onSharingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var confirmSwitch by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -277,7 +279,7 @@ private fun PartyDetailsList(
             }
         }
         AnimatedVisibility(
-            visible = playerMediaKey != party.media.key,
+            visible = playerMedia.key != party.media.key,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically(),
         ) {
@@ -293,10 +295,10 @@ private fun PartyDetailsList(
                     isPrimary = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (party.canControl) {
+                if (party.isHost) {
                     DialogButton(
-                        text = stringResource(R.string.party_play_for_everyone),
-                        onClick = onPlayForEveryone,
+                        text = stringResource(R.string.party_switch, playerMedia.displayTitle()),
+                        onClick = { confirmSwitch = true },
                         isPrimary = false,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -328,6 +330,18 @@ private fun PartyDetailsList(
             party = party,
             onLeave = onLeave,
             onEnd = onEnd,
+        )
+    }
+    if (confirmSwitch) {
+        ConfirmDialog(
+            title = stringResource(R.string.party_switch_title),
+            message = stringResource(R.string.party_switch_message, playerMedia.displayTitle()),
+            confirmLabel = stringResource(R.string.party_switch_confirm),
+            onConfirm = {
+                confirmSwitch = false
+                onSwitchParty()
+            },
+            onDismiss = { confirmSwitch = false },
         )
     }
 }

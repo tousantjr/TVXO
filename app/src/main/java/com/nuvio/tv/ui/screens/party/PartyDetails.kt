@@ -402,7 +402,7 @@ internal fun PartyActions(
 }
 
 @Composable
-private fun ConfirmDialog(
+internal fun ConfirmDialog(
     title: String,
     message: String,
     confirmLabel: String,

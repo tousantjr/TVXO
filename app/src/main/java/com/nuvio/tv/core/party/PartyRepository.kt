@@ -215,7 +215,7 @@ class PartyRepository @Inject constructor(
     fun publishMedia(media: PartyMedia, positionMs: Long) {
         scope.launch {
             val party = _state.value.party ?: return@launch
-            if (media == party.media || !party.canControl) return@launch
+            if (media == party.media || !party.isHost) return@launch
             val sameContent = media.key == party.media.key
             updateParty { it.copy(media = media) }
             val next = if (sameContent) {
