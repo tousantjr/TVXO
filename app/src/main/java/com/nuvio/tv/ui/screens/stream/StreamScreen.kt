@@ -748,7 +748,7 @@ private fun RightStreamSection(
     var enter by remember { mutableStateOf(false) }
     var firstStreamFocusRequestId by remember { mutableStateOf(0) }
     var listHasFocus by remember { mutableStateOf(false) }
-    var firstCardHasFocusInList by remember { mutableStateOf(false) }
+    var focusedStreamKeyInList by remember { mutableStateOf<String?>(null) }
     var userMovedFromFirstResult by remember { mutableStateOf(shouldRestoreFocusedStream) }
     var firstResultFocusAssigned by remember { mutableStateOf(shouldRestoreFocusedStream) }
     val scope = rememberCoroutineScope()
@@ -809,9 +809,11 @@ private fun RightStreamSection(
             trackedFirstStreamKey = firstStreamKey
             return@LaunchedEffect
         }
+        val focusWasOnFirst = trackedFirstStreamKey != null &&
+            focusedStreamKeyInList == trackedFirstStreamKey
         if (firstStreamKey != null && trackedFirstStreamKey != null &&
             firstStreamKey != trackedFirstStreamKey &&
-            listHasFocus && firstCardHasFocusInList
+            listHasFocus && focusWasOnFirst
         ) {
             firstStreamFocusRequestId += 1
         }
@@ -927,7 +929,7 @@ private fun RightStreamSection(
                             onUserNavigatedFromFirstResult = {
                                 userMovedFromFirstResult = true
                             },
-                            onFirstCardFocusChanged = { firstCardHasFocusInList = it },
+                            onFocusedStreamKeyChanged = { focusedStreamKeyInList = it },
                             onFocusChanged = { listHasFocus = it },
                             onExpandStreams = onExpandStreams
                         )
@@ -1044,7 +1046,7 @@ private fun StreamsList(
     orderedAddonNames: List<String> = emptyList(),
     onRequestChipFocus: (Int) -> Unit = {},
     onUserNavigatedFromFirstResult: () -> Unit = {},
-    onFirstCardFocusChanged: (Boolean) -> Unit = {},
+    onFocusedStreamKeyChanged: (String?) -> Unit = {},
     onFocusChanged: (Boolean) -> Unit = {},
     onExpandStreams: () -> Unit = {}
 ) {
@@ -1067,7 +1069,7 @@ private fun StreamsList(
         val validKeys = streamKeys.toHashSet()
         streamFocusRequesters.keys.retainAll(validKeys)
     }
-    var firstCardHasFocus by remember { mutableStateOf(false) }
+    var firstCardHasFocus by remember(firstStreamKey) { mutableStateOf(false) }
 
     var focusedStreamKey by remember { mutableStateOf<String?>(null) }
     val prevStreamKeysRef = remember { mutableStateOf(streamKeys) }
@@ -1199,10 +1201,10 @@ private fun StreamsList(
                     onFocusChanged = { focused ->
                         if (focused) {
                             focusedStreamKey = streamKeys.getOrNull(index)
+                            onFocusedStreamKeyChanged(focusedStreamKey)
                         }
                         if (index == 0) {
                             firstCardHasFocus = focused
-                            onFirstCardFocusChanged(focused)
                         }
                     },
                     onUpKey = if (index == 0) {{
