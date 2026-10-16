@@ -864,8 +864,8 @@ class TraktProgressService @Inject constructor(
             "removeProgress start contentId=$contentId season=$season episode=$episode"
         )
         applyOptimisticRemoval(contentId, season, episode)
-        val playbackMovies = getPlayback("movies", force = true)
-        val playbackEpisodes = getPlayback("episodes", force = true)
+        val playbackMovies = getPlayback("movies", force = true).orEmpty()
+        val playbackEpisodes = getPlayback("episodes", force = true).orEmpty()
 
         val target = contentId.trim()
         playbackMovies
@@ -1113,10 +1113,10 @@ class TraktProgressService @Inject constructor(
             }
 
             if (snapshot == null) {
-                if (!hasLoadedRemoteProgress.value) {
-                    throw IOException("Progress snapshot fetch failed before initial load")
-                }
-                return@supervisorScope
+                // Keep the current snapshot, and let the next poll retry instead of
+                // treating this activity change as already fetched.
+                lastKnownActivityFingerprint = null
+                throw IOException("Progress snapshot fetch failed")
             }
 
             // Guard: if the profile switched mid-refresh, discard stale data.
@@ -1298,7 +1298,8 @@ class TraktProgressService @Inject constructor(
                 return
             }
         }
-        val ids = fetchHiddenProgressShowIds()
+        // Keep the previous set on failure; the next refresh retries.
+        val ids = fetchHiddenProgressShowIds() ?: return
         hiddenProgressShowsMutex.withLock {
             hiddenProgressShowIds.value = ids
             hiddenProgressShowsLoadedAtMs = System.currentTimeMillis()
@@ -1306,7 +1307,7 @@ class TraktProgressService @Inject constructor(
         trace("hidden-progress-shows refreshed: ${ids.size} shows")
     }
 
-    private suspend fun fetchHiddenProgressShowIds(): Set<String> {
+    private suspend fun fetchHiddenProgressShowIds(): Set<String>? {
         val allIds = mutableSetOf<String>()
         var page = 1
         val limit = 1000
@@ -1319,10 +1320,10 @@ class TraktProgressService @Inject constructor(
                     page = page,
                     limit = limit
                 )
-            } ?: break
+            } ?: return null
             if (!response.isSuccessful) {
                 Log.w(TAG, "fetchDroppedShows: failed code=${response.code()}")
-                break
+                return null
             }
             val items = response.body().orEmpty()
             if (items.isEmpty()) break
@@ -1923,6 +1924,7 @@ class TraktProgressService @Inject constructor(
             val historyDeferred = async { fetchRecentEpisodeHistorySnapshot() }
             val moviesDeferred = async {
                 val playback = getPlayback("movies", force = force, startAt = playbackStartAt)
+                    ?: return@async null
                 playback.map { item -> async {
                     try {
                         mappingSemaphore.withPermit { mapPlaybackMovie(item) }
@@ -1933,6 +1935,7 @@ class TraktProgressService @Inject constructor(
             }
             val episodesDeferred = async {
                 val playback = getPlayback("episodes", force = force, startAt = playbackStartAt)
+                    ?: return@async null
                 
                 playback.map { item ->
                     async {
@@ -1942,10 +1945,14 @@ class TraktProgressService @Inject constructor(
                     }
                 }.awaitAll().filterNotNull()
             }
-            val history = try { historyDeferred.await() } catch (_: Exception) { emptyList() }
-            val movies = try { moviesDeferred.await() } catch (_: Exception) { emptyList() }
-            val episodes = try { episodesDeferred.await() } catch (_: Exception) { emptyList() }
+            val history = try { historyDeferred.await() } catch (_: Exception) { null }
+            val movies = try { moviesDeferred.await() } catch (_: Exception) { null }
+            val episodes = try { episodesDeferred.await() } catch (_: Exception) { null }
             Triple(history, movies, episodes)
+        }
+        // A partial snapshot would drop items from Continue Watching, so fail the whole fetch.
+        if (recentCompletedEpisodes == null || inProgressMovies == null || inProgressEpisodes == null) {
+            throw IOException("Trakt progress fetch failed")
         }
 
         inProgressEpisodes.take(5).forEach { p ->
@@ -1996,7 +2003,7 @@ class TraktProgressService @Inject constructor(
         return finalSnapshot
     }
 
-    private suspend fun fetchRecentEpisodeHistorySnapshot(): List<WatchProgress> {
+    private suspend fun fetchRecentEpisodeHistorySnapshot(): List<WatchProgress>? {
         val cutoffMs = recentWatchWindowMs()?.let { windowMs ->
             System.currentTimeMillis() - windowMs
         }
@@ -2013,9 +2020,9 @@ class TraktProgressService @Inject constructor(
                     limit = pageLimit,
                     startAt = cutoffMs?.let(::toTraktUtcDateTime)
                 )
-            } ?: break
+            } ?: return null
 
-            if (!response.isSuccessful) break
+            if (!response.isSuccessful) return null
             val items = response.body().orEmpty()
             if (items.isEmpty()) break
 
@@ -2167,6 +2174,7 @@ class TraktProgressService @Inject constructor(
         val inProgress = getPlayback(
             type = "episodes"
         )
+            .orEmpty()
             .mapNotNull { mapPlaybackEpisode(it, applyAddonRemap = true) }
             .filter { it.contentId == contentId }
 
@@ -2183,12 +2191,13 @@ class TraktProgressService @Inject constructor(
         )
     }
 
+    /** Returns null when the request failed, so callers can tell a failure from no playback. */
     private suspend fun getPlayback(
         type: String,
         force: Boolean = false,
         startAt: String? = null,
         endAt: String? = null
-    ): List<TraktPlaybackItemDto> {
+    ): List<TraktPlaybackItemDto>? {
         val now = System.currentTimeMillis()
         if (startAt == null && endAt == null) {
             cacheMutex.withLock {
@@ -2210,9 +2219,10 @@ class TraktProgressService @Inject constructor(
                 startAt = startAt,
                 endAt = endAt
             )
-        } ?: return emptyList()
+        } ?: return null
+        if (!response.isSuccessful) return null
 
-        val value = if (response.isSuccessful) response.body().orEmpty() else emptyList()
+        val value = response.body().orEmpty()
         if (startAt == null && endAt == null) {
             cacheMutex.withLock {
                 val timed = TimedCache(value = value, updatedAtMs = now)
