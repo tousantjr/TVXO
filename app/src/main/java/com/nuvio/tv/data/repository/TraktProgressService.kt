@@ -2,6 +2,7 @@ package com.nuvio.tv.data.repository
 
 import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.core.network.NetworkResult
@@ -217,6 +218,14 @@ class TraktProgressService @Inject constructor(
     private var lastKnownMoviesWatchedAt: String? = null
     @Volatile
     private var lastKnownEpisodeActivityFingerprint: String? = null
+    /** Set when last_activities changed and cleared once a refresh completes, so a
+     *  cancelled refresh does not leave that change unfetched. */
+    @Volatile
+    private var activityRefreshPending: Boolean = false
+    /** Set when a forced refresh completes. The first poll at or after this time refetches
+     *  playback and history once more, in case Trakt had not caught up with the action yet. */
+    @Volatile
+    private var progressRecheckAtMs: Long = 0L
     @Volatile
     private var lastManualRefreshSignalMs: Long = 0L
     @Volatile
@@ -231,6 +240,9 @@ class TraktProgressService @Inject constructor(
     private val mappingSemaphore = Semaphore(MAPPING_CONCURRENCY)
 
     private val playbackCacheTtlMs = 30_000L
+    /** How long after a watch action refreshes are forced. */
+    @VisibleForTesting
+    internal var forceRefreshWindowMs = 30_000L
     private val userStatsCacheTtlMs = Long.MAX_VALUE
     private val watchedMoviesCacheTtlMs = 10 * 60_000L
     private val watchedMoviesFetchThrottleMs = 15_000L
@@ -318,6 +330,8 @@ class TraktProgressService @Inject constructor(
         lastKnownActivityFingerprint = null
         lastKnownMoviesWatchedAt = null
         lastKnownEpisodeActivityFingerprint = null
+        activityRefreshPending = false
+        progressRecheckAtMs = 0L
         lastManualRefreshSignalMs = 0L
         metadataWarmupScheduled = false
         refreshIntervalMs = baseRefreshIntervalMs
@@ -353,7 +367,7 @@ class TraktProgressService @Inject constructor(
 
     suspend fun refreshNow() {
         val now = System.currentTimeMillis()
-        forceRefreshUntilMs = now + 30_000L
+        forceRefreshUntilMs = now + forceRefreshWindowMs
         if (now - lastManualRefreshSignalMs < manualRefreshSignalThrottleMs) {
             trace("refreshNow: suppressed duplicate signal (${now - lastManualRefreshSignalMs}ms since last)")
             return
@@ -373,7 +387,7 @@ class TraktProgressService @Inject constructor(
         watchedShowSeedsStale = true
         cachedMoviesPlayback = null
         cachedEpisodesPlayback = null
-        forceRefreshUntilMs = System.currentTimeMillis() + 30_000L
+        forceRefreshUntilMs = System.currentTimeMillis() + forceRefreshWindowMs
         lastManualRefreshSignalMs = 0L
         if (SystemClock.elapsedRealtime() - serviceStartedAtMs > 5_000L) {
             refreshSignals.emit(Unit)
@@ -1031,17 +1045,30 @@ class TraktProgressService @Inject constructor(
         refreshIntervalMs = nextInterval
     }
 
-    private suspend fun refreshRemoteSnapshot() {
+    @VisibleForTesting
+    internal suspend fun refreshRemoteSnapshot() {
         if (!traktAuthService.isCircuitClosed()) {
             trace("refreshRemoteSnapshot: circuit breaker open, skipping")
             throw IOException("Trakt circuit breaker is open")
         }
 
-        val force = System.currentTimeMillis() < forceRefreshUntilMs
+        val now = System.currentTimeMillis()
+        val forceDeadline = forceRefreshUntilMs
+        val force = now < forceDeadline
 
-        if (!force && !hasActivityChanged()) {
+        // Read last_activities on forced refreshes too, so the fingerprints and stale
+        // flags already include this refresh's changes and the next poll skips them.
+        val activityChanged = checkActivityChanged()
+        if (activityChanged == true) activityRefreshPending = true
+        val shouldRefresh = activityRefreshPending ||
+            (activityChanged == null && !hasLoadedRemoteProgress.value)
+        val progressRecheckDue = !force && progressRecheckAtMs in 1..now
+        if (!force && !shouldRefresh && !progressRecheckDue) {
             return
         }
+        // With last_activities read, the stale flags say which watched lists changed.
+        // Only refetch both when it could not be read.
+        val refetchWatched = force && activityChanged == null
 
         // Capture the generation at the start of the refresh. If the profile
         // switches while this refresh is in-flight (collectLatest cancellation
@@ -1054,18 +1081,18 @@ class TraktProgressService @Inject constructor(
         supervisorScope {
             val hiddenDeferred = async { runCatching { ensureHiddenProgressShows(force = force) } }
 
-            val watchedMoviesDeferred: Deferred<Set<String>>? = if (force || watchedMoviesStale || !hasLoadedWatchedMovies) {
+            val watchedMoviesDeferred: Deferred<Set<String>>? = if (refetchWatched || watchedMoviesStale || !hasLoadedWatchedMovies) {
                 async {
-                    try { getWatchedMoviesSnapshot(forceRefresh = force || hasLoadedWatchedMovies) }
+                    try { getWatchedMoviesSnapshot(forceRefresh = refetchWatched || hasLoadedWatchedMovies) }
                     catch (_: Exception) { emptySet() }
                 }
             } else null
 
-            val needSeedsRefresh = force || watchedShowSeedsStale || !hasLoadedWatchedShowSeeds
-            val progressDeferred = async { fetchAllProgressSnapshot(force = force) }
+            val needSeedsRefresh = refetchWatched || watchedShowSeedsStale || !hasLoadedWatchedShowSeeds
+            val progressDeferred = async { fetchAllProgressSnapshot(force = force || progressRecheckDue) }
             val seedsDeferred: Deferred<List<WatchProgress>>? = if (needSeedsRefresh) {
                 async {
-                    try { getWatchedShowSeedsSnapshot(forceRefresh = force || hasLoadedWatchedShowSeeds) }
+                    try { getWatchedShowSeedsSnapshot(forceRefresh = refetchWatched || hasLoadedWatchedShowSeeds) }
                     catch (_: Exception) { emptyList() }
                 }
             } else null
@@ -1104,14 +1131,23 @@ class TraktProgressService @Inject constructor(
             hasLoadedRemoteProgress.value = true
             reconcileOptimistic(visibleSnapshot)
             hydrateMetadata(visibleSnapshot)
+            activityRefreshPending = false
+            if (progressRecheckDue) progressRecheckAtMs = 0L
+            // One completed forced refresh is enough; later changes show up in last_activities.
+            // Playback and history are still checked once more after the force window.
+            if (force && forceRefreshUntilMs == forceDeadline) {
+                forceRefreshUntilMs = 0L
+                progressRecheckAtMs = forceDeadline
+            }
         }
     }
 
-    private suspend fun hasActivityChanged(): Boolean {
+    /** Returns whether last_activities changed since the last read, or null if it could not be read. */
+    private suspend fun checkActivityChanged(): Boolean? {
         val response = traktAuthService.executeAuthorizedRequest { authHeader ->
             traktApi.getLastActivities(authHeader)
-        } ?: return !hasLoadedRemoteProgress.value
-        if (!response.isSuccessful) return !hasLoadedRemoteProgress.value
+        } ?: return null
+        if (!response.isSuccessful) return null
 
         val activities = response.body() ?: return true
         val moviesWatchedAt = activities.movies?.watchedAt
@@ -2776,7 +2812,7 @@ class TraktProgressService @Inject constructor(
         val now = System.currentTimeMillis()
         if (now - lastFastSyncRequestMs < fastSyncThrottleMs) return
         lastFastSyncRequestMs = now
-        forceRefreshUntilMs = now + 30_000L
+        forceRefreshUntilMs = now + forceRefreshWindowMs
         refreshSignals.tryEmit(Unit)
     }
 
