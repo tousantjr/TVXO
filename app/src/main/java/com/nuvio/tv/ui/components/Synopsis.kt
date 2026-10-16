@@ -8,6 +8,7 @@ package com.nuvio.tv.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.focusable
@@ -80,6 +81,7 @@ fun SynopsisDescription(
     var isTruncated by rememberSaveable(description, maxLines) { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val highlightInset = 12.dp
+    val readMoreDescription = stringResource(R.string.hero_synopsis_read_more)
 
     LaunchedEffect(isTruncated) {
         onTruncationChanged(isTruncated)
@@ -124,7 +126,7 @@ fun SynopsisDescription(
                         indication = null,
                         onClick = onShowFullDescription
                     )
-                    .semantics { role = Role.Button }
+                    .semantics { role = Role.Button; contentDescription = readMoreDescription }
                     .padding(horizontal = highlightInset, vertical = 8.dp)
             } else {
                 Modifier
@@ -293,6 +295,7 @@ fun SynopsisOverlay(
                         }
                         .focusRequester(contentFocusRequester)
                         .focusable()
+                        .semantics { contentDescription = title }
                         .verticalScroll(scrollState)
                 ) {
                     Text(
