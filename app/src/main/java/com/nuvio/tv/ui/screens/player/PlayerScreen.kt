@@ -1008,6 +1008,19 @@ fun PlayerScreen(
             !uiState.showSubtitleDelayOverlay && !uiState.showSubtitleTimingDialog &&
             !uiState.showMoreDialog &&
             !uiState.isLive
+        val playerControlsVisible = uiState.showControls && uiState.error == null &&
+            !uiState.showLoadingOverlay && !uiState.showPauseOverlay &&
+            !uiState.showStreamInfoOverlay &&
+            !uiState.showSubtitleStylePanel &&
+            !uiState.showSubtitleDelayOverlay &&
+            !uiState.showEpisodesPanel &&
+            !uiState.showSourcesPanel &&
+            !uiState.showPartyPanel &&
+            !uiState.showAudioOverlay &&
+            !uiState.showSubtitleOverlay &&
+            !uiState.showSpeedDialog &&
+            !postPlayRecommendationState.isVisible &&
+            uiState.postPlayMode !is PostPlayMode.StillWatching
         val fallbackSubtitleLiftPx = with(LocalDensity.current) { SUBTITLE_CONTROLS_LIFT.toPx() }
         val playerSurfaceModifier = Modifier
             .align(Alignment.TopEnd)
@@ -1047,15 +1060,17 @@ fun PlayerScreen(
             }
 
             Box(modifier = playerSurfaceModifier) {
-                val subtitleLiftPx = maxOf(
-                    if (uiState.showControls) {
-                        subtitleControlsClearancePx.takeIf { it > 0f } ?: fallbackSubtitleLiftPx
-                    } else {
-                        0f
-                    },
-                    if (skipButtonActuallyVisible) skipClearancePx else 0f,
-                    if (postPlayOverlayMode != null) postPlayClearancePx else 0f,
-                    if (seekOverlayVisible) seekClearancePx else 0f
+                val subtitleLiftPx = computeSubtitleLiftPx(
+                    previewConfiguredPosition = uiState.showSubtitleOverlay || uiState.showSubtitleStylePanel,
+                    controlsVisible = playerControlsVisible,
+                    controlsClearancePx = subtitleControlsClearancePx,
+                    fallbackControlsLiftPx = fallbackSubtitleLiftPx,
+                    skipVisible = skipButtonActuallyVisible,
+                    skipClearancePx = skipClearancePx,
+                    postPlayVisible = postPlayOverlayMode != null,
+                    postPlayClearancePx = postPlayClearancePx,
+                    seekVisible = seekOverlayVisible,
+                    seekClearancePx = seekClearancePx
                 )
                 if (uiState.internalPlayerEngine == InternalPlayerEngine.MVP_PLAYER) {
                     MpvPlayerSurface(
@@ -1394,19 +1409,7 @@ fun PlayerScreen(
 
         // Controls overlay
         AnimatedVisibility(
-            visible = uiState.showControls && uiState.error == null &&
-                !uiState.showLoadingOverlay && !uiState.showPauseOverlay &&
-                !uiState.showStreamInfoOverlay &&
-                !uiState.showSubtitleStylePanel &&
-                !uiState.showSubtitleDelayOverlay &&
-                !uiState.showEpisodesPanel &&
-                !uiState.showSourcesPanel &&
-                !uiState.showPartyPanel &&
-                !uiState.showAudioOverlay &&
-                !uiState.showSubtitleOverlay &&
-                !uiState.showSpeedDialog &&
-                !postPlayRecommendationState.isVisible &&
-                uiState.postPlayMode !is PostPlayMode.StillWatching,
+            visible = playerControlsVisible,
             enter = fadeIn(animationSpec = tween(200)),
             exit = fadeOut(animationSpec = tween(200))
         ) {
@@ -2964,7 +2967,7 @@ private fun ProgressBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (isFocused) NuvioTheme.spacing.md else NuvioTheme.spacing.sm)
+            .height(NuvioTheme.spacing.md)
             .then(
                 if (focusRequester != null) Modifier.focusRequester(focusRequester)
                 else Modifier
@@ -3063,19 +3066,26 @@ private fun ProgressBar(
                 } else {
                     false
                 }
-            }
-            .clip(RoundedCornerShape(3.dp))
-            .background(
-                if (isFocused) Color.White.copy(alpha = 0.45f)
-                else Color.White.copy(alpha = 0.3f)
-            )
-            .playerProgressFill(
-                progress = { animatedProgress },
-                bufferedProgress = { animatedBufferedProgress },
-                bufferedColor = NuvioTheme.colors.Secondary,
-                playedBrush = accentBrush
-            )
-    )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isFocused) NuvioTheme.spacing.md else NuvioTheme.spacing.sm)
+                .clip(RoundedCornerShape(3.dp))
+                .background(
+                    if (isFocused) Color.White.copy(alpha = 0.45f)
+                    else Color.White.copy(alpha = 0.3f)
+                )
+                .playerProgressFill(
+                    progress = { animatedProgress },
+                    bufferedProgress = { animatedBufferedProgress },
+                    bufferedColor = NuvioTheme.colors.Secondary,
+                    playedBrush = accentBrush
+                )
+        )
+    }
 }
 
 @Composable
