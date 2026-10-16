@@ -802,7 +802,6 @@ private fun RightStreamSection(
             firstStreamFocusRequestId += 1
         }
     }
-    // When on "All" tab and new results arrive above the focused stream, move focus to the new first item.
     var trackedFirstStreamKey by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(firstStreamKey, selectedAddonFilter, listHasFocus) {
         if (selectedAddonFilter != null) {
@@ -811,7 +810,7 @@ private fun RightStreamSection(
         }
         if (firstStreamKey != null && trackedFirstStreamKey != null &&
             firstStreamKey != trackedFirstStreamKey &&
-            listHasFocus && !userMovedFromFirstResult
+            listHasFocus && firstCardHasFocus
         ) {
             firstStreamFocusRequestId += 1
         }
@@ -1065,7 +1064,7 @@ private fun StreamsList(
         val validKeys = streamKeys.toHashSet()
         streamFocusRequesters.keys.retainAll(validKeys)
     }
-    var firstCardHasFocus by remember(firstStreamKey) { mutableStateOf(false) }
+    var firstCardHasFocus by remember { mutableStateOf(false) }
 
     var focusedStreamKey by remember { mutableStateOf<String?>(null) }
     val prevStreamKeysRef = remember { mutableStateOf(streamKeys) }
@@ -1077,7 +1076,7 @@ private fun StreamsList(
         if (key != null && prevKeys !== streamKeys) {
             val oldIndex = prevKeys.indexOf(key)
             val newIndex = streamKeys.indexOf(key)
-            if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex) {
+            if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex && oldIndex > 0) {
                 val shift = newIndex - oldIndex
                 val correctedFirst = (streamListState.firstVisibleItemIndex + shift)
                     .coerceIn(0, (streamKeys.size - 1).coerceAtLeast(0))
