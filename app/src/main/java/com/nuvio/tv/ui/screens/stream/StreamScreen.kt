@@ -748,6 +748,7 @@ private fun RightStreamSection(
     var enter by remember { mutableStateOf(false) }
     var firstStreamFocusRequestId by remember { mutableStateOf(0) }
     var listHasFocus by remember { mutableStateOf(false) }
+    var firstCardHasFocusInList by remember { mutableStateOf(false) }
     var userMovedFromFirstResult by remember { mutableStateOf(shouldRestoreFocusedStream) }
     var firstResultFocusAssigned by remember { mutableStateOf(shouldRestoreFocusedStream) }
     val scope = rememberCoroutineScope()
@@ -810,7 +811,7 @@ private fun RightStreamSection(
         }
         if (firstStreamKey != null && trackedFirstStreamKey != null &&
             firstStreamKey != trackedFirstStreamKey &&
-            listHasFocus && firstCardHasFocus
+            listHasFocus && firstCardHasFocusInList
         ) {
             firstStreamFocusRequestId += 1
         }
@@ -926,6 +927,7 @@ private fun RightStreamSection(
                             onUserNavigatedFromFirstResult = {
                                 userMovedFromFirstResult = true
                             },
+                            onFirstCardFocusChanged = { firstCardHasFocusInList = it },
                             onFocusChanged = { listHasFocus = it },
                             onExpandStreams = onExpandStreams
                         )
@@ -1042,6 +1044,7 @@ private fun StreamsList(
     orderedAddonNames: List<String> = emptyList(),
     onRequestChipFocus: (Int) -> Unit = {},
     onUserNavigatedFromFirstResult: () -> Unit = {},
+    onFirstCardFocusChanged: (Boolean) -> Unit = {},
     onFocusChanged: (Boolean) -> Unit = {},
     onExpandStreams: () -> Unit = {}
 ) {
@@ -1199,6 +1202,7 @@ private fun StreamsList(
                         }
                         if (index == 0) {
                             firstCardHasFocus = focused
+                            onFirstCardFocusChanged(focused)
                         }
                     },
                     onUpKey = if (index == 0) {{
