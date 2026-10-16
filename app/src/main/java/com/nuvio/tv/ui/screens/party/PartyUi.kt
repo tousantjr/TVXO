@@ -310,6 +310,15 @@ internal fun PartyNote(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+@Composable
+internal fun ExperimentalNote() {
+    Text(
+        text = stringResource(R.string.party_experimental),
+        style = MaterialTheme.typography.bodySmall,
+        color = NuvioTheme.colors.TextTertiary,
+    )
+}
+
 private fun ActiveParty.presenceOf(member: PartyMember): PartyPresence? =
     presence[member.id] ?: PartyPresence(memberId = member.id).takeIf { member.id == memberId }
 

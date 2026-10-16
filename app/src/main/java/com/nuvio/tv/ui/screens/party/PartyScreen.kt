@@ -334,6 +334,7 @@ private fun JoinContent(
                     minLines = 1,
                 )
             }
+            ExperimentalNote()
             AnimatedVisibility(
                 visible = preview == null,
                 enter = fadeIn(tween(NuvioMotion.tokens.durations.fast)),
