@@ -49,8 +49,7 @@ internal object PlayerSubtitleUtils {
         }
 
         if (containsAny("hbs")) {
-            val tokenizedNoHBS = tokenized.replace("hbs","").trim()
-            LANGUAGE_OVERRIDES[tokenizedNoHBS]?.lowercase()?.let { return it }
+            stripPrefixAndNormalizeLanguageCode(tokenized, "hbs")?.let { return it }
         }
 
         resolveLanguageNameAlias(tokenized)?.let { return it }
@@ -59,6 +58,11 @@ internal object PlayerSubtitleUtils {
         return LANGUAGE_OVERRIDES[code]?.lowercase()
             ?: LANGUAGE_OVERRIDES[normalizedCode]?.lowercase()
             ?: normalizedCode
+    }
+
+    private fun stripPrefixAndNormalizeLanguageCode(language: String, prefix: String): String? {
+        val stripped = language.replace(prefix,"").trim()
+        return LANGUAGE_OVERRIDES[stripped]?.lowercase()
     }
 
     fun matchesLanguageCode(language: String?, target: String): Boolean {
