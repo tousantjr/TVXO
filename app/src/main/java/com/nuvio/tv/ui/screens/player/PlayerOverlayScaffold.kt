@@ -8,8 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +26,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Composable
 internal fun PlayerOverlayScaffold(
@@ -48,7 +48,6 @@ internal fun PlayerOverlayScaffold(
         modifier = modifier
     ) {
         val focusRequester = remember { FocusRequester() }
-        val interactionSource = remember { MutableInteractionSource() }
 
         LaunchedEffect(visible, captureKeys) {
             if (visible && captureKeys) {
@@ -61,9 +60,7 @@ internal fun PlayerOverlayScaffold(
                 .fillMaxSize()
                 .then(
                     if (dismissOnBackgroundClick) {
-                        Modifier.pointerInput(Unit) {
-                            detectTapGestures(onTap = { onDismiss() })
-                        }
+                        Modifier.pointerInput(onDismiss) {`n                            detectTapGestures { onDismiss() }`n                        }
                     } else {
                         Modifier
                     }
