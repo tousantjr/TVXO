@@ -114,7 +114,7 @@ class StreamAutoPlaySelectorTest {
             preferBingeGroupInSelection = true
         )
 
-          assertEquals(filteredOutAddonMatch, selected)\n        assertEquals(filteredOutAddonMatch, selected)
+        assertEquals(filteredOutAddonMatch, selected)
     }
 
     @Test
