@@ -540,7 +540,9 @@ private fun TabbedGridContent(
                                 modifier = Modifier
                                     .width(posterCardStyle.width)
                                     .height(loadingCardHeight)
-                              .clearAndSetSemantics {}`n                              .focusProperties { canFocus = false },`n                                shape = CardDefaults.shape(shape = cardShape),
+                              .clearAndSetSemantics {}
+                              .focusProperties { canFocus = false },
+                                shape = CardDefaults.shape(shape = cardShape),
                                 colors = CardDefaults.colors(
                                     containerColor = NuvioTheme.colors.BackgroundCard,
                                     focusedContainerColor = NuvioTheme.colors.BackgroundCard

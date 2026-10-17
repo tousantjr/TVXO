@@ -60,7 +60,9 @@ internal fun PlayerOverlayScaffold(
                 .fillMaxSize()
                 .then(
                     if (dismissOnBackgroundClick) {
-                        Modifier.pointerInput(onDismiss) {`n                            detectTapGestures { onDismiss() }`n                        }
+                        Modifier.pointerInput(onDismiss) {
+                            detectTapGestures { onDismiss() }
+                        }
                     } else {
                         Modifier
                     }

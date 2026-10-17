@@ -468,7 +468,9 @@ fun CatalogRowSection(
                         modifier = Modifier
                             .width(loadingCardWidth)
                             .height(loadingCardHeight)
-                              .clearAndSetSemantics {}`n                              .focusProperties { canFocus = false },`n                        shape = CardDefaults.shape(shape = seeAllCardShape),
+                              .clearAndSetSemantics {}
+                              .focusProperties { canFocus = false },
+                        shape = CardDefaults.shape(shape = seeAllCardShape),
                         colors = CardDefaults.colors(
                             containerColor = NuvioTheme.colors.BackgroundCard,
                             focusedContainerColor = NuvioTheme.colors.BackgroundCard
