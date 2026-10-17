@@ -15,7 +15,7 @@
     <string name="web_btn_add">Adicionar</string>
     <string name="web_installed_addons">Addons Instalados</string>
     <string name="web_no_addons">Nenhum addon instalado</string>
-    <string name="web_home_catalogs">Catálogos e Coleções da Tela Inicial</string>
+    <string name="web_home_catalogs">Catálogos e Coleções da Tela inicial</string>
     <string name="web_no_catalogs">Nenhum catálogo disponível na tela inicial</string>
     <string name="web_btn_save">Salvar Alterações</string>
     <string name="web_connection_lost">Conexão com a TV perdida</string>
@@ -48,7 +48,7 @@
     <string name="web_manage_collections_subtitle">Crie e gerencie suas coleções personalizadas</string>
     <string name="web_status_msg_collections_updated">Suas coleções foram atualizadas na TV.</string>
     <string name="web_tab_addons">Addons</string>
-    <string name="web_tab_home_layout">Layout da Tela Inicial</string>
+    <string name="web_tab_home_layout">Layout da Tela inicial</string>
     <string name="web_tab_collections">Coleções</string>
     <string name="web_btn_enable_all">Ativar Todos</string>
     <string name="web_btn_disable_all">Desativar Todos</string>
@@ -466,7 +466,7 @@
     <string name="settings_profiles">Perfis</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_content_discovery">Conteúdo e Descoberta</string>
-    <string name="settings_content_discovery_subtitle">Add-ons, plugins, catálogos e fontes de descoberta</string>
+    <string name="settings_content_discovery_subtitle">Addons, plugins, catálogos e fontes de descoberta</string>
     <string name="settings_content_discovery_addons_subtitle">Gerenciar addons, ordem dos catálogos e coleções</string>
     <string name="settings_content_discovery_plugins_subtitle">Gerenciar repositórios e provedores de stream</string>
     <string name="settings_plugins">Plugins</string>
@@ -767,7 +767,7 @@
     <string name="playback_player_internal">Interno</string>
     <string name="playback_player_external">Externo</string>
     <string name="playback_player_ask">Sempre perguntar</string>
-    <string name="playback_internal_player_engine">Player Interno</string>
+    <string name="playback_internal_player_engine">Reprodutor interno</string>
     <string name="playback_engine_exoplayer">ExoPlayer</string>
     <string name="playback_engine_mvplayer">Libmpv (Beta)</string>
     <string name="playback_auto_switch_internal_player_on_error">Alternar motor em erro inicial</string>
@@ -986,7 +986,7 @@
     <string name="autoplay_invalid_regex">Filtro de palavras (Regex) inválido</string>
 
     <string name="layout_title">Configurações de Layout</string>
-    <string name="layout_subtitle">Ajuste o visual da home, visibilidade e pôsteres.</string>
+    <string name="layout_subtitle">Ajuste o visual da Tela inicial, visibilidade e pôsteres.</string>
     <string name="layout_classic">Visual Clássico</string>
     <string name="layout_grid">Visual em Grade</string>
     <string name="layout_modern">Visual Moderno</string>
@@ -1001,8 +1001,8 @@
     <string name="layout_preview_row_sub">Exiba parte do catálogo inferior no layout Moderno.</string>
     <string name="layout_hero_catalogs">Catálogos do Destaque</string>
     <string name="layout_hero_catalogs_sub">Selecione quais catálogos aparecem no destaque.</string>
-    <string name="layout_section_content">Conteúdo da Home</string>
-    <string name="layout_section_content_desc">Controle o que aparece na home e na busca.</string>
+    <string name="layout_section_content">Conteúdo da Tela inicial</string>
+    <string name="layout_section_content_desc">Controle o que aparece na Tela inicial e na busca.</string>
     <string name="layout_section_sidebar">Barra lateral e navegação</string>
     <string name="layout_section_sidebar_desc">Estilo da barra lateral e onde o Descobrir aparece.</string>
     <string name="layout_section_card_depth_desc">Luz de borda e brilho nos cartões de imagem.</string>
@@ -1020,7 +1020,7 @@
     <string name="layout_classic_focus_gradient">Gradiente no item focado</string>
     <string name="layout_classic_focus_gradient_sub">Mescla cores da arte na lateral do Visual Clássico</string>
     <string name="layout_show_hero">Mostrar Destaque</string>
-    <string name="layout_show_hero_sub">Exiba o banner de destaque no topo da home.</string>
+    <string name="layout_show_hero_sub">Exiba o banner de destaque no topo da Tela inicial.</string>
     <string name="layout_show_discover">Mostrar/Ocultar Descobrir</string>
     <string name="layout_show_discover_sub">Adiciona seção Descobrir para navegação</string>
     <string name="layout_discover_location_action">Local do Descobrir</string>
@@ -1219,7 +1219,7 @@
     <string name="mdblist_title">Avaliações do MDBList</string>
     <string name="mdblist_subtitle">Configure avaliações externas no destaque.</string>
     <string name="mdblist_enable_title">Ativar avaliações do MDBList</string>
-    <string name="mdblist_enable_subtitle">Exiba notas externas na tela de detalhes.</string>
+    <string name="mdblist_enable_subtitle">Exiba avaliações externas na tela de detalhes.</string>
     <string name="mdblist_api_key_title">Chave API</string>
     <string name="mdblist_api_key_subtitle">Chave para avaliações do MDBList.</string>
     <string name="mdblist_ratings_credentials_subtitle">Use sua conta do MDBList conectada em Monitoramento ou digite outra chave de API para avaliações.</string>
@@ -1228,13 +1228,13 @@
     <string name="mdblist_trakt_title">Trakt</string>
     <string name="mdblist_trakt_subtitle">Exiba as avaliações do Trakt.</string>
     <string name="mdblist_imdb_title">IMDb</string>
-    <string name="mdblist_imdb_subtitle">Exiba notas do IMDb (substitui a padrão).</string>
+    <string name="mdblist_imdb_subtitle">Exiba avaliações do IMDb (substitui a padrão).</string>
     <string name="mdblist_tmdb_title">TMDB</string>
     <string name="mdblist_tmdb_subtitle">Exiba as avaliações do TMDB.</string>
     <string name="mdblist_letterboxd_title">Letterboxd</string>
     <string name="mdblist_letterboxd_subtitle">Exiba as avaliações do Letterboxd.</string>
     <string name="mdblist_tomatoes_title">Rotten Tomatoes</string>
-    <string name="mdblist_tomatoes_subtitle">Exiba as notas da crítica especializada.</string>
+    <string name="mdblist_tomatoes_subtitle">Exiba as avaliações da crítica especializada.</string>
     <string name="mdblist_audience_title">Nota do Público</string>
     <string name="mdblist_audience_subtitle">Exiba as avaliações da audiência.</string>
     <string name="mdblist_metacritic_title">Metacritic</string>
@@ -1436,8 +1436,8 @@
     <string name="tmdb_subtitle">Escolha quais metadados virão do TMDB</string>
     <string name="tmdb_enable_title">Ativar enriquecimento TMDB</string>
     <string name="tmdb_enable_subtitle">Usar TMDB para aprimorar dados dos addons</string>
-    <string name="tmdb_modern_home_title">Ativar na Home Moderna</string>
-    <string name="tmdb_modern_home_subtitle">Aplicar dados do TMDB na Home Moderna e cartões focados</string>
+    <string name="tmdb_modern_home_title">Ativar na Tela inicial moderna</string>
+    <string name="tmdb_modern_home_subtitle">Aplicar dados do TMDB na Tela inicial moderna e cartões focados</string>
     <string name="tmdb_enrich_continue_watching_title">Aprimorar Continuar Assistindo</string>
     <string name="tmdb_enrich_continue_watching_subtitle">Aplicar metadados do TMDB no Continuar Assistindo</string>
     <string name="tmdb_language_title">Idioma</string>
@@ -1534,7 +1534,7 @@
     <string name="trakt_login">Login</string>
     <string name="trakt_retry">Tentar novamente</string>
     <string name="trakt_back">Voltar</string>
-    <string name="trakt_cw_window_title">Período de Atividade</string>
+    <string name="trakt_cw_window_title">Janela Continuar assistindo</string>
     <string name="trakt_cw_window_subtitle">Escolha o período que seu histórico Trakt deve aparecer em Continuar Assistindo.</string>
     <string name="trakt_unaired_dialog_title">Episódios não lançados</string>
     <string name="trakt_unaired_dialog_subtitle">Exibir episódios antes da data de lançamento?</string>
@@ -1714,7 +1714,7 @@
     <string name="addon_manage_addons_only_from_phone_subtitle">Leia o código QR para gerenciar addons pelo celular</string>
     <string name="addon_manage_collections_from_phone_subtitle">Escaneie um QR para gerenciar coleções pelo celular</string>
     <string name="addon_reorder_title">Reordenar Tela inicial</string>
-    <string name="addon_reorder_subtitle">Controla a ordem dos catálogos e coleções na Home (Clássico + Moderno + Grade)</string>
+    <string name="addon_reorder_subtitle">Controla a ordem dos catálogos e coleções na Tela inicial (Clássico + Moderno + Grade)</string>
     <string name="addon_qr_scan_instruction">Escaneie com seu celular para gerenciar addons, catálogos e coleções</string>
     <string name="addon_qr_addons_only_scan_instruction">Leia com o celular para gerenciar Addons</string>
     <string name="addon_qr_collections_scan_instruction">Escaneie com seu celular para gerenciar coleções</string>
@@ -1743,7 +1743,7 @@
     <string name="catalog_order_follow_addons">Seguir ordem das Addons</string>
     <string name="catalog_order_follow_addons_desc">Catálogos seguem a ordem dos addons. Coleções podem mudar de addon.</string>
     <string name="catalog_order_empty">Nenhum catálogo disponível no momento.</string>
-    <string name="catalog_order_disabled_on_home">Oculto na Home</string>
+    <string name="catalog_order_disabled_on_home">Oculto na Tela inicial</string>
     <string name="catalog_order_enable">Ativar</string>
     <string name="catalog_order_disable">Ocultar</string>
 
@@ -1793,7 +1793,7 @@
     <string name="p2p_download_subtitle">Este é um download único necessário para fonte P2P.</string>
     <string name="stream_type_external">Link Externo</string>
     <string name="stream_player_picker_title">Qual player deseja usar?</string>
-    <string name="stream_player_internal">Player Interno</string>
+    <string name="stream_player_internal">Reprodutor interno</string>
     <string name="stream_player_external">Player Externo</string>
     <string name="stream_filter_all">Tudo</string>
     <string name="stream_episode_label">T%1$d:E%2$d</string>
@@ -2596,7 +2596,7 @@
     <string name="collections_editor_save">Salvar</string>
     <string name="collections_editor_backdrop">Imagem de fundo</string>
     <string name="collections_editor_pin_above">Fixar acima dos catálogos</string>
-    <string name="collections_editor_pin_above_desc">Mostrar esta coleção acima dos catálogos da home. Coleções fixadas seguem ordem de criação.</string>
+    <string name="collections_editor_pin_above_desc">Mostrar esta coleção acima dos catálogos da Tela inicial. Coleções fixadas seguem ordem de criação.</string>
     <string name="collections_editor_focus_glow">Brilho de foco</string>
     <string name="collections_editor_focus_glow_desc">Usar brilho nativo da TV nos cartões desta coleção</string>
     <string name="collections_editor_view_mode">Modo de visualização</string>
@@ -2630,7 +2630,7 @@
     <string name="collections_editor_source">Fonte</string>
     <string name="collections_editor_view_mode_tabs">Abas</string>
     <string name="collections_editor_view_mode_rows">Linhas</string>
-    <string name="collections_editor_view_mode_follow">Seguir layout da Home</string>
+    <string name="collections_editor_view_mode_follow">Seguir layout da Tela inicial</string>
     <string name="collections_editor_shape_poster">Poster</string>
     <string name="collections_editor_shape_wide">Largo</string>
     <string name="collections_editor_shape_square">Quadrado</string>
@@ -2949,11 +2949,11 @@
     <string name="trakt_library_error_update_list_failed">Falha ao atualizar lista</string>
     <string name="trakt_library_error_delete_list_failed">Falha ao excluir lista</string>
     <string name="trakt_library_error_reorder_lists_failed">Falha ao reordenar listas</string>
-    <string name="trakt_library_error_fetch_watchlist_movies">Falha ao buscar filmes da watchlist</string>
-    <string name="trakt_library_error_fetch_watchlist_shows">Falha ao buscar séries da watchlist</string>
+    <string name="trakt_library_error_fetch_watchlist_movies">Falha ao buscar filmes da Minha Lista</string>
+    <string name="trakt_library_error_fetch_watchlist_shows">Falha ao buscar séries da Minha Lista</string>
     <string name="trakt_library_error_fetch_personal_lists">Falha ao buscar listas pessoais</string>
-    <string name="trakt_library_error_add_watchlist_failed">Falha ao adicionar à watchlist</string>
-    <string name="trakt_library_error_remove_watchlist_failed">Falha ao remover da watchlist</string>
+    <string name="trakt_library_error_add_watchlist_failed">Falha ao adicionar à Minha Lista</string>
+    <string name="trakt_library_error_remove_watchlist_failed">Falha ao remover da Minha Lista</string>
     <string name="trakt_library_error_add_to_list_failed">Falha ao adicionar à lista</string>
     <string name="trakt_library_error_remove_from_list_failed">Falha ao remover da lista</string>
     <string name="trakt_library_error_missing_compatible_ids">IDs compatíveis ausentes para operação Trakt</string>
