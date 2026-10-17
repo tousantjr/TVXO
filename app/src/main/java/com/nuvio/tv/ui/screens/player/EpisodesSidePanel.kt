@@ -723,7 +723,7 @@ private fun EpisodesSeasonTabs(
                     .semantics {
                         role = Role.Tab
                         this.selected = isSelected
-                    }
+                    },
                 shape = CardDefaults.shape(shape = RoundedCornerShape(NuvioTheme.spacing.xl)),
                 colors = CardDefaults.colors(
                     containerColor = if (isSelected) Color(0xFFF5F5F5) else NuvioTheme.colors.BackgroundCard,
