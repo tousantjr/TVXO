@@ -319,14 +319,14 @@ private fun EpisodeStreamsView(
             isPrimary = false,
             modifier = Modifier
                 .focusRequester(backButtonFocusRequester)
-                    .semantics {
-                        role = Role.Tab
-                        this.selected = isSelected
-                    }
-                    .onFocusChanged {
-                        isFocused = it.isFocused
-                        if (it.isFocused && season != selectedSeason) pendingSeason = season
-                    },
+                .onFocusChanged { backButtonHasFocus = it.isFocused }
+                .onKeyEvent { event ->
+                    if (event.nativeKeyEvent.action == KeyEvent.ACTION_DOWN &&
+                        event.key == androidx.compose.ui.input.key.Key.DirectionDown
+                    ) {
+                        val activeIdx = if (uiState.episodeSelectedAddonFilter == null) 1
+                            else (orderedAddonNames.indexOf(uiState.episodeSelectedAddonFilter) + 2).coerceAtLeast(1)
+                        requestChipFocus(activeIdx)
                         true
                     } else false
                 }
