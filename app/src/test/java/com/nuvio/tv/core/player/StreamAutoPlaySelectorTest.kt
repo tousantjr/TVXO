@@ -114,9 +114,7 @@ class StreamAutoPlaySelectorTest {
             preferBingeGroupInSelection = true
         )
 
-        // Binge-group continuity searches all streams, so the first matching stream
-        // wins even though its addon is excluded by the autoplay source filter.
-        assertEquals(filteredOutAddonMatch, selected)
+          assertEquals(filteredOutAddonMatch, selected)\n        assertEquals(filteredOutAddonMatch, selected)
     }
 
     @Test
