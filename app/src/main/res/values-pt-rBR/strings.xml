@@ -1257,10 +1257,10 @@
     <string name="tracking_mdblist_features_title">Recursos do MDBList</string>
     <string name="tracking_mdblist_features_subtitle">Configurações específicas do MDBList</string>
 
-    <string name="debrid_title">Serviços Debrid</string>
+    <string name="debrid_title">Serviços Debrid conectados</string>
     <string name="debrid_subtitle">Conecte suas contas para resolver links e acessar seu serviço debrid.</string>
     <string name="debrid_experimental_notice">Essas integrações são experimentais e podem ser alteradas ou removidas no futuro.</string>
-    <string name="debrid_cloud_library">Biblioteca Debrid</string>
+    <string name="debrid_cloud_library">Biblioteca na nuvem</string>
     <string name="debrid_cloud_library_description">Explore e assista aos arquivos que já estão salvos nas suas contas Debrid conectadas.</string>
     <string name="debrid_enable_title">Resolver links de vídeo</string>
     <string name="debrid_enable_subtitle">Usa o serviço Debrid para liberar e carregar os links. Isso pode adicionar o arquivo à nuvem da sua conta.</string>
