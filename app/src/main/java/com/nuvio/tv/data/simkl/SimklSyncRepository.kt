@@ -114,7 +114,11 @@ class SimklSyncRepository @Inject constructor(
             val playback = current.snapshot.playback.filterNot { session -> session.id in sessionIds }
             if (playback.size == current.snapshot.playback.size) return@withLock
             val snapshot = current.snapshot.copy(playback = playback)
-            val projection = buildProjection(snapshot)
+            val projection = if (snapshot.entries === current.snapshot.entries && _projection.value !== SimklSnapshotProjection.Empty) {
+                _projection.value.withUpdatedPlayback(snapshot)
+            } else {
+                buildProjection(snapshot)
+            }
             storage.save(profileId, encodeSnapshot(snapshot))
             if (profileId == profileManager.activeProfileId.value) {
                 _projection.value = projection
@@ -135,7 +139,11 @@ class SimklSyncRepository @Inject constructor(
                 committedAtEpochMs = System.currentTimeMillis()
             )
             if (snapshot == current.snapshot) return@withLock
-            val projection = buildProjection(snapshot)
+            val projection = if (snapshot.entries === current.snapshot.entries && _projection.value !== SimklSnapshotProjection.Empty) {
+                _projection.value.withUpdatedPlayback(snapshot)
+            } else {
+                buildProjection(snapshot)
+            }
             storage.save(profileId, encodeSnapshot(snapshot))
             if (isCurrent(profileId, generation)) {
                 _projection.value = projection
@@ -214,6 +222,8 @@ class SimklSyncRepository @Inject constructor(
             merged.playback === previous.snapshot.playback
         ) {
             _projection.value
+        } else if (merged.entries === previous.snapshot.entries && _projection.value !== SimklSnapshotProjection.Empty) {
+            _projection.value.withUpdatedPlayback(merged)
         } else {
             buildProjection(merged)
         }
