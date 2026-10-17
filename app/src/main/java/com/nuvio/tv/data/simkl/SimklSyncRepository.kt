@@ -114,12 +114,17 @@ class SimklSyncRepository @Inject constructor(
             val playback = current.snapshot.playback.filterNot { session -> session.id in sessionIds }
             if (playback.size == current.snapshot.playback.size) return@withLock
             val snapshot = current.snapshot.copy(playback = playback)
-            val projection = if (snapshot.entries === current.snapshot.entries && _projection.value !== SimklSnapshotProjection.Empty) {
+            val onlyPlaybackChanged = snapshot.entries === current.snapshot.entries
+            val projection = if (onlyPlaybackChanged && _projection.value !== SimklSnapshotProjection.Empty) {
                 _projection.value.withUpdatedPlayback(snapshot)
             } else {
                 buildProjection(snapshot)
             }
-            storage.save(profileId, encodeSnapshot(snapshot))
+            if (onlyPlaybackChanged) {
+                storage.savePlayback(profileId, encodePlayback(snapshot.playback))
+            } else {
+                storage.save(profileId, encodeSnapshot(snapshot))
+            }
             if (profileId == profileManager.activeProfileId.value) {
                 _projection.value = projection
                 _state.value = current.copy(snapshot = snapshot)
@@ -139,12 +144,17 @@ class SimklSyncRepository @Inject constructor(
                 committedAtEpochMs = System.currentTimeMillis()
             )
             if (snapshot == current.snapshot) return@withLock
-            val projection = if (snapshot.entries === current.snapshot.entries && _projection.value !== SimklSnapshotProjection.Empty) {
+            val onlyPlaybackChanged = snapshot.entries === current.snapshot.entries
+            val projection = if (onlyPlaybackChanged && _projection.value !== SimklSnapshotProjection.Empty) {
                 _projection.value.withUpdatedPlayback(snapshot)
             } else {
                 buildProjection(snapshot)
             }
-            storage.save(profileId, encodeSnapshot(snapshot))
+            if (onlyPlaybackChanged) {
+                storage.savePlayback(profileId, encodePlayback(snapshot.playback))
+            } else {
+                storage.save(profileId, encodeSnapshot(snapshot))
+            }
             if (isCurrent(profileId, generation)) {
                 _projection.value = projection
                 _state.value = current.copy(snapshot = snapshot)
@@ -175,7 +185,7 @@ class SimklSyncRepository @Inject constructor(
 
     private suspend fun loadProfile(profileId: Int) = loadMutex.withLock {
         if (loadedProfileId == profileId) return@withLock
-        val snapshot = storage.load(profileId)
+        var snapshot = storage.load(profileId)
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.let { payload ->
@@ -184,6 +194,17 @@ class SimklSyncRepository @Inject constructor(
                     .getOrNull()
             }
             ?: SimklSyncSnapshot()
+        val playbackOverride = storage.loadPlayback(profileId)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { payload ->
+                runCatching { decodePlayback(payload) }
+                    .onFailure { error -> Log.w(TAG, "Unable to decode Simkl playback override", error) }
+                    .getOrNull()
+            }
+        if (playbackOverride != null) {
+            snapshot = snapshot.copy(playback = playbackOverride)
+        }
         val projection = buildProjection(snapshot)
         if (profileId == profileManager.activeProfileId.value) {
             loadedProfileId = profileId
@@ -265,6 +286,12 @@ class SimklSyncRepository @Inject constructor(
 
     private suspend fun encodeSnapshot(snapshot: SimklSyncSnapshot): String =
         withContext(Dispatchers.Default) { json.encodeToString(snapshot) }
+
+    private suspend fun decodePlayback(payload: String): List<SimklPlaybackSession> =
+        withContext(Dispatchers.Default) { json.decodeFromString(payload) }
+
+    private suspend fun encodePlayback(playback: List<SimklPlaybackSession>): String =
+        withContext(Dispatchers.Default) { json.encodeToString(playback) }
 
     private companion object {
         const val TAG = "SimklSync"
