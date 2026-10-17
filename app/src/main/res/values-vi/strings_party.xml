@@ -1,12 +1,12 @@
 <resources>
-    <string name="party_title">Phòng xem chung</string>
+    <string name="party_title">Xem chung</string>
     <string name="party_settings_description">Tham gia cùng bạn bè bằng mã phòng</string>
     <string name="party_start_title">Xem cùng nhau</string>
     <string name="party_start_description">Mời bạn bè. Mỗi người phát từ nguồn riêng và luôn được đồng bộ.</string>
     <string name="party_start_action">Tạo phòng xem chung</string>
     <string name="party_sign_in_required">Đăng nhập vào tài khoản Nuvio để sử dụng phòng xem chung.</string>
-    <string name="party_unavailable">Phòng xem chung hiện không có sẵn.</string>
-    <string name="party_experimental">Phòng xem chung đang ở giai đoạn thử nghiệm và có thể không hoạt động như mong đợi.</string>
+    <string name="party_unavailable">Xem chung hiện không có sẵn.</string>
+    <string name="party_experimental">Xem chung đang ở giai đoạn thử nghiệm và có thể không hoạt động như mong đợi.</string>
     <string name="party_code_label">Mã phòng</string>
     <string name="party_seats">%1$d trong số %2$d chỗ</string>
     <string name="party_host">Chủ phòng</string>
@@ -22,7 +22,7 @@
     <string name="party_remove_message">Họ sẽ không thể tham gia lại phòng này.</string>
     <string name="party_leave">Rời phòng</string>
     <string name="party_end">Kết thúc với mọi người</string>
-    <string name="party_end_title">Kết thúc phòng xem chung?</string>
+    <string name="party_end_title">Kết thúc xem chung?</string>
     <string name="party_end_message">Mọi người sẽ bị ngắt kết nối khỏi phòng.</string>
     <string name="party_now_watching">Phòng này đang xem %1$s</string>
     <string name="party_switch">Chuyển sang phòng %1$s</string>
