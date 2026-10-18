@@ -869,18 +869,16 @@ private fun RightStreamSection(
             .padding(top = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.xxxl)
     ) {
         resumeText?.let { text ->
-            val resumeShape = RoundedCornerShape(20.dp)
             Box(
                 modifier = Modifier
                     .padding(bottom = NuvioTheme.spacing.md)
-                    .clip(resumeShape)
-                    .background(NuvioTheme.colors.BackgroundCard)
-                    .border(BorderStroke(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border), resumeShape)
-                    .padding(horizontal = NuvioTheme.spacing.xxl, vertical = NuvioTheme.spacing.md)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.72f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = NuvioTheme.colors.TextPrimary
                 )
             }
