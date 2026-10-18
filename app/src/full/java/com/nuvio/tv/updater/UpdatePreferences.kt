@@ -30,6 +30,8 @@ class UpdatePreferences @Inject constructor(
     private val autoInstallEnabledKey = booleanPreferencesKey("auto_install_enabled")
     private val downloadedTagKey = stringPreferencesKey("downloaded_release_tag")
     private val downloadedApkPathKey = stringPreferencesKey("downloaded_apk_path")
+    private val autoInstalledTagKey = stringPreferencesKey("auto_installed_release_tag")
+    private val autoInstallNoticeEnabledKey = booleanPreferencesKey("auto_install_notice_enabled")
 
     val ignoredTag: Flow<String?> = dataStore.data.map { prefs ->
         prefs[ignoredTagKey]
@@ -57,6 +59,15 @@ class UpdatePreferences @Inject constructor(
         val tag = prefs[downloadedTagKey]
         val path = prefs[downloadedApkPathKey]
         if (tag != null && path != null) tag to path else null
+    }
+
+    /** Release the idle job last installed without asking, so the next launch can say the app was updated. */
+    val autoInstalledTag: Flow<String?> = dataStore.data.map { prefs ->
+        prefs[autoInstalledTagKey]
+    }
+
+    val autoInstallNoticeEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[autoInstallNoticeEnabledKey] ?: true
     }
 
     suspend fun getOrInitializeUpdateChannel(): UpdateChannel {
@@ -103,6 +114,18 @@ class UpdatePreferences @Inject constructor(
                 prefs[downloadedTagKey] = tag
                 prefs[downloadedApkPathKey] = apkPath
             }
+        }
+    }
+
+    suspend fun setAutoInstallNoticeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[autoInstallNoticeEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAutoInstalledTag(tag: String?) {
+        dataStore.edit { prefs ->
+            if (tag == null) prefs.remove(autoInstalledTagKey) else prefs[autoInstalledTagKey] = tag
         }
     }
 

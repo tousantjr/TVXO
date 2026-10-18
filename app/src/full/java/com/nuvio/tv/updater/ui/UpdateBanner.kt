@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
@@ -55,6 +56,7 @@ import com.nuvio.tv.updater.model.AppUpdate
 internal fun UpdateBanner(
     state: UpdateUiState,
     update: AppUpdate,
+    isInstalledUpdate: Boolean,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onShowReleaseNotes: () -> Unit,
@@ -74,6 +76,7 @@ internal fun UpdateBanner(
     val progressAlpha = if (isWhiteTheme) 0.18f else 1f
     val dividerColor = NuvioTheme.colors.Border
     val subtitle = when {
+        isInstalledUpdate -> stringResource(R.string.update_installed_automatically)
         state.errorMessage != null -> state.errorMessage
         state.isDownloading && state.downloadProgress != null -> stringResource(
             R.string.update_downloading_progress,
@@ -85,7 +88,7 @@ internal fun UpdateBanner(
     }
     val updateLabel = listOfNotNull(
         update.tag,
-        update.assetSizeBytes?.let { Formatter.formatShortFileSize(context, it) }
+        update.assetSizeBytes?.takeUnless { isInstalledUpdate }?.let { Formatter.formatShortFileSize(context, it) }
     ).joinToString(separator = " • ")
 
     Box(
@@ -116,7 +119,7 @@ internal fun UpdateBanner(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.CloudDownload,
+                imageVector = if (isInstalledUpdate) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
                 contentDescription = null,
                 tint = NuvioTheme.colors.TextPrimary,
                 modifier = Modifier.size(28.dp)
@@ -157,35 +160,38 @@ internal fun UpdateBanner(
                 enabled = update.notes.isNotBlank()
             )
 
-            Button(
-                onClick = {
-                    when {
-                        state.isDownloading -> Unit
-                        state.downloadedApkPath != null -> onInstall()
-                        else -> onDownload()
-                    }
-                },
-                enabled = state.isDownloading ||
-                    state.downloadedApkPath != null ||
-                    state.isUpdateAvailable,
-                colors = ButtonDefaults.colors(
-                    containerColor = NuvioTheme.colors.Secondary,
-                    focusedContainerColor = NuvioTheme.colors.SecondaryVariant,
-                    contentColor = NuvioTheme.colors.OnSecondary,
-                    focusedContentColor = NuvioTheme.colors.OnSecondaryVariant
-                ),
-                shape = ButtonDefaults.shape(RoundedCornerShape(50)),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = when {
-                        state.isDownloading -> stringResource(R.string.update_downloading_ellipsis)
-                        state.downloadedApkPath != null -> stringResource(R.string.update_install)
-                        state.errorMessage != null -> stringResource(R.string.action_retry)
-                        else -> stringResource(R.string.update_download)
+            // An update installed automatically has nothing left to download or install.
+            if (!isInstalledUpdate) {
+                Button(
+                    onClick = {
+                        when {
+                            state.isDownloading -> Unit
+                            state.downloadedApkPath != null -> onInstall()
+                            else -> onDownload()
+                        }
                     },
-                    fontWeight = FontWeight.SemiBold
-                )
+                    enabled = state.isDownloading ||
+                        state.downloadedApkPath != null ||
+                        state.isUpdateAvailable,
+                    colors = ButtonDefaults.colors(
+                        containerColor = NuvioTheme.colors.Secondary,
+                        focusedContainerColor = NuvioTheme.colors.SecondaryVariant,
+                        contentColor = NuvioTheme.colors.OnSecondary,
+                        focusedContentColor = NuvioTheme.colors.OnSecondaryVariant
+                    ),
+                    shape = ButtonDefaults.shape(RoundedCornerShape(50)),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = when {
+                            state.isDownloading -> stringResource(R.string.update_downloading_ellipsis)
+                            state.downloadedApkPath != null -> stringResource(R.string.update_install)
+                            state.errorMessage != null -> stringResource(R.string.action_retry)
+                            else -> stringResource(R.string.update_download)
+                        },
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             if (!state.isDownloading) {

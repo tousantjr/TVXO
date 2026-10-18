@@ -35,7 +35,10 @@ data class UpdateUiState(
     val updateBannerEnabled: Boolean = true,
     val updateChannel: UpdateChannel = UpdateChannel.STABLE,
     val autoInstallEnabled: Boolean = false,
-    val autoInstallSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val autoInstallSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+    val autoInstallNoticeEnabled: Boolean = true,
+    /** Release installed automatically since the last launch, shown in the banner until dismissed. */
+    val installedUpdate: AppUpdate? = null
 )
 
 @HiltViewModel
@@ -55,14 +58,17 @@ class UpdateViewModel @Inject constructor(
             val enabled = updatePreferences.updateBannerEnabled.first()
             val channel = updatePreferences.getOrInitializeUpdateChannel()
             val autoInstallEnabled = updatePreferences.autoInstallEnabled.first()
+            val autoInstallNoticeEnabled = updatePreferences.autoInstallNoticeEnabled.first()
             _uiState.update {
                 it.copy(
                     updateBannerEnabled = enabled,
                     updateChannel = channel,
-                    autoInstallEnabled = autoInstallEnabled
+                    autoInstallEnabled = autoInstallEnabled,
+                    autoInstallNoticeEnabled = autoInstallNoticeEnabled
                 )
             }
             downloadStore.clearIfInstalled()
+            consumeAutoInstalledUpdate()
             syncBackgroundJobs()
             if (enabled && !BuildConfig.IS_DEBUG_BUILD) {
                 checkForUpdates(force = false, showNoUpdateFeedback = false)
@@ -94,6 +100,10 @@ class UpdateViewModel @Inject constructor(
                 .onSuccess { update ->
                     val remoteNewer = VersionUtils.isRemoteNewer(update.tag, BuildConfig.VERSION_NAME)
                     val downloadedFile = if (remoteNewer) downloadStore.downloadedFileFor(update) else null
+                    // The release just installed carries the notes the "updated" banner can show.
+                    val installedUpdate = _uiState.value.installedUpdate?.let { installed ->
+                        if (installed.tag == update.tag) update else installed
+                    }
                     if (remoteNewer && downloadedFile == null && update.tag != dismissedTag && !BuildConfig.IS_DEBUG_BUILD) {
                         UpdateJobService.scheduleCheckNow(context)
                     }
@@ -114,7 +124,8 @@ class UpdateViewModel @Inject constructor(
                             downloadProgress = null,
                             downloadedApkPath = downloadedFile?.absolutePath
                                 ?: state.downloadedApkPath.takeIf { remoteNewer && state.update?.tag == update.tag },
-                            showBanner = shouldShow,
+                            showBanner = shouldShow || installedUpdate != null,
+                            installedUpdate = installedUpdate,
                             showUnknownSourcesDialog = false,
                             errorMessage = null,
                             feedbackMessage = if (showNoUpdateFeedback && !remoteNewer) {
@@ -134,7 +145,7 @@ class UpdateViewModel @Inject constructor(
                             isDownloading = false,
                             downloadProgress = null,
                             downloadedApkPath = null,
-                            showBanner = false,
+                            showBanner = it.installedUpdate != null,
                             showUnknownSourcesDialog = false,
                             errorMessage = null,
                             feedbackMessage = if (showNoUpdateFeedback) {
@@ -165,7 +176,8 @@ class UpdateViewModel @Inject constructor(
             it.copy(
                 showBanner = false,
                 showUnknownSourcesDialog = false,
-                errorMessage = null
+                errorMessage = null,
+                installedUpdate = null
             )
         }
         val tag = state.update?.tag
@@ -304,6 +316,31 @@ class UpdateViewModel @Inject constructor(
             runCatching { ApkInstaller.install(context, apkFile, background = false) }
                 .onFailure { ApkInstaller.launchSystemInstaller(context, apkFile) }
         }
+    }
+
+    // Shows the "updated" banner once after the idle job installed a release, then forgets it.
+    private suspend fun consumeAutoInstalledUpdate() {
+        val tag = updatePreferences.autoInstalledTag.first() ?: return
+        // Still older than the installed version means the install has not happened yet.
+        if (VersionUtils.isRemoteNewer(tag, BuildConfig.VERSION_NAME)) return
+        updatePreferences.setAutoInstalledTag(null)
+        if (VersionUtils.isRemoteNewer(BuildConfig.VERSION_NAME, tag)) return
+        if (!_uiState.value.autoInstallNoticeEnabled) return
+        val installed = AppUpdate(
+            tag = tag,
+            title = tag,
+            notes = "",
+            releaseUrl = null,
+            assetName = "",
+            assetUrl = "",
+            assetSizeBytes = null
+        )
+        _uiState.update { it.copy(installedUpdate = installed, showBanner = true) }
+    }
+
+    fun setAutoInstallNoticeEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(autoInstallNoticeEnabled = enabled) }
+        viewModelScope.launch { updatePreferences.setAutoInstallNoticeEnabled(enabled) }
     }
 
     fun setAutoInstallEnabled(enabled: Boolean) {

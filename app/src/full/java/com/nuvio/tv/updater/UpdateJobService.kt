@@ -101,6 +101,7 @@ class UpdateJobService : JobService() {
         val (tag, apkFile) = entryPoint.updateDownloadStore().pendingInstall() ?: return
         if (tag == preferences.ignoredTag.first()) return
         Log.d(TAG, "Installing $tag while the device is idle")
+        preferences.setAutoInstalledTag(tag)
         ApkInstaller.install(applicationContext, apkFile, background = true)
     }
 

@@ -21,7 +21,8 @@ data class UpdateUiState(
     val updateBannerEnabled: Boolean = false,
     val updateChannel: UpdateChannel = UpdateChannel.STABLE,
     val autoInstallEnabled: Boolean = false,
-    val autoInstallSupported: Boolean = false
+    val autoInstallSupported: Boolean = false,
+    val autoInstallNoticeEnabled: Boolean = false
 )
 
 @HiltViewModel
@@ -48,4 +49,6 @@ class UpdateViewModel @Inject constructor() : ViewModel() {
     fun openUnknownSourcesSettings() = Unit
 
     fun setAutoInstallEnabled(enabled: Boolean) = Unit
+
+    fun setAutoInstallNoticeEnabled(enabled: Boolean) = Unit
 }
