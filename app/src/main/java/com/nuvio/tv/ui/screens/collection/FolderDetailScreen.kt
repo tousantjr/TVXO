@@ -244,7 +244,7 @@ private fun FolderHeader(folder: com.nuvio.tv.domain.model.CollectionFolder) {
             }
             AsyncImage(
                 model = folder.coverImageUrl,
-                contentDescription = folder.title,
+                contentDescription = null,
                 modifier = Modifier
                     .width(iconWidth)
                     .height(iconHeight)
@@ -308,7 +308,7 @@ private fun TabbedGridContent(
             }
             AsyncImage(
                 model = folder.coverImageUrl,
-                contentDescription = folder.title,
+                contentDescription = null,
                 modifier = Modifier
                     .width(iconWidth)
                     .height(iconHeight)
