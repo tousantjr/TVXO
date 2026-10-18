@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -867,12 +869,21 @@ private fun RightStreamSection(
             .padding(top = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.xxxl)
     ) {
         resumeText?.let { text ->
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = NuvioTheme.colors.TextSecondary,
-                modifier = Modifier.padding(bottom = NuvioTheme.spacing.sm)
-            )
+            val resumeShape = RoundedCornerShape(20.dp)
+            Box(
+                modifier = Modifier
+                    .padding(bottom = NuvioTheme.spacing.md)
+                    .clip(resumeShape)
+                    .background(NuvioTheme.colors.BackgroundCard)
+                    .border(BorderStroke(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border), resumeShape)
+                    .padding(horizontal = NuvioTheme.spacing.xxl, vertical = NuvioTheme.spacing.md)
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = NuvioTheme.colors.TextPrimary
+                )
+            }
         }
         val chipRowHeight = NuvioTheme.spacing.huge
 
