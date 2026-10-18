@@ -276,15 +276,8 @@ android {
         abi {
             isEnable = !buildingAppBundle
             reset()
-            // Local dev only
-            val localAbi = providers.gradleProperty("nuvio.localAbi").orNull?.takeIf { it.isNotBlank() }
-            if (localAbi != null) {
-                include(localAbi)
-                isUniversalApk = false
-            } else {
-                include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-                isUniversalApk = true
-            }
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 

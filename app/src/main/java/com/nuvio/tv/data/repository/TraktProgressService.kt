@@ -28,7 +28,6 @@ import com.nuvio.tv.data.remote.dto.trakt.TraktWatchedMovieItemDto
 import com.nuvio.tv.data.remote.dto.trakt.TraktWatchedShowItemDto
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.domain.repository.MetaRepository
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -1102,8 +1101,6 @@ class TraktProgressService @Inject constructor(
 
             val snapshot = try {
                 progressDeferred.await()
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "fetchAllProgressSnapshot failed, keeping existing snapshot", e)
                 null

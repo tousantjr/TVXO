@@ -1,4 +1,0 @@
-# Local, gitignored files copied into a fresh worktree by tools/new-worktree.ps1.
-# One gitignore-style pattern per line.
-local.properties
-*.keystore
