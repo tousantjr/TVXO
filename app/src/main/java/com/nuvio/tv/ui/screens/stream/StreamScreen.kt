@@ -872,13 +872,13 @@ private fun RightStreamSection(
             Box(
                 modifier = Modifier
                     .padding(bottom = NuvioTheme.spacing.md)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.72f))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = NuvioTheme.spacing.xl, vertical = NuvioTheme.spacing.md)
             ) {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = NuvioTheme.colors.TextPrimary
                 )
             }
