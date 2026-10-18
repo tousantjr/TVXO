@@ -1,6 +1,7 @@
 package com.nuvio.tv.updater
 
 import android.content.Context
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.BuildConfig
@@ -32,7 +33,9 @@ data class UpdateUiState(
     val errorMessage: String? = null,
     val feedbackMessage: String? = null,
     val updateBannerEnabled: Boolean = true,
-    val updateChannel: UpdateChannel = UpdateChannel.STABLE
+    val updateChannel: UpdateChannel = UpdateChannel.STABLE,
+    val autoInstallEnabled: Boolean = false,
+    val autoInstallSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 )
 
 @HiltViewModel
@@ -40,7 +43,7 @@ class UpdateViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val updateRepository: UpdateRepository,
     private val updatePreferences: UpdatePreferences,
-    private val apkDownloader: ApkDownloader
+    private val downloadStore: UpdateDownloadStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UpdateUiState())
@@ -51,12 +54,16 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch {
             val enabled = updatePreferences.updateBannerEnabled.first()
             val channel = updatePreferences.getOrInitializeUpdateChannel()
+            val autoInstallEnabled = updatePreferences.autoInstallEnabled.first()
             _uiState.update {
                 it.copy(
                     updateBannerEnabled = enabled,
-                    updateChannel = channel
+                    updateChannel = channel,
+                    autoInstallEnabled = autoInstallEnabled
                 )
             }
+            downloadStore.clearIfInstalled()
+            syncBackgroundJobs()
             if (enabled && !BuildConfig.IS_DEBUG_BUILD) {
                 checkForUpdates(force = false, showNoUpdateFeedback = false)
             }
@@ -86,6 +93,10 @@ class UpdateViewModel @Inject constructor(
             result
                 .onSuccess { update ->
                     val remoteNewer = VersionUtils.isRemoteNewer(update.tag, BuildConfig.VERSION_NAME)
+                    val downloadedFile = if (remoteNewer) downloadStore.downloadedFileFor(update) else null
+                    if (remoteNewer && downloadedFile == null && update.tag != dismissedTag && !BuildConfig.IS_DEBUG_BUILD) {
+                        UpdateJobService.scheduleCheckNow(context)
+                    }
                     val shouldShow = UpdateBannerPolicy.shouldShow(
                         isRemoteNewer = remoteNewer,
                         force = force,
@@ -101,9 +112,8 @@ class UpdateViewModel @Inject constructor(
                             isUpdateAvailable = remoteNewer,
                             isDownloading = false,
                             downloadProgress = null,
-                            downloadedApkPath = state.downloadedApkPath.takeIf {
-                                remoteNewer && state.update?.tag == update.tag
-                            },
+                            downloadedApkPath = downloadedFile?.absolutePath
+                                ?: state.downloadedApkPath.takeIf { remoteNewer && state.update?.tag == update.tag },
                             showBanner = shouldShow,
                             showUnknownSourcesDialog = false,
                             errorMessage = null,
@@ -185,6 +195,7 @@ class UpdateViewModel @Inject constructor(
         }
         viewModelScope.launch {
             updatePreferences.setUpdateBannerEnabled(enabled)
+            syncBackgroundJobs()
             if (enabled && changed && !BuildConfig.IS_DEBUG_BUILD) {
                 checkForUpdates(force = false, showNoUpdateFeedback = false)
             }
@@ -196,7 +207,7 @@ class UpdateViewModel @Inject constructor(
         if (state.updateChannel == channel) return
 
         updateCheckJob?.cancel()
-        state.downloadedApkPath?.let { File(it).delete() }
+        UpdateJobService.cancelIdleInstall(context)
         _uiState.update {
             it.copy(
                 updateChannel = channel,
@@ -213,6 +224,7 @@ class UpdateViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
+            downloadStore.clear()
             updatePreferences.setUpdateChannel(channel)
             if (!BuildConfig.IS_DEBUG_BUILD) {
                 checkForUpdates(force = true, showNoUpdateFeedback = false)
@@ -232,10 +244,8 @@ class UpdateViewModel @Inject constructor(
                 )
             }
 
-            val safeName = update.assetName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
-            val destination = File(File(context.cacheDir, "updates"), safeName)
             val result = withContext(Dispatchers.IO) {
-                apkDownloader.download(update.assetUrl, destination) { downloaded, total ->
+                downloadStore.download(update) { downloaded, total ->
                     val progress = if (total != null && total > 0) {
                         (downloaded.toFloat() / total.toFloat()).coerceIn(0f, 1f)
                     } else {
@@ -290,7 +300,33 @@ class UpdateViewModel @Inject constructor(
         }
 
         _uiState.update { it.copy(showUnknownSourcesDialog = false) }
-        ApkInstaller.launchInstall(context, apkFile)
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { ApkInstaller.install(context, apkFile, background = false) }
+                .onFailure { ApkInstaller.launchSystemInstaller(context, apkFile) }
+        }
+    }
+
+    fun setAutoInstallEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(autoInstallEnabled = enabled) }
+        viewModelScope.launch {
+            updatePreferences.setAutoInstallEnabled(enabled)
+            syncBackgroundJobs()
+            if (enabled && downloadStore.pendingInstall() != null) {
+                UpdateJobService.scheduleIdleInstall(context)
+            }
+        }
+    }
+
+    // Background checks run while the banner or automatic installs are on; the idle install job only with the latter.
+    private fun syncBackgroundJobs() {
+        if (BuildConfig.IS_DEBUG_BUILD) return
+        val state = _uiState.value
+        if (state.updateBannerEnabled || state.autoInstallEnabled) {
+            UpdateJobService.schedulePeriodicCheck(context)
+        } else {
+            UpdateJobService.cancelPeriodicCheck(context)
+        }
+        if (!state.autoInstallEnabled) UpdateJobService.cancelIdleInstall(context)
     }
 
     fun openUnknownSourcesSettings() {

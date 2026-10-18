@@ -54,6 +54,17 @@ internal fun UpdateChannelSettings(
         }
     )
 
+    if (state.autoInstallSupported) {
+        SettingsToggleRow(
+            title = stringResource(R.string.about_update_auto_install_title),
+            subtitle = stringResource(R.string.about_update_auto_install_subtitle),
+            checked = state.autoInstallEnabled,
+            onToggle = {
+                viewModel.setAutoInstallEnabled(!state.autoInstallEnabled)
+            }
+        )
+    }
+
     SettingsActionRow(
         title = stringResource(R.string.about_check_updates),
         subtitle = stringResource(R.string.about_check_updates_subtitle),

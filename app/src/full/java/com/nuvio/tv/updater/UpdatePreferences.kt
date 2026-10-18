@@ -27,6 +27,9 @@ class UpdatePreferences @Inject constructor(
     private val lastCheckAtKey = longPreferencesKey("last_check_at_ms")
     private val updateBannerEnabledKey = booleanPreferencesKey("update_banner_enabled")
     private val updateChannelKey = stringPreferencesKey("update_channel")
+    private val autoInstallEnabledKey = booleanPreferencesKey("auto_install_enabled")
+    private val downloadedTagKey = stringPreferencesKey("downloaded_release_tag")
+    private val downloadedApkPathKey = stringPreferencesKey("downloaded_apk_path")
 
     val ignoredTag: Flow<String?> = dataStore.data.map { prefs ->
         prefs[ignoredTagKey]
@@ -43,6 +46,17 @@ class UpdatePreferences @Inject constructor(
     val updateChannel: Flow<UpdateChannel> = dataStore.data.map { prefs ->
         UpdateChannel.fromStoredValue(prefs[updateChannelKey])
             ?: UpdateChannel.defaultForVersion(BuildConfig.VERSION_NAME)
+    }
+
+    val autoInstallEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[autoInstallEnabledKey] ?: false
+    }
+
+    /** Release tag and APK path of the update already downloaded, if any, so it survives the app being closed. */
+    val downloadedUpdate: Flow<Pair<String, String>?> = dataStore.data.map { prefs ->
+        val tag = prefs[downloadedTagKey]
+        val path = prefs[downloadedApkPathKey]
+        if (tag != null && path != null) tag to path else null
     }
 
     suspend fun getOrInitializeUpdateChannel(): UpdateChannel {
@@ -71,6 +85,24 @@ class UpdatePreferences @Inject constructor(
     suspend fun setUpdateBannerEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[updateBannerEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAutoInstallEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[autoInstallEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setDownloadedUpdate(tag: String?, apkPath: String?) {
+        dataStore.edit { prefs ->
+            if (tag == null || apkPath == null) {
+                prefs.remove(downloadedTagKey)
+                prefs.remove(downloadedApkPathKey)
+            } else {
+                prefs[downloadedTagKey] = tag
+                prefs[downloadedApkPathKey] = apkPath
+            }
         }
     }
 
