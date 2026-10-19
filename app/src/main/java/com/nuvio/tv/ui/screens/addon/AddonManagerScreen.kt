@@ -1,5 +1,6 @@
 package com.nuvio.tv.ui.screens.addon
 
+import com.nuvio.tv.ui.theme.NuvioPrimitives
 import com.nuvio.tv.ui.theme.NuvioTheme
 
 import android.graphics.Bitmap
@@ -594,9 +595,9 @@ internal fun AddonMessageOverlay(
                 onClick = { },
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = if (isError) {
-                        Color(0xFFC62828).copy(alpha = 0.92f)
+                        NuvioPrimitives.red600.copy(alpha = 0.92f)
                     } else {
-                        Color(0xFF2E7D32).copy(alpha = 0.92f)
+                        NuvioPrimitives.green700.copy(alpha = 0.92f)
                     }
                 ),
                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(NuvioTheme.radii.md))
