@@ -133,10 +133,8 @@ internal class MdbListLibraryRemote(private val api: MdbListApiClient, private v
             val page = decodeMdbListLibraryPage(response.body)
             val before = items.size
             page.items.forEach { item -> if (item.key !in items) items[item.key] = item }
-            // Read-only lists can be other users' huge public lists: keep the first part instead of the whole list.
-            if (readOnly && (items.size >= MDBLIST_READ_ONLY_LIST_ITEM_LIMIT || items.size == before)) {
-                return items.values.take(MDBLIST_READ_ONLY_LIST_ITEM_LIMIT)
-            }
+            // A read-only list page that repeats earlier titles means the server is looping, so stop there.
+            if (readOnly && items.size == before) return items.values.toList()
             val nextCursor = page.nextCursor ?: response.header("X-Next-Cursor")?.takeIf { it.isNotBlank() }
             query = when {
                 nextCursor != null -> initial + ("cursor" to nextCursor)
@@ -148,8 +146,6 @@ internal class MdbListLibraryRemote(private val api: MdbListApiClient, private v
         throw MdbListDecodingException()
     }
 }
-
-internal const val MDBLIST_READ_ONLY_LIST_ITEM_LIMIT = 5_000
 
 internal fun mdbListLibraryItemsPath(key: String): String = when {
     key == MDBLIST_WATCHLIST_KEY -> "/watchlist/items"

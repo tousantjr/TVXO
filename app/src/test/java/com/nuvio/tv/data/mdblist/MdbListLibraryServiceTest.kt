@@ -480,16 +480,18 @@ class MdbListLibraryServiceTest {
     }
 
     @Test
-    fun `read-only lists stop at the item limit or when a page adds nothing new`() = runTest {
+    fun `read-only lists are read in full and stop when a page adds nothing new`() = runTest {
         val h = MdbListSyncTestHarness(backgroundScope)
         val remote = MdbListLibraryRemote(h.http.api, h.repository.currentScope())
-        repeat(10) { page ->
+        repeat(8) { page ->
             val movies = (1..1000).joinToString(",") { """{"id":${page * 1000 + it}}""" }
-            h.http.reply(body = """{"movies":[$movies],"pagination":{"next_cursor":"page-${page + 1}","has_more":true}}""")
+            val pagination = if (page < 7) """{"next_cursor":"page-${page + 1}","has_more":true}""" else """{"has_more":false}"""
+            h.http.reply(body = """{"movies":[$movies],"pagination":$pagination}""")
         }
-        val capped = remote.items("mdblist:liked:79776")
-        assertEquals(MDBLIST_READ_ONLY_LIST_ITEM_LIMIT, capped.size)
-        assertEquals(MDBLIST_READ_ONLY_LIST_ITEM_LIMIT / 1000, h.http.engine.requests.size)
+        val whole = remote.items("mdblist:external:9")
+        assertEquals(8_000, whole.size)
+        assertEquals(8_000L, whole.last().media.ids.tmdb)
+        assertEquals(8, h.http.engine.requests.size)
 
         val h2 = MdbListSyncTestHarness(backgroundScope)
         h2.http.reply(body = """{"movies":[{"id":1}],"pagination":{"next_cursor":"a","has_more":true}}""")
