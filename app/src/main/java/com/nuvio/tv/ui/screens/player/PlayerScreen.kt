@@ -1026,6 +1026,14 @@ fun PlayerScreen(
             !uiState.showSpeedDialog &&
             !postPlayRecommendationState.isVisible &&
             uiState.postPlayMode !is PostPlayMode.StillWatching
+        val latestPlayerControlsVisible by rememberUpdatedState(playerControlsVisible)
+        LaunchedEffect(playerControlsVisible) {
+            if (!playerControlsVisible) {
+                subtitleControlsClearancePx = 0f
+                progressBarSubtitleClearancePx = 0f
+                controlsTitleRightPx = 0f
+            }
+        }
         val fallbackSubtitleLiftPx = with(LocalDensity.current) { SUBTITLE_CONTROLS_LIFT.toPx() }
         val playerSurfaceModifier = Modifier
             .align(Alignment.TopEnd)
@@ -1100,8 +1108,9 @@ fun PlayerScreen(
                     clearsTitle = subtitleClearsControlsTitle
                 )
                 var heldControlsClearancePx by remember { mutableFloatStateOf(0f) }
-                LaunchedEffect(playerControlsVisible, effectiveControlsClearancePx) {
-                    heldControlsClearancePx = if (playerControlsVisible) {
+                val controlsClearanceMeasured = playerControlsVisible && subtitleControlsClearancePx > 0f
+                LaunchedEffect(controlsClearanceMeasured, effectiveControlsClearancePx) {
+                    heldControlsClearancePx = if (controlsClearanceMeasured) {
                         maxOf(heldControlsClearancePx, effectiveControlsClearancePx)
                     } else {
                         0f
@@ -1109,7 +1118,7 @@ fun PlayerScreen(
                 }
                 val targetSubtitleLiftPx = computeSubtitleLiftPx(
                     previewConfiguredPosition = previewConfiguredSubtitlePosition,
-                    controlsVisible = playerControlsVisible,
+                    controlsVisible = controlsClearanceMeasured,
                     controlsClearancePx = maxOf(heldControlsClearancePx, effectiveControlsClearancePx),
                     fallbackControlsLiftPx = fallbackSubtitleLiftPx,
                     skipVisible = skipButtonActuallyVisible,
@@ -1496,10 +1505,15 @@ fun PlayerScreen(
             PlayerControlsOverlay(
                 uiState = uiState,
                 viewModel = viewModel,
-                onSubtitleClearanceChanged = { subtitleControlsClearancePx = it },
+                subtitleReportingActive = playerControlsVisible,
+                onSubtitleClearanceChanged = {
+                    if (latestPlayerControlsVisible) subtitleControlsClearancePx = it
+                },
                 onSubtitleTitleBoundsChanged = { progressBarClearance, titleRight ->
-                    progressBarSubtitleClearancePx = progressBarClearance
-                    controlsTitleRightPx = titleRight
+                    if (latestPlayerControlsVisible) {
+                        progressBarSubtitleClearancePx = progressBarClearance
+                        controlsTitleRightPx = titleRight
+                    }
                 },
                 playPauseFocusRequester = playPauseFocusRequester,
                 progressBarFocusRequester = progressBarFocusRequester,
@@ -2351,7 +2365,6 @@ private fun PlayerView.applySubtitleStyleIfNeeded(
         return
     }
     setTag(R.id.player_view_subtitle_style_tag, config)
-    bindSubtitleFrameLayoutListener()
     subView.apply {
         val baseFontSize = EXO_SUBTITLE_BASE_SP
         val scaledFontSize = baseFontSize * (subtitleStyle.size / 100f)
@@ -2389,10 +2402,9 @@ private fun PlayerView.applySubtitleStyleIfNeeded(
             val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt().coerceAtLeast(0)
             setPadding(paddingLeft, paddingTop, paddingRight, extraPadding)
             val availableHeight = height - extraPadding
-            val liftInView = liftPx - subtitleFrameBottomGapPx()
             setBottomPaddingFraction(
-                if (liftInView > 0f && availableHeight > 0) {
-                    maxOf(bottomPaddingFraction, (liftInView - extraPadding) / availableHeight).coerceIn(0f, 0.5f)
+                if (liftPx > 0f && availableHeight > 0) {
+                    maxOf(bottomPaddingFraction, (liftPx - extraPadding) / availableHeight).coerceIn(0f, 0.5f)
                 } else {
                     bottomPaddingFraction
                 }
@@ -2413,8 +2425,7 @@ private fun PlayerView.exoSubtitleTextMetrics(): SubtitleTextMetrics? {
     val applied = getTag(R.id.player_view_subtitle_style_tag) as? SubtitleAppliedConfig ?: return null
     if (applied.isAss) return null
     val subView = subtitleView ?: return null
-    val frame = subView.parent as? android.view.View ?: return null
-    if (subView.width <= 0 || frame.width <= 0) return null
+    if (subView.width <= 0) return null
     val textSizePx = android.util.TypedValue.applyDimension(
         android.util.TypedValue.COMPLEX_UNIT_SP,
         EXO_SUBTITLE_BASE_SP * (applied.style.size / 100f),
@@ -2422,14 +2433,14 @@ private fun PlayerView.exoSubtitleTextMetrics(): SubtitleTextMetrics? {
     )
     val innerPaddingPx = textSizePx * EXO_SUBTITLE_INNER_PADDING_RATIO
     val location = IntArray(2)
-    frame.getLocationInWindow(location)
+    subView.getLocationInWindow(location)
     return SubtitleTextMetrics(
         textSizePx = textSizePx,
         bold = applied.style.bold,
-        scaleX = frame.scaleX,
+        scaleX = 1f,
         innerPaddingPx = innerPaddingPx,
         wrapWidthPx = (subView.width - subView.paddingLeft - subView.paddingRight - innerPaddingPx * 2f).coerceAtLeast(0f),
-        centerXPx = location[0] + frame.width * frame.scaleX / 2f
+        centerXPx = location[0] + subView.width / 2f
     )
 }
 
@@ -2441,23 +2452,6 @@ private fun measureSubtitleBlockPx(
     paint.textSize = metrics.textSizePx
     paint.typeface = if (metrics.bold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
     return subtitleBlockWidthPx(text, metrics) { paint.measureText(it) }
-}
-
-private fun PlayerView.subtitleFrameBottomGapPx(): Float {
-    val frame = subtitleView?.parent as? android.view.View ?: return 0f
-    if (height <= 0 || frame.height <= 0) return 0f
-    return (height - (frame.y + frame.height)).coerceAtLeast(0f)
-}
-
-private fun PlayerView.bindSubtitleFrameLayoutListener() {
-    val frame = subtitleView?.parent as? android.view.View ?: return
-    if (frame.getTag(R.id.player_view_subtitle_frame_listener_tag) != null) return
-    frame.setTag(R.id.player_view_subtitle_frame_listener_tag, true)
-    frame.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-        if (left == oldLeft && top == oldTop && right == oldRight && bottom == oldBottom) return@addOnLayoutChangeListener
-        val applied = getTag(R.id.player_view_subtitle_style_tag) as? SubtitleAppliedConfig ?: return@addOnLayoutChangeListener
-        if (applied.liftPx > 0f) post { applySubtitleStyleIfNeeded(applied.style, applied.liftPx, force = true) }
-    }
 }
 
 private fun PlayerView.syncLibassOverlay(
@@ -2568,6 +2562,7 @@ private fun PlayerControlsOverlay(
     onBack: () -> Unit,
     reportCodeVisible: Boolean,
     skipButtonVisible: Boolean = false,
+    subtitleReportingActive: Boolean = true,
     onSubtitleClearanceChanged: (Float) -> Unit = {},
     onSubtitleTitleBoundsChanged: (Float, Float) -> Unit = { _, _ -> }
 ) {
@@ -2579,8 +2574,12 @@ private fun PlayerControlsOverlay(
     val titleRights = remember { mutableStateMapOf<String, Float>() }
     var progressBarClearancePx by remember { mutableFloatStateOf(0f) }
     val titleRightPx = titleRights.values.maxOrNull() ?: 0f
-    LaunchedEffect(progressBarClearancePx, titleRightPx) {
-        latestTitleBoundsCallback(progressBarClearancePx, titleRightPx)
+    var controlsClearancePx by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(subtitleReportingActive, controlsClearancePx) {
+        if (subtitleReportingActive && controlsClearancePx > 0f) latestClearanceCallback(controlsClearancePx)
+    }
+    LaunchedEffect(subtitleReportingActive, progressBarClearancePx, titleRightPx) {
+        if (subtitleReportingActive) latestTitleBoundsCallback(progressBarClearancePx, titleRightPx)
     }
     val customPlayPainter = rememberRawSvgPainter(R.raw.ic_player_play)
     val customPausePainter = rememberRawSvgPainter(R.raw.ic_player_pause)
@@ -2638,7 +2637,7 @@ private fun PlayerControlsOverlay(
                     val rootHeight = coordinates.findRootCoordinates().size.height
                     val top = coordinates.boundsInRoot().top
                     if (rootHeight > 0) {
-                        latestClearanceCallback((rootHeight - top - clearanceOffsetPx).coerceAtLeast(0f))
+                        controlsClearancePx = (rootHeight - top - clearanceOffsetPx).coerceAtLeast(0f)
                     }
                 }
                 .padding(horizontal = NuvioTheme.spacing.xxl, vertical = NuvioTheme.spacing.xl)
