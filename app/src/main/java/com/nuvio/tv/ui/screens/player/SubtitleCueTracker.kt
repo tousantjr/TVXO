@@ -9,33 +9,44 @@ import kotlinx.coroutines.flow.asStateFlow
 
 internal data class SubtitleCueState(
     val version: Long = 0L,
-    val visible: Boolean = false
+    val visible: Boolean = false,
+    val text: String = "",
+    val hasBitmap: Boolean = false
 )
 
 internal class SubtitleCueTracker {
     private val mutableState = MutableStateFlow(SubtitleCueState())
     val state: StateFlow<SubtitleCueState> = mutableState.asStateFlow()
+    private val mutablePrescannedTexts = MutableStateFlow<List<String>>(emptyList())
+    val prescannedTexts: StateFlow<List<String>> = mutablePrescannedTexts.asStateFlow()
 
     @Volatile
     private var lastKey: String? = null
 
     fun update(cues: List<Cue>) {
+        val hasBitmap = cues.any { it.bitmap != null }
         publish(
-            key = cues.joinToString("\u0000") { it.text?.toString().orEmpty() },
-            visible = cues.any { !it.text.isNullOrBlank() || it.bitmap != null }
+            key = cues.joinToString("\u0000") { it.text?.toString().orEmpty() } + if (hasBitmap) "\u0001" else "",
+            visible = cues.any { !it.text.isNullOrBlank() || it.bitmap != null },
+            text = cues.mapNotNull { it.text?.toString()?.takeIf(String::isNotBlank) }.joinToString("\n"),
+            hasBitmap = hasBitmap
         )
     }
 
     fun updateText(text: String?) {
         val key = text.orEmpty()
-        publish(key = key, visible = key.isNotBlank())
+        publish(key = key, visible = key.isNotBlank(), text = key, hasBitmap = false)
+    }
+
+    fun setPrescannedTexts(texts: List<String>) {
+        mutablePrescannedTexts.value = texts
     }
 
     @Synchronized
-    private fun publish(key: String, visible: Boolean) {
+    private fun publish(key: String, visible: Boolean, text: String, hasBitmap: Boolean) {
         if (key == lastKey) return
         lastKey = key
-        mutableState.value = SubtitleCueState(mutableState.value.version + 1, visible)
+        mutableState.value = SubtitleCueState(mutableState.value.version + 1, visible, text, hasBitmap)
     }
 }
 

@@ -54,3 +54,44 @@ internal fun nextSubtitleLift(
     if (cueVersion != pendingDropCueVersion) return SubtitleLiftDecision(targetLiftPx, null)
     return SubtitleLiftDecision(appliedLiftPx, pendingDropCueVersion)
 }
+
+internal data class SubtitleTextMetrics(
+    val textSizePx: Float,
+    val bold: Boolean,
+    val scaleX: Float,
+    val innerPaddingPx: Float,
+    val wrapWidthPx: Float,
+    val centerXPx: Float
+)
+
+internal fun subtitleBlockWidthPx(
+    text: String,
+    metrics: SubtitleTextMetrics,
+    measureLine: (String) -> Float
+): Float {
+    val widestLine = text.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .maxOfOrNull(measureLine) ?: return 0f
+    return (minOf(widestLine, metrics.wrapWidthPx) + metrics.innerPaddingPx * 2f) * metrics.scaleX
+}
+
+internal fun subtitleClearsTitle(
+    blockWidthPx: Float?,
+    centerXPx: Float,
+    titleRightPx: Float,
+    marginPx: Float
+): Boolean {
+    if (blockWidthPx == null) return false
+    if (titleRightPx <= 0f) return true
+    return centerXPx - blockWidthPx / 2f - marginPx >= titleRightPx
+}
+
+internal fun effectiveSubtitleControlsClearancePx(
+    fullClearancePx: Float,
+    progressBarClearancePx: Float,
+    clearsTitle: Boolean
+): Float {
+    if (!clearsTitle || progressBarClearancePx <= 0f) return fullClearancePx
+    return minOf(fullClearancePx, progressBarClearancePx)
+}
