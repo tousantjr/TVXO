@@ -225,6 +225,11 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         mpv.setPropertyDouble("time-pos", seconds)
     }
 
+    fun currentSubtitleText(): String? {
+        if (!initialized) return null
+        return mpv.getPropertyString("sub-text")
+    }
+
     fun currentPositionMs(): Long {
         if (!initialized) return 0L
         val seconds = mpv.getPropertyDouble("time-pos/full")

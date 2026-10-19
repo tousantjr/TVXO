@@ -1058,10 +1058,19 @@ fun PlayerScreen(
             }
 
             Box(modifier = playerSurfaceModifier) {
-                val subtitleLiftPx = computeSubtitleLiftPx(
-                    previewConfiguredPosition = uiState.showSubtitleOverlay || uiState.showSubtitleStylePanel,
+                val previewConfiguredSubtitlePosition = uiState.showSubtitleOverlay || uiState.showSubtitleStylePanel
+                var heldControlsClearancePx by remember { mutableFloatStateOf(0f) }
+                LaunchedEffect(playerControlsVisible, subtitleControlsClearancePx) {
+                    heldControlsClearancePx = if (playerControlsVisible) {
+                        maxOf(heldControlsClearancePx, subtitleControlsClearancePx)
+                    } else {
+                        0f
+                    }
+                }
+                val targetSubtitleLiftPx = computeSubtitleLiftPx(
+                    previewConfiguredPosition = previewConfiguredSubtitlePosition,
                     controlsVisible = playerControlsVisible,
-                    controlsClearancePx = subtitleControlsClearancePx,
+                    controlsClearancePx = maxOf(heldControlsClearancePx, subtitleControlsClearancePx),
                     fallbackControlsLiftPx = fallbackSubtitleLiftPx,
                     skipVisible = skipButtonActuallyVisible,
                     skipClearancePx = skipClearancePx,
@@ -1070,6 +1079,36 @@ fun PlayerScreen(
                     seekVisible = seekOverlayVisible,
                     seekClearancePx = seekClearancePx
                 )
+                val subtitleCueState by viewModel.controller.subtitleCueTracker.state.collectAsState()
+                var subtitleLiftPx by remember { mutableFloatStateOf(0f) }
+                var pendingDropCueVersion by remember { mutableStateOf<Long?>(null) }
+                var subtitleDropTimedOut by remember { mutableStateOf(false) }
+                val applySubtitleLiftImmediately = !uiState.isPlaying || previewConfiguredSubtitlePosition
+                LaunchedEffect(
+                    targetSubtitleLiftPx,
+                    subtitleCueState,
+                    applySubtitleLiftImmediately,
+                    subtitleDropTimedOut
+                ) {
+                    val decision = nextSubtitleLift(
+                        targetLiftPx = targetSubtitleLiftPx,
+                        appliedLiftPx = subtitleLiftPx,
+                        cueVersion = subtitleCueState.version,
+                        cueVisible = subtitleCueState.visible,
+                        applyImmediately = applySubtitleLiftImmediately,
+                        pendingDropCueVersion = pendingDropCueVersion,
+                        dropTimedOut = subtitleDropTimedOut
+                    )
+                    subtitleLiftPx = decision.appliedLiftPx
+                    pendingDropCueVersion = decision.pendingDropCueVersion
+                    if (decision.pendingDropCueVersion == null) subtitleDropTimedOut = false
+                }
+                LaunchedEffect(pendingDropCueVersion) {
+                    if (pendingDropCueVersion != null) {
+                        delay(SUBTITLE_LIFT_DROP_TIMEOUT_MS)
+                        subtitleDropTimedOut = true
+                    }
+                }
                 if (uiState.internalPlayerEngine == InternalPlayerEngine.MVP_PLAYER) {
                     MpvPlayerSurface(
                         viewModel = viewModel,
@@ -2235,6 +2274,7 @@ private fun PlayerView.applySubtitleStyleIfNeeded(
         return
     }
     setTag(R.id.player_view_subtitle_style_tag, config)
+    bindSubtitleFrameLayoutListener()
     subView.apply {
         val baseFontSize = 24f
         val scaledFontSize = baseFontSize * (subtitleStyle.size / 100f)
@@ -2268,18 +2308,37 @@ private fun PlayerView.applySubtitleStyleIfNeeded(
 
         val bottomPaddingFraction =
             (0.06f + (subtitleStyle.verticalOffset / 250f)).coerceIn(0f, 0.4f)
-        setBottomPaddingFraction(bottomPaddingFraction)
-
-        post {
+        val applyPosition = {
             val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt().coerceAtLeast(0)
             setPadding(paddingLeft, paddingTop, paddingRight, extraPadding)
             val availableHeight = height - extraPadding
-            if (liftPx > 0f && availableHeight > 0) {
-                setBottomPaddingFraction(
-                    maxOf(bottomPaddingFraction, (liftPx - extraPadding) / availableHeight).coerceIn(0f, 0.5f)
-                )
-            }
+            val liftInView = liftPx - subtitleFrameBottomGapPx()
+            setBottomPaddingFraction(
+                if (liftInView > 0f && availableHeight > 0) {
+                    maxOf(bottomPaddingFraction, (liftInView - extraPadding) / availableHeight).coerceIn(0f, 0.5f)
+                } else {
+                    bottomPaddingFraction
+                }
+            )
         }
+        if (height > 0) applyPosition() else post { applyPosition() }
+    }
+}
+
+private fun PlayerView.subtitleFrameBottomGapPx(): Float {
+    val frame = subtitleView?.parent as? android.view.View ?: return 0f
+    if (height <= 0 || frame.height <= 0) return 0f
+    return (height - (frame.y + frame.height)).coerceAtLeast(0f)
+}
+
+private fun PlayerView.bindSubtitleFrameLayoutListener() {
+    val frame = subtitleView?.parent as? android.view.View ?: return
+    if (frame.getTag(R.id.player_view_subtitle_frame_listener_tag) != null) return
+    frame.setTag(R.id.player_view_subtitle_frame_listener_tag, true)
+    frame.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+        if (left == oldLeft && top == oldTop && right == oldRight && bottom == oldBottom) return@addOnLayoutChangeListener
+        val applied = getTag(R.id.player_view_subtitle_style_tag) as? SubtitleAppliedConfig ?: return@addOnLayoutChangeListener
+        if (applied.liftPx > 0f) post { applySubtitleStyleIfNeeded(applied.style, applied.liftPx, force = true) }
     }
 }
 

@@ -76,4 +76,27 @@ class SubtitleLiftRulesTest {
 
         assertEquals(140f, lift)
     }
+
+    @Test
+    fun `lift rises right away even while a line is showing`() {
+        assertEquals(
+            SubtitleLiftDecision(200f, null),
+            nextSubtitleLift(200f, 0f, cueVersion = 3, cueVisible = true, applyImmediately = false, pendingDropCueVersion = null, dropTimedOut = false)
+        )
+    }
+
+    @Test
+    fun `lift drops only after the shown line changes`() {
+        val waiting = nextSubtitleLift(0f, 200f, cueVersion = 3, cueVisible = true, applyImmediately = false, pendingDropCueVersion = null, dropTimedOut = false)
+        assertEquals(SubtitleLiftDecision(200f, 3L), waiting)
+        assertEquals(waiting, nextSubtitleLift(0f, 200f, 3, true, false, waiting.pendingDropCueVersion, false))
+        assertEquals(SubtitleLiftDecision(0f, null), nextSubtitleLift(0f, 200f, 4, true, false, waiting.pendingDropCueVersion, false))
+    }
+
+    @Test
+    fun `lift drops right away with no line, when paused or previewing, or after the timeout`() {
+        assertEquals(SubtitleLiftDecision(0f, null), nextSubtitleLift(0f, 200f, 3, cueVisible = false, applyImmediately = false, pendingDropCueVersion = null, dropTimedOut = false))
+        assertEquals(SubtitleLiftDecision(0f, null), nextSubtitleLift(0f, 200f, 3, cueVisible = true, applyImmediately = true, pendingDropCueVersion = null, dropTimedOut = false))
+        assertEquals(SubtitleLiftDecision(0f, null), nextSubtitleLift(0f, 200f, 3, cueVisible = true, applyImmediately = false, pendingDropCueVersion = 3L, dropTimedOut = true))
+    }
 }
