@@ -871,14 +871,17 @@ private fun RightStreamSection(
         resumeText?.let { text ->
             Box(
                 modifier = Modifier
-                    .padding(bottom = NuvioTheme.spacing.md)
-                    .clip(RoundedCornerShape(24.dp))
+                    // Start padding and height mirror the chip row below (LazyRow contentPadding sm, tv FilterChip 36dp).
+                    .padding(start = NuvioTheme.spacing.sm, bottom = NuvioTheme.spacing.sm)
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.72f))
-                    .padding(horizontal = NuvioTheme.spacing.xl, vertical = NuvioTheme.spacing.md)
+                    .padding(horizontal = NuvioTheme.spacing.lg),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = NuvioTheme.colors.TextPrimary
                 )
             }
