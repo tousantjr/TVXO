@@ -82,6 +82,7 @@ fun UpdateBannerHost(
                     state = state,
                     update = it,
                     isInstalledUpdate = state.update == null,
+                    autoDismissPaused = showReleaseNotes,
                     onDownload = onDownload,
                     onInstall = onInstall,
                     onShowReleaseNotes = { showReleaseNotes = true },
