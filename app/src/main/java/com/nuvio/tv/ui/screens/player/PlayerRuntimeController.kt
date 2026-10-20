@@ -442,6 +442,12 @@ class PlayerRuntimeController(
     internal var activeSidecarGeneration: Long = 0L // AutoSync hook
     internal var activeSidecarSubtitleKey: String? = null
     internal var sidecarTimedCues: List<androidx.media3.extractor.text.CuesWithTiming> = emptyList()
+        set(value) {
+            field = value
+            subtitleCueTracker.setPrescannedTexts(
+                value.flatMap { it.cues }.mapNotNull { it.text?.toString()?.takeIf(String::isNotBlank) }
+            )
+        }
     internal var lastSidecarCueSignature: Long? = null
     internal var exoSubtitleViewRef: WeakReference<androidx.media3.ui.SubtitleView>? = null
     /** Cancels previous TEXT-track bounce jobs when subtitle delay is adjusted repeatedly. */
@@ -598,6 +604,7 @@ class PlayerRuntimeController(
     internal var currentMediaSession: MediaSession? = null
     internal var ffmpegAudioRenderer: FfmpegAudioRenderer? = null
     internal var mpvView: NuvioMpvSurfaceView? = null
+    internal val subtitleCueTracker = SubtitleCueTracker()
     internal var mpvInitializationInProgress: Boolean = false
     internal var mpvMediaLoadPrepared: Boolean = false
     internal var mpvTrackRefreshJob: Job? = null
