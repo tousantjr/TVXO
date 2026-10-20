@@ -2371,7 +2371,51 @@ private fun PlayerView.syncExoSurfaceLayout(
         resizeMode = targetResizeMode
     }
     applyExoAspectMode(aspectModeAppliedToExoSurface(tunnelingEnabled, aspectMode))
+    syncLibassOverlayOffset(aspectMode)
     reportSubtitleTextMetrics()
+}
+
+private const val ASS_VIDEO_ASPECT_TOLERANCE = 0.01f
+
+/**
+ * libass renders overlays into the full output surface. Keep that surface unscaled so text is
+ * proportioned correctly, then align it with the centred video rectangle by translating it over
+ * letterbox or pillarbox bars. This applies only when the ASS script's PlayRes aspect ratio
+ * matches the video: a differently shaped authoring canvas may intentionally use other
+ * coordinates.
+ */
+private fun PlayerView.syncLibassOverlayOffset(aspectMode: AspectMode) {
+    val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl) ?: return
+    overlay.translationX = 0f
+    overlay.translationY = 0f
+
+    if (!overlay.hasAssOverlayChild()) return
+
+    if (aspectMode != AspectMode.ORIGINAL) {
+        return
+    }
+
+    val videoAspect = readExoVideoAspectRatio(this) ?: return
+    val viewAspect = readViewAspectRatio(width, height)
+    if (videoAspect <= 0f || viewAspect <= 0f) return
+
+    val assTrack = (player as? ExoPlayer)?.getAssHandlerCompat()?.track ?: return
+    val assWidth = assTrack.getWidth()
+    val assHeight = assTrack.getHeight()
+    if (assWidth <= 0 || assHeight <= 0) return
+
+    val assAspect = assWidth.toFloat() / assHeight
+    val aspectDifference = abs(assAspect - videoAspect) / videoAspect
+    if (aspectDifference > ASS_VIDEO_ASPECT_TOLERANCE) return
+
+    overlay.translationX = when {
+        videoAspect < viewAspect -> (width - height * videoAspect) / 2f
+        else -> 0f
+    }
+    overlay.translationY = when {
+        videoAspect > viewAspect -> (height - width / videoAspect) / 2f
+        else -> 0f
+    }
 }
 
 private data class SubtitleAppliedConfig(
@@ -2584,6 +2628,7 @@ private fun PlayerView.syncLibassOverlay(
         )
     )
     setTag(R.id.libass_overlay_bound_player, player)
+    syncLibassOverlayOffset(getTag(R.id.player_view_aspect_mode_tag) as? AspectMode ?: AspectMode.ORIGINAL)
 }
 
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
