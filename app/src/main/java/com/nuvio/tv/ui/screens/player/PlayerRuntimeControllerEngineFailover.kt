@@ -116,7 +116,7 @@ internal fun PlayerRuntimeController.switchToInternalPlayerEngine(
     pendingMpvHardRestartOnNextAttach = switchingToMpv
     delayMpvResumeSeekUntilVideoTrack = switchingToMpv
 
-    releasePlayer(flushPlaybackState = true)
+    releasePlayer(flushPlaybackState = true, keepTorrentStream = true)
     initializePlayer(
         url = currentStreamUrl,
         headers = currentHeaders,

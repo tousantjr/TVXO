@@ -370,6 +370,20 @@
     <string name="appearance_settings_style_subtitle">Choose how the settings screens are presented</string>
     <string name="appearance_launcher_artwork">Launcher Artwork</string>
     <string name="appearance_launcher_artwork_subtitle">Choose how Nuvio appears on your TV home screen</string>
+    <string name="ambient_mode_title">Ambient Mode</string>
+    <string name="ambient_mode_subtitle">Show artwork from your catalogs while the TV sits idle</string>
+    <string name="ambient_mode_enabled_subtitle">Fill the screen with backdrops after a period with no remote input</string>
+    <string name="ambient_mode_timeout">Start After</string>
+    <string name="ambient_mode_timeout_subtitle">How long to wait before Ambient Mode starts</string>
+    <plurals name="ambient_mode_timeout_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <string name="ambient_mode_catalogs">Catalogs</string>
+    <string name="ambient_mode_catalogs_subtitle">Choose up to 3 catalogs to pull artwork from</string>
+    <string name="ambient_mode_catalogs_dialog_subtitle">Choose up to 3 catalogs</string>
+    <string name="ambient_mode_catalogs_default">Same as hero</string>
+    <string name="ambient_mode_catalogs_count">%1$d of %2$d</string>
     <string name="appearance_app_icon_and_banner">App Icon &amp; Banner</string>
     <string name="appearance_app_icon_and_banner_subtitle">Change app icon and banner</string>
     <string name="appearance_app_icon_picker_title">Choose App Icon &amp; Banner</string>
@@ -894,6 +908,10 @@
     <string name="sub_outline">Outline</string>
     <string name="sub_outline_sub">Add outline around subtitle text for better visibility</string>
     <string name="sub_outline_color">Outline Color</string>
+    <string name="sub_hdr_style">Separate HDR / Dolby Vision style</string>
+    <string name="sub_hdr_style_sub">Use a different text color and a dimmer brightness for subtitles on HDR and Dolby Vision video</string>
+    <string name="sub_hdr_text_color">HDR Text Color</string>
+    <string name="sub_hdr_brightness">HDR Subtitle Brightness</string>
     <string name="sub_advanced_section">Advanced Subtitle Rendering</string>
     <string name="sub_libass">Use libass for ASS/SSA subtitles</string>
     <string name="sub_libass_sub">Experimental: advanced ASS/SSA rendering (styles, positioning, animations)</string>
@@ -1169,6 +1187,7 @@
     <string name="layout_custom_poster_screen_library">Library</string>
     <string name="layout_custom_poster_screen_search">Search</string>
     <string name="layout_custom_poster_screen_details">Details Screen</string>
+    <string name="layout_custom_poster_screen_tv_recommendations">TV Recommendations</string>
 
     <!-- Custom Poster Web Page -->
     <string name="layout_always_show_landscape_clearlogo">Always Backdrop with Logo for Landscape Posters</string>
@@ -1956,6 +1975,9 @@
     <string name="subtitle_style_bold">Bold</string>
     <string name="subtitle_style_text_color">Text Color</string>
     <string name="subtitle_style_text_opacity">Text Opacity</string>
+    <string name="subtitle_style_text_color_hdr">Text Color (HDR)</string>
+    <string name="subtitle_style_text_opacity_hdr">Text Opacity (HDR)</string>
+    <string name="subtitle_style_brightness_hdr">Brightness (HDR)</string>
     <string name="subtitle_style_outline">Outline</string>
     <string name="subtitle_style_bottom_offset">Bottom Offset</string>
     <string name="subtitle_style_defaults">Defaults</string>
@@ -3246,8 +3268,6 @@
     <string name="playback_reset_to_default">Reset to Default</string>
     <string name="playback_net_custom">Custom Network</string>
     <string name="playback_net_custom_sub">Use multiple parallel connections to fetch progressive streams. When off, a single connection is used.</string>
-    <string name="playback_net_http2">Enable HTTP/2</string>
-    <string name="playback_net_http2_sub">Enable HTTP/2 protocol for network connections, allowing request multiplexing and faster handshake times.</string>
     <string name="playback_net_parallel">Parallel Connections</string>
     <string name="playback_net_parallel_sub">Use multiple connections in parallel for fetching streams. Activate when you experience buffering although your download speed is definitely more than sufficient.</string>
     <string name="playback_net_connection_count">Connection Count</string>
