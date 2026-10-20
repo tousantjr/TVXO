@@ -2100,7 +2100,8 @@ internal fun PlayerRuntimeController.resetLoadingOverlayForNewStream() {
             loadingMessage = preparingMessage,
             loadingIssueReportVisible = false,
             loadingIssueElapsedMs = 0L,
-            loadingProgress = null
+            loadingProgress = null,
+            isHdrVideo = false
         )
     }
 }

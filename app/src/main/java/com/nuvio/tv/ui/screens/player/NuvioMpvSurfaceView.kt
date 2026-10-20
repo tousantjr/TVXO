@@ -466,6 +466,17 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         }
     }
 
+    /** True for PQ/HLG video, false for any other transfer, null until mpv knows the video params. */
+    fun readVideoIsHdr(): Boolean? {
+        if (!initialized) return null
+        val gamma = runCatching { mpv.getPropertyString("video-params/gamma") }.getOrNull()
+            ?.trim()
+            ?.lowercase(Locale.ROOT)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        return gamma == "pq" || gamma == "hlg"
+    }
+
     internal fun subtitleTextMetrics(style: SubtitleStyleSettings): SubtitleTextMetrics? {
         if (!initialized || width <= 0 || height <= 0 || isAssOrSsaSubtitleSelectedNow()) return null
         val fontSize = mpv.getPropertyDouble("sub-font-size") ?: return null
