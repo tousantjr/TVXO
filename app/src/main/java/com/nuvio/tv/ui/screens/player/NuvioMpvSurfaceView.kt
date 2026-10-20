@@ -234,6 +234,11 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
             .onFailure { Log.w(TAG, "Exact seek failed: ${it.message}") }
     }
 
+    fun currentSubtitleText(): String? {
+        if (!initialized) return null
+        return mpv.getPropertyString("sub-text")
+    }
+
     fun currentPositionMs(): Long {
         if (!initialized) return 0L
         val seconds = mpv.getPropertyDouble("time-pos/full")
@@ -427,7 +432,7 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
     fun applySubtitleStyle(style: SubtitleStyleSettings) {
         if (!initialized) return
         runCatching {
-            val scale = (style.size / 100.0).coerceIn(0.5, 3.0)
+            val scale = subtitleScale(style)
             val clampedOffset = style.verticalOffset.coerceIn(
                 SUBTITLE_VERTICAL_OFFSET_MIN,
                 SUBTITLE_VERTICAL_OFFSET_MAX
@@ -480,6 +485,26 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
             ?: return null
         return gamma == "pq" || gamma == "hlg"
     }
+
+    internal fun subtitleTextMetrics(style: SubtitleStyleSettings): SubtitleTextMetrics? {
+        if (!initialized || width <= 0 || height <= 0 || isAssOrSsaSubtitleSelectedNow()) return null
+        val fontSize = mpv.getPropertyDouble("sub-font-size") ?: return null
+        val unitPx = height / MPV_SUBTITLE_REFERENCE_HEIGHT
+        val textSizePx = (fontSize * subtitleScale(style)).toFloat() * unitPx
+        val marginXPx = (mpv.getPropertyInt("sub-margin-x") ?: MPV_SUBTITLE_DEFAULT_MARGIN_X) * unitPx
+        val location = IntArray(2)
+        getLocationInWindow(location)
+        return SubtitleTextMetrics(
+            textSizePx = textSizePx,
+            bold = style.bold,
+            scaleX = 1f,
+            innerPaddingPx = textSizePx * MPV_SUBTITLE_INNER_PADDING_RATIO,
+            wrapWidthPx = (width - marginXPx * 2f).coerceAtLeast(0f),
+            centerXPx = location[0] + width / 2f
+        )
+    }
+
+    private fun subtitleScale(style: SubtitleStyleSettings): Double = (style.size / 100.0).coerceIn(0.5, 3.0)
 
     private fun isAssOrSsaSubtitleSelectedNow(): Boolean {
         if (!initialized) return false
@@ -840,6 +865,9 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "NuvioMpvSurfaceView"
+        private const val MPV_SUBTITLE_REFERENCE_HEIGHT = 720f
+        private const val MPV_SUBTITLE_DEFAULT_MARGIN_X = 25
+        private const val MPV_SUBTITLE_INNER_PADDING_RATIO = 0.125f
         private const val MPV_VIDEO_OUTPUT_GPU = "gpu"
         private const val MPV_VIDEO_OUTPUT_GPU_NEXT = "gpu-next"
         private const val MPV_HWDEC_DISABLED = "no"
