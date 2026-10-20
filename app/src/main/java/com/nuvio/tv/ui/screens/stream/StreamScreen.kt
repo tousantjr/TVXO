@@ -875,7 +875,8 @@ private fun RightStreamSection(
                     .padding(start = NuvioTheme.spacing.sm, bottom = NuvioTheme.spacing.sm)
                     .height(36.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.72f))
+                    .background(NuvioTheme.colors.BackgroundCard)
+                    .border(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border, RoundedCornerShape(20.dp))
                     .padding(horizontal = NuvioTheme.spacing.lg),
                 contentAlignment = Alignment.Center
             ) {
