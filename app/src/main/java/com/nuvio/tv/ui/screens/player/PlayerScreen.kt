@@ -15,7 +15,6 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import androidx.annotation.RawRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -127,8 +126,6 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil3.compose.rememberAsyncImagePainter
-import coil3.request.ImageRequest
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import com.nuvio.tv.core.party.PartyAction
@@ -147,6 +144,7 @@ import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.ui.components.LoadingIndicator
 import android.text.format.DateFormat
+import com.nuvio.tv.ui.util.rememberRawSvgPainter
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -1078,7 +1076,7 @@ fun PlayerScreen(
                         isPlaying = uiState.isPlaying,
                         isBuffering = uiState.isBuffering,
                         aspectMode = uiState.aspectMode,
-                        subtitleStyle = uiState.subtitleStyle,
+                        subtitleStyle = uiState.effectiveSubtitleStyle,
                         subtitleLiftPx = subtitleLiftPx,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -1094,7 +1092,7 @@ fun PlayerScreen(
                             tunneledSurfaceFill = uiState.tunneledSurfaceFill,
                             useLibass = uiState.useLibass,
                             libassRenderType = uiState.libassRenderType,
-                            subtitleStyle = uiState.subtitleStyle,
+                            subtitleStyle = uiState.effectiveSubtitleStyle,
                             subtitleLiftPx = subtitleLiftPx,
                             onBindSubtitleView = viewModel::bindExoSubtitleView,
                             modifier = Modifier.fillMaxSize()
@@ -1809,7 +1807,8 @@ fun PlayerScreen(
                 val isAssDisabled = isCurrentSubtitleAss && (isUsingMpv || uiState.useLibass)
 
                 SubtitleStyleSidePanel(
-                    subtitleStyle = uiState.subtitleStyle,
+                    subtitleStyle = uiState.editableSubtitleStyle,
+                    isEditingHdrStyle = uiState.isEditingHdrSubtitleStyle,
                     onEvent = { if (!isAssDisabled) viewModel.onEvent(it) },
                     isStyleDisabledByLibass = isAssDisabled,
                     modifier = Modifier
@@ -1854,7 +1853,8 @@ fun PlayerScreen(
             },
             addonSubtitles = uiState.addonSubtitles,
             selectedAddonSubtitle = uiState.selectedAddonSubtitle,
-            subtitleStyle = uiState.subtitleStyle,
+            subtitleStyle = uiState.editableSubtitleStyle,
+            isEditingHdrStyle = uiState.isEditingHdrSubtitleStyle,
             subtitleDelayMs = uiState.subtitleDelayMs,
             installedSubtitleAddonOrder = uiState.installedSubtitleAddonOrder,
             isLoadingAddons = uiState.isLoadingAddonSubtitles,
@@ -3514,20 +3514,6 @@ private fun SubtitleDelayOverlay(
             }
         }
     }
-}
-
-@Composable
-private fun rememberRawSvgPainter(@RawRes iconRes: Int): Painter {
-    val context = LocalContext.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val sizePx = with(density) { NuvioTheme.spacing.xl.roundToPx() }
-    val request = remember(iconRes, context, sizePx) {
-        ImageRequest.Builder(context)
-            .data(iconRes)
-            .size(sizePx)
-            .build()
-    }
-    return rememberAsyncImagePainter(model = request)
 }
 
 @Composable
