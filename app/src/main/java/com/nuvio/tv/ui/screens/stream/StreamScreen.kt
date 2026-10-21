@@ -868,54 +868,6 @@ private fun RightStreamSection(
         modifier = modifier
             .padding(top = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.xxxl)
     ) {
-        resumeText?.let { text ->
-            Box(
-                modifier = Modifier
-                    // Start padding and height mirror the chip row below (LazyRow contentPadding sm, tv FilterChip 36dp).
-                    .padding(start = NuvioTheme.spacing.sm, bottom = NuvioTheme.spacing.sm)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(NuvioTheme.colors.BackgroundCard)
-                    .border(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border, RoundedCornerShape(20.dp))
-                    .padding(horizontal = NuvioTheme.spacing.lg),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = NuvioTheme.colors.TextPrimary
-                )
-            }
-        }
-        val chipRowHeight = NuvioTheme.spacing.huge
-
-        // Addon filter chips
-        Box(modifier = Modifier.height(chipRowHeight)) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = sourceChips.isNotEmpty() || (!isLoading && availableAddons.isNotEmpty()),
-                enter = fadeIn(animationSpec = tween(300)),
-                exit = fadeOut(animationSpec = tween(300))
-            ) {
-                AddonFilterChips(
-                    addons = availableAddons,
-                    sourceChips = sourceChips,
-                    selectedAddon = selectedAddonFilter,
-                    isStillFetching = sourceChips.any { it.status == SourceChipStatus.LOADING },
-                    onRefresh = {
-                        userMovedFromFirstResult = false
-                        firstResultFocusAssigned = false
-                        onRefresh()
-                    },
-                    onAddonSelected = { onAddonFilterSelected(it) },
-                    externalFocusRequesters = chipFocusRequesters,
-                    externalOrderedNames = orderedAddonNames,
-                    debugTag = "StreamScreen"
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
-
         androidx.compose.animation.AnimatedVisibility(
             visible = enter,
             enter = fadeIn(animationSpec = tween(260)) +
@@ -925,8 +877,8 @@ private fun RightStreamSection(
                 ),
             exit = fadeOut(animationSpec = tween(120))
         ) {
-            // Content area
-            Box(
+            // Content area – resume pill, addon chips and streams all inside one card
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(NuvioTheme.radii.xl))
@@ -947,49 +899,101 @@ private fun RightStreamSection(
                         } else {
                             NuvioTheme.colors.BackgroundCard.copy(alpha = 0.5f)
                         }
-                    ),
-                contentAlignment = Alignment.Center
+                    )
+                    .padding(NuvioTheme.spacing.lg)
             ) {
-                when {
-                    sharedStream == null && isLoading -> {
-                        LoadingState(showAddonLogo = showAddonLogo)
-                    }
-                    sharedStream == null && error != null -> {
-                        ErrorState(
-                            message = error,
-                            onRetry = onRetry
+                resumeText?.let { text ->
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = NuvioTheme.spacing.sm)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(NuvioTheme.colors.BackgroundCard)
+                            .border(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border, RoundedCornerShape(20.dp))
+                            .padding(horizontal = NuvioTheme.spacing.lg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = NuvioTheme.colors.TextPrimary
                         )
                     }
-                    sharedStream == null && streams.isEmpty() -> {
-                        EmptyState()
-                    }
-                    else -> {
-                        StreamsList(
-                            streams = streams,
-                            sharedStream = sharedStream,
-                            partySource = partySource,
-                            onSharedStreamSelected = onSharedStreamSelected,
-                            onStreamSelected = onStreamSelected,
-                            focusedStreamIndex = focusedStreamIndex,
-                            shouldRestoreFocusedStream = shouldRestoreFocusedStream,
-                            onRestoreFocusedStreamHandled = onRestoreFocusedStreamHandled,
-                            firstStreamFocusRequestId = firstStreamFocusRequestId,
-                            availableAddons = availableAddons,
-                            selectedAddonFilter = selectedAddonFilter,
-                            showFileSizeBadges = showFileSizeBadges,
-                            showAddonLogo = showAddonLogo,
-                            badgePlacement = badgePlacement,
-                            hasBadgeRules = hasBadgeRules,
-                            onAddonFilterSelected = { onAddonFilterSelectedGuarded(it) },
-                            orderedAddonNames = orderedAddonNames,
-                            onRequestChipFocus = { requestChipFocus(it) },
-                            onUserNavigatedFromFirstResult = {
-                                userMovedFromFirstResult = true
+                }
+
+                // Addon filter chips
+                Box(modifier = Modifier.height(NuvioTheme.spacing.huge)) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = sourceChips.isNotEmpty() || (!isLoading && availableAddons.isNotEmpty()),
+                        enter = fadeIn(animationSpec = tween(300)),
+                        exit = fadeOut(animationSpec = tween(300))
+                    ) {
+                        AddonFilterChips(
+                            addons = availableAddons,
+                            sourceChips = sourceChips,
+                            selectedAddon = selectedAddonFilter,
+                            isStillFetching = sourceChips.any { it.status == SourceChipStatus.LOADING },
+                            onRefresh = {
+                                userMovedFromFirstResult = false
+                                firstResultFocusAssigned = false
+                                onRefresh()
                             },
-                            onFocusedStreamKeyChanged = { focusedStreamKeyInList = it },
-                            onFocusChanged = { listHasFocus = it },
-                            onExpandStreams = onExpandStreams
+                            onAddonSelected = { onAddonFilterSelected(it) },
+                            externalFocusRequesters = chipFocusRequesters,
+                            externalOrderedNames = orderedAddonNames,
+                            debugTag = "StreamScreen"
                         )
+                    }
+                }
+
+                // Streams / loading / error / empty
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        sharedStream == null && isLoading -> {
+                            LoadingState(showAddonLogo = showAddonLogo)
+                        }
+                        sharedStream == null && error != null -> {
+                            ErrorState(
+                                message = error,
+                                onRetry = onRetry
+                            )
+                        }
+                        sharedStream == null && streams.isEmpty() -> {
+                            EmptyState()
+                        }
+                        else -> {
+                            StreamsList(
+                                streams = streams,
+                                sharedStream = sharedStream,
+                                partySource = partySource,
+                                onSharedStreamSelected = onSharedStreamSelected,
+                                onStreamSelected = onStreamSelected,
+                                focusedStreamIndex = focusedStreamIndex,
+                                shouldRestoreFocusedStream = shouldRestoreFocusedStream,
+                                onRestoreFocusedStreamHandled = onRestoreFocusedStreamHandled,
+                                firstStreamFocusRequestId = firstStreamFocusRequestId,
+                                availableAddons = availableAddons,
+                                selectedAddonFilter = selectedAddonFilter,
+                                showFileSizeBadges = showFileSizeBadges,
+                                showAddonLogo = showAddonLogo,
+                                badgePlacement = badgePlacement,
+                                hasBadgeRules = hasBadgeRules,
+                                onAddonFilterSelected = { onAddonFilterSelectedGuarded(it) },
+                                orderedAddonNames = orderedAddonNames,
+                                onRequestChipFocus = { requestChipFocus(it) },
+                                onUserNavigatedFromFirstResult = {
+                                    userMovedFromFirstResult = true
+                                },
+                                onFocusedStreamKeyChanged = { focusedStreamKeyInList = it },
+                                onFocusChanged = { listHasFocus = it },
+                                onExpandStreams = onExpandStreams
+                            )
+                        }
                     }
                 }
             }
@@ -1220,7 +1224,6 @@ private fun StreamsList(
         state = streamListState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(NuvioTheme.spacing.lg)
             .onFocusChanged { onFocusChanged(it.hasFocus) }
             .onKeyEvent { event ->
                 if (event.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@onKeyEvent false
@@ -1285,7 +1288,7 @@ private fun StreamsList(
                                       else orderedAddonNames.indexOf(selectedAddonFilter) + 2
                             onRequestChipFocus(idx)
                         },
-                        marked = true
+                        outlined = true
                     )
                 }
             }
@@ -1301,8 +1304,7 @@ private fun StreamsList(
                     showAddonLogo = showAddonLogo,
                     badgePlacement = badgePlacement,
                     reserveBadgeSpace = hasBadgeRules && stream.badges.isEmpty(),
-                    marked = isPartySource,
-                    markedLabel = partySourceLabel.takeIf { isPartySource },
+                    label = partySourceLabel.takeIf { isPartySource },
                     onClick = { onStreamSelected(stream) },
                     focusRequester = when {
                         shouldRestoreFocusedStream && index == focusedStreamIndex.coerceIn(0, (streams.lastIndex).coerceAtLeast(0)) -> restoreFocusRequester
@@ -1340,8 +1342,8 @@ private fun StreamCard(
     focusRequester: FocusRequester? = null,
     onFocusChanged: ((Boolean) -> Unit)? = null,
     onUpKey: (() -> Unit)? = null,
-    marked: Boolean = false,
-    markedLabel: String? = null
+    outlined: Boolean = false,
+    label: String? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -1396,14 +1398,14 @@ private fun StreamCard(
         shape = CardDefaults.shape(shape = cardShape),
         border = if (hasGradientFocusRing) {
             CardDefaults.border(
-                border = markedBorder(marked, cardShape),
+                border = outlineBorder(outlined, cardShape),
                 focusedBorder = Border(
                     border = NuvioTheme.focusRing.border(NuvioTheme.spacing.xxs),
                     shape = cardShape
                 )
             )
         } else {
-            CardDefaults.border(border = markedBorder(marked, cardShape))
+            CardDefaults.border(border = outlineBorder(outlined, cardShape))
         },
         scale = CardDefaults.scale(focusedScale = 1f)
     ) {
@@ -1446,19 +1448,13 @@ private fun StreamCard(
                         ),
                         color = NuvioTheme.colors.TextPrimary
                     )
-                    if (markedLabel != null) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(NuvioTheme.colors.Primary.copy(alpha = 0.2f))
-                                .padding(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs)
-                        ) {
-                            Text(
-                                text = markedLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = NuvioTheme.colors.Primary
-                            )
-                        }
+                    if (label != null) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = NuvioTheme.colors.Secondary,
+                            maxLines = 1
+                        )
                     }
                 }
 
@@ -1533,8 +1529,8 @@ private fun StreamCard(
 }
 
 @Composable
-private fun markedBorder(marked: Boolean, shape: RoundedCornerShape): Border =
-    if (marked) {
+private fun outlineBorder(outlined: Boolean, shape: RoundedCornerShape): Border =
+    if (outlined) {
         Border(
             border = BorderStroke(NuvioTheme.spacing.hairline, NuvioTheme.colors.Primary.copy(alpha = 0.65f)),
             shape = shape
