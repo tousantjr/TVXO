@@ -466,6 +466,13 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         }
     }
 
+    fun readPlayerMediaInfo(): PlayerMediaInfo? {
+        if (!initialized) return null
+        return mpvMediaInfo { name ->
+            runCatching { mpv.getPropertyString(name) }.getOrNull()?.trim()?.takeIf { it.isNotBlank() }
+        }
+    }
+
     /** True for PQ/HLG video, false for any other transfer, null until mpv knows the video params. */
     fun readVideoIsHdr(): Boolean? {
         if (!initialized) return null

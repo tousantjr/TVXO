@@ -143,6 +143,7 @@ import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.SubtitleStyleSettings
 import com.nuvio.tv.data.local.StreamAutoPlayMode
+import com.nuvio.tv.domain.model.StreamBadge
 import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.ui.components.LoadingIndicator
@@ -195,6 +196,7 @@ fun PlayerScreen(
     onOpenPartyMedia: (PartyMedia) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val playerBadges = rememberPlayerBadges(viewModel, uiState)
     val partyState by viewModel.party.state.collectAsState()
     val partyPlayback by viewModel.party.playback.collectAsState()
     val partyAvailable by viewModel.party.available.collectAsState()
@@ -1505,6 +1507,7 @@ fun PlayerScreen(
             val context = LocalContext.current
             PlayerControlsOverlay(
                 uiState = uiState,
+                playerBadges = playerBadges,
                 viewModel = viewModel,
                 subtitleReportingActive = playerControlsVisible,
                 onSubtitleClearanceChanged = {
@@ -2537,6 +2540,7 @@ private fun PlayerView.setAssOverlayVisibility(visibility: Int) {
 @Composable
 private fun PlayerControlsOverlay(
     uiState: PlayerUiState,
+    playerBadges: List<StreamBadge>,
     viewModel: PlayerViewModel,
     playPauseFocusRequester: FocusRequester,
     progressBarFocusRequester: FocusRequester,
@@ -2691,6 +2695,15 @@ private fun PlayerControlsOverlay(
                             color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (playerBadges.isNotEmpty()) {
+                        PlayerBadges(
+                            badges = playerBadges,
+                            modifier = Modifier
+                                .padding(vertical = NuvioTheme.spacing.xs)
+                                .reportRightEdge("badges", titleRights)
                         )
                     }
 
