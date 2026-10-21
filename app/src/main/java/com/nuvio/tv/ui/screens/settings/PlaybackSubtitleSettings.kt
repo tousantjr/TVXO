@@ -7,7 +7,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nuvio.tv.R
 import com.nuvio.tv.data.local.AVAILABLE_SUBTITLE_LANGUAGES
-import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.SubtitleLanguageOption
@@ -183,14 +182,6 @@ internal fun PlaybackSubtitlesSection(
         onToggle = { onUpdate { setUseLibass(!settings.useLibass) } },
         enabled = enabled
     )
-    if (settings.useLibass) {
-        SettingsActionRow(
-            title = stringResource(R.string.sub_libass_mode),
-            subtitle = null,
-            value = libassRenderTypeOptions().firstOrNull { it.value == settings.libassRenderType }?.title,
-            onClick = { onOpenDialog(PlaybackDialog.LIBASS_RENDER_TYPE) }
-        )
-    }
 }
 
 @Composable
@@ -200,35 +191,6 @@ internal fun subtitleLanguageLabel(style: SubtitleStyleSettings): String = when 
     else -> AVAILABLE_SUBTITLE_LANGUAGES.find { it.code == style.preferredLanguage }?.displayName
         ?: stringResource(R.string.appearance_language_system)
 }
-
-@Composable
-private fun libassRenderTypeOptions(): List<SettingsPickerOption<LibassRenderType>> = listOf(
-    SettingsPickerOption(
-        LibassRenderType.OVERLAY_OPEN_GL,
-        stringResource(R.string.sub_mode_overlay_gl),
-        stringResource(R.string.sub_mode_overlay_gl_sub)
-    ),
-    SettingsPickerOption(
-        LibassRenderType.OVERLAY_CANVAS,
-        stringResource(R.string.sub_mode_overlay_canvas),
-        stringResource(R.string.sub_mode_overlay_canvas_sub)
-    ),
-    SettingsPickerOption(
-        LibassRenderType.EFFECTS_OPEN_GL,
-        stringResource(R.string.sub_mode_effects_gl),
-        stringResource(R.string.sub_mode_effects_gl_sub)
-    ),
-    SettingsPickerOption(
-        LibassRenderType.EFFECTS_CANVAS,
-        stringResource(R.string.sub_mode_effects_canvas),
-        stringResource(R.string.sub_mode_effects_canvas_sub)
-    ),
-    SettingsPickerOption(
-        LibassRenderType.CUES,
-        stringResource(R.string.sub_mode_standard),
-        stringResource(R.string.sub_mode_standard_sub)
-    )
-)
 
 @Composable
 internal fun SubtitleSettingsDialogs(
@@ -304,18 +266,6 @@ internal fun SubtitleSettingsDialogs(
                 onDismiss()
             },
             onDismiss = onDismiss
-        )
-        PlaybackDialog.LIBASS_RENDER_TYPE -> SettingsSingleChoiceDialog(
-            title = stringResource(R.string.sub_libass_mode),
-            options = libassRenderTypeOptions(),
-            selectedValue = settings.libassRenderType,
-            onOptionSelected = { renderType ->
-                onUpdate { setLibassRenderType(renderType) }
-                onDismiss()
-            },
-            onDismiss = onDismiss,
-            width = 480.dp,
-            maxHeight = 380.dp
         )
         else -> Unit
     }

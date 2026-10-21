@@ -15,10 +15,9 @@ import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor as StockMatroskaExtractor
 import androidx.media3.extractor.text.SubtitleParser
 import com.nuvio.tv.core.player.dvmkv.MatroskaExtractor as DvMatroskaExtractor
-import io.github.peerless2012.ass.media.AssHandler
-import io.github.peerless2012.ass.media.kt.withAssSupport
-import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory
-import io.github.peerless2012.ass.media.type.AssRenderType
+import com.nuvio.tv.libass.media.AssHandler
+import com.nuvio.tv.libass.media.AssHandlerConfig
+import com.nuvio.tv.libass.media.parser.AssSubtitleParserFactory
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -27,13 +26,12 @@ private val assHandlersByPlayer = Collections.synchronizedMap(WeakHashMap<ExoPla
 @OptIn(UnstableApi::class)
 internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
     context: Context,
-    renderType: AssRenderType = AssRenderType.CUES,
     playerMediaSourceFactory: PlayerMediaSourceFactory? = null,
     dataSourceFactory: DataSource.Factory = PlayerPlaybackNetworking.createDataSourceFactory(context),
     extractorsFactory: ExtractorsFactory = DefaultExtractorsFactory(),
     renderersFactory: RenderersFactory = DefaultRenderersFactory(context)
 ): ExoPlayer {
-    val assHandler = AssHandler(renderType)
+    val assHandler = AssHandler()
     val assSubtitleParserFactory = CompatAssSubtitleParserFactory(assHandler)
     val assExtractorsFactory = extractorsFactory.withAssMkvSupportCompat(
         subtitleParserFactory = assSubtitleParserFactory,
@@ -50,9 +48,12 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
     )
     mediaSourceFactory.setSubtitleParserFactory(assSubtitleParserFactory)
 
+    // The new libass module renders subtitles via its own SurfaceView overlay
+    // pipeline (atlas + GL), so no special renderers factory wrapper is needed.
+    // The old peerless2012 withAssSupport() is no longer required.
     val player = this
         .setMediaSourceFactory(mediaSourceFactory)
-        .setRenderersFactory(renderersFactory.withAssSupport(assHandler))
+        .setRenderersFactory(renderersFactory)
         .build()
 
     assHandlersByPlayer[player] = assHandler
@@ -102,17 +103,11 @@ private fun ExtractorsFactory.withAssMkvSupportCompat(
         val extractors = delegate.createExtractors()
         extractors.forEachIndexed { index, extractor ->
             val underlying = extractor.getUnderlyingImplementation()
-            // Stock MatroskaExtractor: replace with ASS-aware variant for libass support.
-            // Only the innermost extractor is replaced, so wrappers such as AutoSync's
-            // embedded subtitle observer keep seeing the stream.
             if (underlying is StockMatroskaExtractor) {
                 extractors[index] = extractor.replaceInnermostExtractor(
                     NuvioAssMatroskaExtractor(subtitleParserFactory, assHandler)
                 )
             }
-            // The DV7 factory swaps in a vendored DvMatroskaExtractor for DV conversion.
-            // Preserve its Dolby Vision transformer while enabling libass and zlib subtitle
-            // decompression from the same vendored Matroska extractor base class.
             if (underlying is DvMatroskaExtractor) {
                 extractors[index] = extractor.replaceInnermostExtractor(
                     NuvioAssMatroskaExtractor(

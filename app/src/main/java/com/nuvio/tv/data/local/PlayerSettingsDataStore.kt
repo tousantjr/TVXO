@@ -470,7 +470,13 @@ enum class InternalPlayerEngine {
 }
 
 enum class LibassRenderType {
-    CUES, EFFECTS_CANVAS, EFFECTS_OPEN_GL, OVERLAY_CANVAS, OVERLAY_OPEN_GL
+    // Legacy values kept for backward compatibility with persisted preferences.
+    // The new libass module always uses the SurfaceView atlas pipeline.
+    CUES, EFFECTS_CANVAS, EFFECTS_OPEN_GL, OVERLAY_CANVAS, OVERLAY_OPEN_GL;
+
+    companion object {
+        val DEFAULT = OVERLAY_OPEN_GL
+    }
 }
 /**
  * How DV7 streams should be handled at playback time.

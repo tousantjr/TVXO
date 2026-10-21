@@ -163,7 +163,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.media3.exoplayer.ExoPlayer
-import io.github.peerless2012.ass.media.widget.AssSubtitleView
+import com.nuvio.tv.libass.media.widget.AssSubtitleSurfaceView
 import kotlin.math.abs
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
@@ -2519,13 +2519,10 @@ private fun PlayerView.syncLibassOverlay(
     enabled: Boolean,
     renderType: LibassRenderType
 ) {
-    val containerId = if (renderType == LibassRenderType.OVERLAY_OPEN_GL) {
-        R.id.libass_overlay_container_gl
-    } else {
-        R.id.libass_overlay_container
-    }
+    // The new libass module always uses the GL overlay SurfaceView.
+    val containerId = R.id.libass_overlay_container_gl
     val overlayContainer = findViewById<android.widget.FrameLayout>(containerId) ?: return
-    val needsOverlay = enabled && renderType.usesOverlaySubtitleView()
+    val needsOverlay = enabled
     val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
     val hasOverlayChild = overlayContainer.hasAssOverlayChild()
 
@@ -2545,7 +2542,12 @@ private fun PlayerView.syncLibassOverlay(
     }
 
     overlayContainer.removeAssOverlayChildren()
-    val assSubtitleView = AssSubtitleView(overlayContainer.context, assHandler)
+    val assSubtitleView = AssSubtitleSurfaceView(overlayContainer.context, assHandler)
+    // Wire video frame timing: each video frame's PTS drives subtitle rendering
+    // so the overlay swap is vsync-aligned with the corresponding video frame.
+    assHandler.videoFrameCallback = { presentationTimeUs, releaseTimeNs ->
+        assSubtitleView.requestRender(presentationTimeUs, releaseTimeNs)
+    }
     overlayContainer.addView(
         assSubtitleView,
         android.widget.FrameLayout.LayoutParams(
@@ -2557,12 +2559,13 @@ private fun PlayerView.syncLibassOverlay(
 }
 
 private fun LibassRenderType.usesOverlaySubtitleView(): Boolean {
-    return this == LibassRenderType.OVERLAY_CANVAS || this == LibassRenderType.OVERLAY_OPEN_GL
+    // The new libass module always uses the overlay SurfaceView.
+    return true
 }
 
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
     for (index in 0 until childCount) {
-        if (getChildAt(index) is AssSubtitleView) {
+        if (getChildAt(index) is AssSubtitleSurfaceView) {
             return true
         }
     }
@@ -2571,7 +2574,7 @@ private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
 
 private fun android.widget.FrameLayout.removeAssOverlayChildren() {
     for (index in childCount - 1 downTo 0) {
-        if (getChildAt(index) is AssSubtitleView) {
+        if (getChildAt(index) is AssSubtitleSurfaceView) {
             removeViewAt(index)
         }
     }
@@ -2588,6 +2591,9 @@ private fun PlayerView.setAssOverlayVisibility(visibility: Int) {
             container.removeAssOverlayChildren()
         }
         setTag(R.id.libass_overlay_bound_player, null)
+        // Disconnect video frame callback so the pipeline stops rendering
+        val player = player as? ExoPlayer ?: return
+        player.getAssHandlerCompat()?.videoFrameCallback = null
     }
 }
 

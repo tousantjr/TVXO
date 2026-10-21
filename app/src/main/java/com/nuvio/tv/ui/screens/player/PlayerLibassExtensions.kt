@@ -1,14 +1,7 @@
 package com.nuvio.tv.ui.screens.player
 
-import com.nuvio.tv.data.local.LibassRenderType
-import io.github.peerless2012.ass.media.type.AssRenderType
-
-internal fun LibassRenderType.toAssRenderType(): AssRenderType {
-    return when (this) {
-        LibassRenderType.CUES -> AssRenderType.CUES
-        LibassRenderType.EFFECTS_CANVAS -> AssRenderType.EFFECTS_CANVAS
-        LibassRenderType.EFFECTS_OPEN_GL -> AssRenderType.EFFECTS_OPEN_GL
-        LibassRenderType.OVERLAY_CANVAS -> AssRenderType.OVERLAY_CANVAS
-        LibassRenderType.OVERLAY_OPEN_GL -> AssRenderType.OVERLAY_OPEN_GL
-    }
-}
+// The libass module (based on Plezy by edde746, forked from peerless2012's
+// libass-android) always renders via the atlas SurfaceView pipeline with
+// vsync-pinned swap. The old render type selection from peerless2012's library
+// (CUES/EFFECTS_CANVAS/EFFECTS_OPEN_GL/OVERLAY_CANVAS/OVERLAY_OPEN_GL) is no
+// longer needed.
