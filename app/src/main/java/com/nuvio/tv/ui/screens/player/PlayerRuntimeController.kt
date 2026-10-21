@@ -32,6 +32,7 @@ import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.local.DeviceLocalPlayerPreferences
 import com.nuvio.tv.data.local.StreamLinkCacheDataStore
+import com.nuvio.tv.core.streams.StreamBadgeMatcher
 import com.nuvio.tv.data.local.StreamBadgeSettingsDataStore
 import com.nuvio.tv.data.local.BingeGroupCacheDataStore
 import com.nuvio.tv.data.local.StreamAutoPlayMode
@@ -776,7 +777,12 @@ class PlayerRuntimeController(
                     it.copy(
                         showFileSizeBadges = settings.showFileSizeBadges,
                         showAddonLogo = settings.showAddonLogo,
-                        streamBadgePlacement = settings.badgePlacement
+                        streamBadgePlacement = settings.badgePlacement,
+                        playerBadgeFilters = if (settings.showInPlayer) {
+                            StreamBadgeMatcher.compile(settings.rules)
+                        } else {
+                            emptyList()
+                        }
                     )
                 }
             }
