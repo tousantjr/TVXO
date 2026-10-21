@@ -311,8 +311,10 @@
     <string name="sub_opacity">Krycie</string>
     <string name="sub_advanced_section">Zaawansowane renderowanie napisów</string>
     <string name="sub_libass">Używaj libass dla napisów ASS/SSA</string>
-    <string name="sub_libass_sub">Tymczasowo wyłączone z powodu konserwacji</string>
+    <string name="sub_libass_sub">Zaawansowane renderowanie ASS/SSA (style, pozycjonowanie, animacje)</string>
     <string name="sub_libass_mode">Tryb renderowania libass</string>
+    <string name="sub_libass_render_scale">Rozdzielczość renderowania napisów</string>
+    <string name="sub_libass_render_scale_sub">Niższa rozdzielczość poprawia wydajność przy ciężkim typesettingu kosztem ostrości</string>
     <string name="sub_mode_overlay_gl">Nakładka OpenGL (Zalecane)</string>
     <string name="sub_mode_overlay_gl_sub">Najlepsza jakość z obsługą HDR. Renderuje napisy w osobnym wątku.</string>
     <string name="sub_mode_overlay_canvas">Nakładka Canvas</string>
