@@ -134,6 +134,7 @@ import com.nuvio.tv.core.party.PartyAction
 import com.nuvio.tv.core.party.PartyMedia
 import com.nuvio.tv.core.party.PartyNotice
 import com.nuvio.tv.core.party.PartySync
+import com.nuvio.tv.ui.screens.party.ConfirmDialog
 import com.nuvio.tv.ui.screens.party.PartyPanel
 import com.nuvio.tv.ui.screens.party.PartyStatusPill
 import com.nuvio.tv.core.player.PlayerWindowBackdrop
@@ -2590,6 +2591,7 @@ private fun PlayerControlsOverlay(
     val customSourcePainter = rememberRawSvgPainter(R.raw.ic_player_source)
     val customAspectPainter = rememberRawSvgPainter(R.raw.ic_player_aspect_ratio)
     val customEpisodesPainter = rememberRawSvgPainter(R.raw.ic_player_episodes)
+    var showEngineSwitchConfirm by remember { mutableStateOf(false) }
     val playbackTimeline by viewModel.playbackTimeline.collectAsState()
     val isLivePlayback = playbackTimeline.isLive
     val progressUpTarget = if (isLivePlayback) {
@@ -2837,15 +2839,6 @@ private fun PlayerControlsOverlay(
                         onFocused = onResetHideTimer
                     )
 
-                    ControlButton(
-                        icon = Icons.Default.SwapHoriz,
-                        contentDescription = stringResource(R.string.cd_switch_player_engine),
-                        onClick = onSwitchPlayerEngine,
-                        upFocusRequester = progressUpTarget,
-                        onDownKey = onHideControls,
-                        onFocused = onResetHideTimer
-                    )
-
                     if (hasEpisodeContext) {
                         ControlButton(
                             icon = Icons.AutoMirrored.Filled.List,
@@ -2906,6 +2899,14 @@ private fun PlayerControlsOverlay(
                                 onDownKey = onHideControls,
                                 onFocused = onResetHideTimer
                             )
+                            ControlButton(
+                                icon = Icons.Default.SwapHoriz,
+                                contentDescription = stringResource(R.string.cd_switch_player_engine),
+                                onClick = { showEngineSwitchConfirm = true },
+                                upFocusRequester = progressUpTarget,
+                                onDownKey = onHideControls,
+                                onFocused = onResetHideTimer
+                            )
                             onOpenInExternalPlayer?.let { openInExternalPlayer ->
                                 ControlButton(
                                     icon = Icons.AutoMirrored.Filled.OpenInNew,
@@ -2961,6 +2962,24 @@ private fun PlayerControlsOverlay(
             }
             }
         }
+    }
+
+    if (showEngineSwitchConfirm) {
+        val targetEngine = if (uiState.internalPlayerEngine == InternalPlayerEngine.MVP_PLAYER) {
+            R.string.playback_engine_exoplayer
+        } else {
+            R.string.playback_engine_mvplayer
+        }
+        ConfirmDialog(
+            title = stringResource(R.string.player_engine_switch_title, stringResource(targetEngine)),
+            message = stringResource(R.string.player_engine_switch_message),
+            confirmLabel = stringResource(R.string.action_switch),
+            onConfirm = {
+                showEngineSwitchConfirm = false
+                onSwitchPlayerEngine()
+            },
+            onDismiss = { showEngineSwitchConfirm = false }
+        )
     }
 }
 
