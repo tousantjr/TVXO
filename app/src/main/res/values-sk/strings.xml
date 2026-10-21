@@ -3318,8 +3318,7 @@
     <string name="mdblist_library_lists_summary">Zobrazené %1$d z %2$d</string>
     <string name="tracking_mdblist_features_title">Funkcie MDBList</string>
     <string name="tracking_mdblist_features_subtitle">Nastavenia špecifické pre MDBList</string>
-    <string name="youtube_resolving_stream">Načítava sa video z YouTube</string>
-    <string name="youtube_resolution_failed">Toto video z YouTube sa nepodarilo načítať.</string>
+
     <string name="settings_p2p_profile_title">Profil torrentu</string>
     <string name="settings_p2p_profile_soft">Šetrný</string>
     <string name="settings_p2p_profile_balanced">Vyvážený</string>
