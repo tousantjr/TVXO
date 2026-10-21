@@ -3405,4 +3405,6 @@
     <string name="autosync_toast_failed_no_reference">Đồng bộ thất bại: video này không có phụ đề nhúng sẵn để so sánh.</string>
     <string name="autosync_toast_failed_unsupported">Đồng bộ thất bại: Tự động đồng bộ không hỗ trợ đồng bộ định dạng phụ đề này.</string>
     <string name="autosync_label_synced">Đã tự động đồng bộ</string>
+    <string name="stream_resume_from_time">Xem tiếp từ %1$s</string>
+    <string name="stream_resume_from_percent">Xem tiếp từ %1$d%%</string>
 </resources>
