@@ -3339,8 +3339,6 @@
     <string name="settings_p2p_clear_cache_playback_active">Pred vymazaním vyrovnávacej pamäte zastavte prehrávanie P2P</string>
     <string name="settings_p2p_clear_cache_done">Vymazaných %1$s neaktívnych dát torrentov</string>
     <string name="settings_p2p_clear_cache_failed">Nepodarilo sa vymazať vyrovnávaciu pamäť torrentov</string>
-    <string name="library_sort_released_desc">Dátum vydania ↓</string>
-    <string name="library_sort_released_asc">Dátum vydania ↑</string>
     <string name="collections_editor_catalog_missing">Katalóg nie je k dispozícii</string>
     <string name="player_torrent_fetching_metadata">Načítavajú sa metadáta torrentu…</string>
     <string name="player_torrent_preparing_stream">Pripravuje sa stream torrentu…</string>
