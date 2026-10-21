@@ -3318,7 +3318,8 @@
     <string name="mdblist_library_lists_summary">Zobrazené %1$d z %2$d</string>
     <string name="tracking_mdblist_features_title">Funkcie MDBList</string>
     <string name="tracking_mdblist_features_subtitle">Nastavenia špecifické pre MDBList</string>
-
+    <string name="youtube_resolving_stream">Načítava sa video z YouTube</string>
+    <string name="youtube_resolution_failed">Toto video z YouTube sa nepodarilo načítať.</string>
     <string name="settings_p2p_profile_title">Profil torrentu</string>
     <string name="settings_p2p_profile_soft">Šetrný</string>
     <string name="settings_p2p_profile_balanced">Vyvážený</string>
@@ -3339,6 +3340,8 @@
     <string name="settings_p2p_clear_cache_playback_active">Pred vymazaním vyrovnávacej pamäte zastavte prehrávanie P2P</string>
     <string name="settings_p2p_clear_cache_done">Vymazaných %1$s neaktívnych dát torrentov</string>
     <string name="settings_p2p_clear_cache_failed">Nepodarilo sa vymazať vyrovnávaciu pamäť torrentov</string>
+    <string name="library_sort_released_asc">Najstaršie vydané</string>
+    <string name="library_sort_released_desc">Najnovšie vydané</string>
     <string name="collections_editor_catalog_missing">Katalóg nie je k dispozícii</string>
     <string name="player_torrent_fetching_metadata">Načítavajú sa metadáta torrentu…</string>
     <string name="player_torrent_preparing_stream">Pripravuje sa stream torrentu…</string>
@@ -3378,51 +3381,6 @@
     <string name="autosync_toast_failed_no_reference">Synchronizácia zlyhala: toto video nemá žiadne vložené titulky na porovnanie.</string>
     <string name="autosync_toast_failed_unsupported">Synchronizácia zlyhala: Automatická synchronizácia nepodporuje tento formát titulkov.</string>
     <string name="autosync_label_synced">Automaticky synchronizované</string>
-
-    <string name="settings_appearance_app_language_restart_title">Vyžaduje sa reštart</string>
-    <string name="settings_appearance_app_language_restart_message">Zatvorte a znova otvorte aplikáciu na aktualizáciu rozloženia pre tento jazyk.</string>
-    <string name="settings_poster_always_show_landscape_clearlogo">Vždy pozadie s logom pre plagáty na šírku</string>
-    <string name="settings_playback_preload_next_episode">Prednačítať zdroje ďalšej epizódy</string>
-    <string name="settings_playback_preload_next_episode_description">Spustiť vyhľadávanie zdrojov na pozadí predtým, ako sa zobrazí tlačidlo ďalšej epizódy.</string>
-    <string name="settings_playback_exo_native_memory">Natívna pamäť ExoPlayer</string>
-    <string name="settings_playback_exo_native_memory_description">Uchovávať vyrovnávaciu pamäť prehrávania v natívnej pamäti namiesto Java heapu, vďaka čomu sa môžu veľké súbory načítať do pamäte bez nároku na výkon.</string>
-    <string name="settings_playback_exo_native_memory_unsupported">Toto zariadenie nepodporuje natívnu pamäť prehrávania.</string>
-    <string name="settings_playback_exo_native_memory_device">Pamäť zariadenia: %1$s. Bezpečný limit vyrovnávacej pamäte: %2$d MB.</string>
-    <string name="settings_playback_buffer_custom">Vlastná vyrovnávacia pamäť prehrávania</string>
-    <string name="settings_playback_buffer_custom_description">Prepísať vyrovnávaciu pamäť prehrávača. Keď je možnosť vypnutá, ExoPlayer používa štandardnú vyrovnávaciu pamäť alebo predvolené hodnoty natívnej pamäte (ak je zapnutá).</string>
-    <string name="settings_playback_buffer_warning">Tieto hodnoty menia, koľko dát sa načítava do pamäte pred a počas prehrávania. Príliš malá hodnota môže spôsobiť sekanie a príliš veľká môže spotrebovať viac pamäte.</string>
-    <string name="settings_playback_buffer_min">Minimálna vyrovnávacia pamäť</string>
-    <string name="settings_playback_buffer_max">Maximálna vyrovnávacia pamäť</string>
-    <string name="settings_playback_buffer_initial">Počiatočná vyrovnávacia pamäť</string>
-
-    <string name="settings_playback_buffer_rebuffer">Vyrovnávacia pamäť po zaseknutí</string>
-    <string name="settings_playback_buffer_back">Spätná vyrovnávacia pamäť</string>
-    <string name="settings_playback_buffer_target">Cieľová veľkosť vyrovnávacej pamäte</string>
-    <string name="settings_playback_buffer_seconds">%1$d s</string>
-    <string name="settings_playback_buffer_same_as_min">%1$d s (rovnako ako min)</string>
-    <string name="settings_playback_buffer_target_warning">Nad bezpečným limitom %1$d MB. Pri prehrávaní môže dôjsť k vyčerpaniu pamäte.</string>
-    <string name="settings_playback_vod_cache">Disková vyrovnávacia pamäť pre VOD</string>
-    <string name="settings_playback_vod_cache_description">Uložiť aktuálny progresívny stream na disk. Posun dozadu za hranicu operačnej pamäte tak zostane okamžitý a krátke výpadky siete neprerušia prehrávanie. Streamy HLS a DASH sa do vyrovnávacej pamäte neukladajú.</string>
-    <string name="settings_playback_vod_cache_auto_size">Automatická veľkosť</string>
-    <string name="settings_playback_vod_cache_auto_size_description">Určiť veľkosť vyrovnávacej pamäte podľa voľného miesta na disku. Vypnite pre ručnú voľbu veľkosti.</string>
-    <string name="settings_playback_vod_cache_size">Veľkosť vyrovnávacej pamäte VOD</string>
-    <string name="settings_playback_vod_cache_size_value">%1$d MB</string>
-    <string name="settings_playback_vod_cache_warning">Zápis na disk pokračuje počas prehrávania uloženého streamu. Nová veľkosť sa uplatní pri nasledujúcom spustení aplikácie.</string>
-    <string name="settings_tracking_mdblist_section">Funkcie MDBList</string>
-    <string name="settings_mdblist_library_lists">Zoznamy v knižnici</string>
-    <string name="settings_mdblist_library_lists_description">Vyberte, ktoré zoznamy MDBList sa zobrazia v Knižnici a v Správe zoznamov. Zoznam sledovaných sa zobrazuje vždy.</string>
-    <string name="settings_mdblist_library_lists_summary">Zobrazené %1$d z \%2$d</string>
-    <string name="settings_mdblist_library_lists_empty">Vo vašom účte MDBList sa zatiaľ nenašli žiadne zoznamy. Synchronizujte pre ich načítanie.</string>
-    <string name="player_auto_skip_intro_notification">Úvod preskočený na %1$s</string>
-    <string name="player_auto_skip_recap_notification">Zhrnutie preskočené na %1$s</string>
-    <string name="player_auto_skip_outro_notification">Záver preskočený na %1$s</string>
-    <string name="player_auto_skip_movie_credits_notification">Titulky preskočené na %1$s</string>
-    <string name="youtube_resolving_stream">Načítava sa video z YouTube</string>
-    <string name="youtube_resolution_failed">Toto video z YouTube sa nepodarilo načítať.</string>
-    <string name="continue_watching_up_next">Nasleduje</string>
-    <string name="continue_watching_up_next_episode">Nasleduje • S%1$d E\%2$d</string>
-    <string name="library_sort_released_asc">Najstaršie vydané</string>
-    <string name="library_sort_released_desc">Najnovšie vydané</string>
 
     <string name="ambient_mode_title">Ambientný režim</string>
     <string name="ambient_mode_subtitle">Zobrazovať obrázky z vašich katalógov, kým je TV neaktívny</string>
