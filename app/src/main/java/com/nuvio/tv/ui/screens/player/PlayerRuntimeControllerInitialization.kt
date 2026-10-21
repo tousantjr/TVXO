@@ -1002,6 +1002,11 @@ internal fun PlayerRuntimeController.initializePlayer(
             if (!afrPreflightGate.isCurrent(afrPreflightToken)) return@launch
 
             _exoPlayer = if (useLibass) {
+                // Set libass render scale before building the player - this controls
+                // the rasterization resolution of the atlas pipeline.
+                com.nuvio.tv.libass.media.AssHandler.setRenderScale(
+                    playerSettings.libassRenderScale.scale
+                )
                 val playerDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, headers)
                 ExoPlayer.Builder(context)
                     .setBandwidthMeter(bandwidthMeter)

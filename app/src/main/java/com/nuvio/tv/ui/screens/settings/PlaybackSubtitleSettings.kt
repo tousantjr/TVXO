@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nuvio.tv.R
 import com.nuvio.tv.data.local.AVAILABLE_SUBTITLE_LANGUAGES
+import com.nuvio.tv.data.local.LibassRenderScale
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.SubtitleLanguageOption
@@ -182,6 +183,14 @@ internal fun PlaybackSubtitlesSection(
         onToggle = { onUpdate { setUseLibass(!settings.useLibass) } },
         enabled = enabled
     )
+    if (settings.useLibass) {
+        SettingsActionRow(
+            title = stringResource(R.string.sub_libass_render_scale),
+            subtitle = stringResource(R.string.sub_libass_render_scale_sub),
+            value = settings.libassRenderScale.label,
+            onClick = { onOpenDialog(PlaybackDialog.LIBASS_RENDER_SCALE) }
+        )
+    }
 }
 
 @Composable
@@ -263,6 +272,22 @@ internal fun SubtitleSettingsDialogs(
             selectedColor = Color(style.hdrTextColor),
             onColorSelected = { color ->
                 onUpdate { setSubtitleHdrTextColor(color.toArgb()) }
+                onDismiss()
+            },
+            onDismiss = onDismiss
+        )
+        PlaybackDialog.LIBASS_RENDER_SCALE -> SettingsSingleChoiceDialog(
+            title = stringResource(R.string.sub_libass_render_scale),
+            options = LibassRenderScale.entries.map { scale ->
+                SettingsPickerOption(
+                    scale,
+                    scale.label,
+                    null
+                )
+            },
+            selectedValue = settings.libassRenderScale,
+            onOptionSelected = { scale ->
+                onUpdate { setLibassRenderScale(scale) }
                 onDismiss()
             },
             onDismiss = onDismiss
