@@ -627,7 +627,7 @@
     <string name="sub_outline_color">Barva obrobe</string>
     <string name="sub_advanced_section">Napredno izrisovanje podnapisov</string>
     <string name="sub_libass">Uporabi libass za ASS/SSA podnapise</string>
-    <string name="sub_libass_sub">Začasno onemogočeno zaradi vzdrževanja</string>
+    <string name="sub_libass_sub">Napredno upodabljanje ASS/SSA (slogi, pozicioniranje, animacije)</string>
     <string name="sub_libass_mode">Način izrisovanja Libass</string>
     <string name="sub_mode_overlay_gl">Prekrivanje OpenGL (Priporočeno)</string>
     <string name="sub_mode_overlay_gl_sub">Najboljša kakovost s HDR podporo. Podnapise izriše v ločeni niti.</string>

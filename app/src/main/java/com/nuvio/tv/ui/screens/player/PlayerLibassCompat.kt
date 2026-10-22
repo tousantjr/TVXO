@@ -63,6 +63,16 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
 
 internal fun ExoPlayer.getAssHandlerCompat(): AssHandler? = assHandlersByPlayer[this]
 
+/**
+ * Releases the AssHandler associated with this player and removes it from the map.
+ * Must be called when the player is being disposed to free native libass resources
+ * (renderer, tracks, embedded MKV fonts).
+ */
+internal fun ExoPlayer.releaseAssHandlerCompat() {
+    val handler = assHandlersByPlayer.remove(this)
+    handler?.release()
+}
+
 @OptIn(UnstableApi::class)
 private class CompatAssSubtitleParserFactory(
     private val assHandler: AssHandler
@@ -103,11 +113,17 @@ private fun ExtractorsFactory.withAssMkvSupportCompat(
         val extractors = delegate.createExtractors()
         extractors.forEachIndexed { index, extractor ->
             val underlying = extractor.getUnderlyingImplementation()
+            // Stock MatroskaExtractor: replace with ASS-aware variant for libass support.
+            // Only the innermost extractor is replaced, so wrappers such as AutoSync's
+            // embedded subtitle observer keep seeing the stream.
             if (underlying is StockMatroskaExtractor) {
                 extractors[index] = extractor.replaceInnermostExtractor(
                     NuvioAssMatroskaExtractor(subtitleParserFactory, assHandler)
                 )
             }
+            // The DV7 factory swaps in a vendored DvMatroskaExtractor for DV conversion.
+            // Preserve its Dolby Vision transformer while enabling libass and zlib subtitle
+            // decompression from the same vendored Matroska extractor base class.
             if (underlying is DvMatroskaExtractor) {
                 extractors[index] = extractor.replaceInnermostExtractor(
                     NuvioAssMatroskaExtractor(

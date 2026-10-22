@@ -221,7 +221,7 @@
     <string name="sub_outline_color">Culoarea conturului</string>
     <string name="sub_advanced_section">Redare avansată a subtitrărilor</string>
     <string name="sub_libass">Folosește libass pentru subtitrările ASS/SSA</string>
-    <string name="sub_libass_sub">Dezactivat temporar pentru mentenanță</string>
+    <string name="sub_libass_sub">Randare avansată ASS/SSA (stiluri, poziționare, animații)</string>
     <string name="sub_libass_mode">Mod de redare Libass</string>
     <string name="sub_mode_overlay_gl">Suprapunere OpenGL (Recomandat)</string>
     <string name="sub_mode_overlay_gl_sub">Calitate superioară cu suport HDR. Redă subtitrările pe un thread separat.</string>

@@ -907,7 +907,7 @@
     <string name="sub_outline_color">Color del Contorno</string>
     <string name="sub_advanced_section">Renderizado Avanzado de Subtítulos</string>
     <string name="sub_libass">Usar libass para subtítulos ASS/SSA</string>
-    <string name="sub_libass_sub">Deshabilitado temporalmente por mantenimiento</string>
+    <string name="sub_libass_sub">Renderizado avanzado ASS/SSA (estilos, posicionamiento, animaciones)</string>
     <string name="sub_libass_mode">Modo de Renderizado Libass</string>
     <string name="sub_mode_overlay_gl">Superposición OpenGL (Recomendado)</string>
     <string name="sub_mode_overlay_gl_sub">Mejor calidad con soporte HDR. Renderiza los subtítulos en un hilo separado.</string>

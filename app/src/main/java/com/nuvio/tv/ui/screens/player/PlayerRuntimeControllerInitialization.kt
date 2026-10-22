@@ -140,6 +140,8 @@ private fun PlayerRuntimeController.disposeExoPlayerBeforeRebuild() {
         runCatching { player.stop() }
         runCatching { player.clearMediaItems() }
         runCatching { player.clearVideoSurface() }
+        // Release native libass resources (renderer, tracks, fonts) before the player.
+        runCatching { player.releaseAssHandlerCompat() }
         runCatching { player.release() }
     }
     _exoPlayer = null

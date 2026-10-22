@@ -922,7 +922,7 @@
     <string name="sub_hdr_brightness">Brillo de subtítulos en HDR</string>
     <string name="sub_advanced_section">Renderizado avanzado de subtítulos</string>
     <string name="sub_libass">Usar libass para subtítulos ASS/SSA</string>
-    <string name="sub_libass_sub">Temporalmente deshabilitado para mantenimiento</string>
+    <string name="sub_libass_sub">Renderizado avanzado ASS/SSA (estilos, posicionamiento, animaciones)</string>
     <string name="sub_libass_mode">Modo de renderizado Libass</string>
     <string name="sub_mode_overlay_gl">Superposición OpenGL (Recomendado)</string>
     <string name="sub_mode_overlay_gl_sub">Mejor calidad con soporte HDR. Renderiza subtítulos en un hilo separado.</string>

@@ -2192,8 +2192,7 @@ private fun ExoPlayerSurface(
         update = {
             it.syncLibassOverlay(
                 player = player,
-                enabled = useLibass,
-                renderType = libassRenderType
+                enabled = useLibass
             )
             latestBindSubtitleView(it.subtitleView)
         }
@@ -2303,8 +2302,7 @@ private fun ExoPlayerSurface(
     LaunchedEffect(playerView, player, useLibass, libassRenderType) {
         playerView.syncLibassOverlay(
             player = player,
-            enabled = useLibass,
-            renderType = libassRenderType
+            enabled = useLibass
         )
     }
 
@@ -2516,8 +2514,7 @@ private fun measureSubtitleBlockPx(
 
 private fun PlayerView.syncLibassOverlay(
     player: ExoPlayer,
-    enabled: Boolean,
-    renderType: LibassRenderType
+    enabled: Boolean
 ) {
     // The new libass module always uses the GL overlay SurfaceView.
     val containerId = R.id.libass_overlay_container_gl
@@ -2531,6 +2528,8 @@ private fun PlayerView.syncLibassOverlay(
             overlayContainer.removeAssOverlayChildren()
         }
         if (boundPlayer != null) {
+            // Clear the callback so the detached view stops receiving renders.
+            player.getAssHandlerCompat()?.videoFrameCallback = null
             setTag(R.id.libass_overlay_bound_player, null)
         }
         return
@@ -2545,6 +2544,7 @@ private fun PlayerView.syncLibassOverlay(
     val assSubtitleView = AssSubtitleSurfaceView(overlayContainer.context, assHandler)
     // Wire video frame timing: each video frame's PTS drives subtitle rendering
     // so the overlay swap is vsync-aligned with the corresponding video frame.
+    // This is the primary path for non-tunneled playback.
     assHandler.videoFrameCallback = { presentationTimeUs, releaseTimeNs ->
         assSubtitleView.requestRender(presentationTimeUs, releaseTimeNs)
     }
@@ -2556,11 +2556,6 @@ private fun PlayerView.syncLibassOverlay(
         )
     )
     setTag(R.id.libass_overlay_bound_player, player)
-}
-
-private fun LibassRenderType.usesOverlaySubtitleView(): Boolean {
-    // The new libass module always uses the overlay SurfaceView.
-    return true
 }
 
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {

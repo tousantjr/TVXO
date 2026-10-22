@@ -487,7 +487,7 @@ enum class LibassRenderType {
  * hardware where heavy typesetting exceeds the frame budget at full resolution.
  */
 enum class LibassRenderScale(val scale: Float, val label: String) {
-    FULL(1.0f, "Full"),
+    FULL(1.0f, "1:1"),
     THREE_QUARTER(0.75f, "\u00BE"),
     HALF(0.5f, "\u00BD"),
     THIRD(0.33f, "\u2153"),
@@ -919,7 +919,7 @@ class PlayerSettingsDataStore @Inject constructor(
                     runCatching { InternalPlayerEngine.valueOf(it) }.getOrDefault(InternalPlayerEngine.EXOPLAYER)
                 } ?: InternalPlayerEngine.EXOPLAYER,
                 autoSwitchInternalPlayerOnError = prefs[autoSwitchInternalPlayerOnErrorKey] ?: false,
-                useLibass = prefs[useLibassKey] ?: true,
+                useLibass = prefs[useLibassKey] ?: false,
                 libassRenderType = prefs[libassRenderTypeKey]?.let {
                     try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
                 } ?: LibassRenderType.OVERLAY_OPEN_GL,
@@ -1119,7 +1119,7 @@ class PlayerSettingsDataStore @Inject constructor(
     val useLibass: Flow<Boolean> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.onStart { migrateProfile(pid) }
     }.map { prefs ->
-        prefs[useLibassKey] ?: true
+        prefs[useLibassKey] ?: false
     }
 
     val libassRenderType: Flow<LibassRenderType> = profileManager.activeProfileId.flatMapLatest { pid ->
