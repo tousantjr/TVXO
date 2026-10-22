@@ -16,7 +16,6 @@ import androidx.media3.extractor.mkv.MatroskaExtractor as StockMatroskaExtractor
 import androidx.media3.extractor.text.SubtitleParser
 import com.nuvio.tv.core.player.dvmkv.MatroskaExtractor as DvMatroskaExtractor
 import com.nuvio.tv.libass.media.AssHandler
-import com.nuvio.tv.libass.media.AssHandlerConfig
 import com.nuvio.tv.libass.media.parser.AssSubtitleParserFactory
 import com.nuvio.tv.libass.media.render.AssRenderersFactory
 import java.util.Collections
