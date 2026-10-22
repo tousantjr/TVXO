@@ -2530,6 +2530,11 @@ private fun PlayerView.syncLibassOverlay(
         if (boundPlayer != null) {
             // Clear the callback so the detached view stops receiving renders.
             player.getAssHandlerCompat()?.videoFrameCallback = null
+            // Stop the tunneling fallback polling.
+            @Suppress("UNCHECKED_CAST")
+            val pollingPair = getTag(R.id.libass_overlay_polling_runnable) as? Pair<Runnable, android.os.Handler>
+            pollingPair?.let { (runnable, handler) -> handler.removeCallbacks(runnable) }
+            setTag(R.id.libass_overlay_polling_runnable, null)
             setTag(R.id.libass_overlay_bound_player, null)
         }
         return
@@ -2542,12 +2547,34 @@ private fun PlayerView.syncLibassOverlay(
 
     overlayContainer.removeAssOverlayChildren()
     val assSubtitleView = AssSubtitleSurfaceView(overlayContainer.context, assHandler)
-    // Wire video frame timing: each video frame's PTS drives subtitle rendering
-    // so the overlay swap is vsync-aligned with the corresponding video frame.
-    // This is the primary path for non-tunneled playback.
+    // Primary path: VideoFrameMetadataListener provides exact PTS + releaseTimeNs
+    // for vsync-pinned rendering. Works for non-tunneled playback.
     assHandler.videoFrameCallback = { presentationTimeUs, releaseTimeNs ->
         assSubtitleView.requestRender(presentationTimeUs, releaseTimeNs)
     }
+    // Fallback for tunneled playback and paused seeks: VideoFrameMetadataListener
+    // is not invoked during tunneling or when no frames are rendered. Poll the
+    // player position so subtitles still show up (without vsync pinning).
+    val pollingHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    var lastFrameCallbackNs = System.nanoTime()
+    val originalCallback = assHandler.videoFrameCallback
+    assHandler.videoFrameCallback = { pts, releaseNs ->
+        lastFrameCallbackNs = System.nanoTime()
+        originalCallback?.invoke(pts, releaseNs)
+    }
+    val pollingRunnable = object : Runnable {
+        override fun run() {
+            val elapsed = (System.nanoTime() - lastFrameCallbackNs) / 1_000_000
+            // If no frame callback in 500ms and player is playing, use position polling
+            if (elapsed > 500 && player.isPlaying) {
+                val posUs = player.currentPosition * 1000L
+                assSubtitleView.requestRender(posUs, androidx.media3.common.C.TIME_UNSET)
+            }
+            pollingHandler.postDelayed(this, 250)
+        }
+    }
+    pollingHandler.postDelayed(pollingRunnable, 500)
+    setTag(R.id.libass_overlay_polling_runnable, pollingRunnable to pollingHandler)
     overlayContainer.addView(
         assSubtitleView,
         android.widget.FrameLayout.LayoutParams(
@@ -2585,6 +2612,11 @@ private fun PlayerView.setAssOverlayVisibility(visibility: Int) {
             val container = findViewById<android.widget.FrameLayout>(containerId) ?: continue
             container.removeAssOverlayChildren()
         }
+        // Stop the tunneling fallback polling.
+        @Suppress("UNCHECKED_CAST")
+        val pollingPair = getTag(R.id.libass_overlay_polling_runnable) as? Pair<Runnable, android.os.Handler>
+        pollingPair?.let { (runnable, handler) -> handler.removeCallbacks(runnable) }
+        setTag(R.id.libass_overlay_polling_runnable, null)
         setTag(R.id.libass_overlay_bound_player, null)
         // Disconnect video frame callback so the pipeline stops rendering
         val player = player as? ExoPlayer ?: return
