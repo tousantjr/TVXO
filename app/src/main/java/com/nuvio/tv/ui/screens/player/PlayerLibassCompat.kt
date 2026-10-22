@@ -18,6 +18,7 @@ import com.nuvio.tv.core.player.dvmkv.MatroskaExtractor as DvMatroskaExtractor
 import com.nuvio.tv.libass.media.AssHandler
 import com.nuvio.tv.libass.media.AssHandlerConfig
 import com.nuvio.tv.libass.media.parser.AssSubtitleParserFactory
+import com.nuvio.tv.libass.media.render.AssRenderersFactory
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -48,12 +49,12 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
     )
     mediaSourceFactory.setSubtitleParserFactory(assSubtitleParserFactory)
 
-    // The new libass module renders subtitles via its own SurfaceView overlay
-    // pipeline (atlas + GL), so no special renderers factory wrapper is needed.
-    // The old peerless2012 withAssSupport() is no longer required.
+    // Wrap the renderers factory with AssRenderersFactory to add a
+    // NoSampleRenderer-based position fallback for tunneled playback.
+    val assRenderersFactory = AssRenderersFactory(assHandler, renderersFactory)
     val player = this
         .setMediaSourceFactory(mediaSourceFactory)
-        .setRenderersFactory(renderersFactory)
+        .setRenderersFactory(assRenderersFactory)
         .build()
 
     assHandlersByPlayer[player] = assHandler
