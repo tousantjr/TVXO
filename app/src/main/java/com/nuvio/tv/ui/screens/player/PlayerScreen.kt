@@ -2192,7 +2192,8 @@ private fun ExoPlayerSurface(
         update = {
             it.syncLibassOverlay(
                 player = player,
-                enabled = useLibass
+                enabled = useLibass,
+                
             )
             latestBindSubtitleView(it.subtitleView)
         }
@@ -2299,10 +2300,11 @@ private fun ExoPlayerSurface(
         )
     }
 
-    LaunchedEffect(playerView, player, useLibass, libassRenderType) {
+    LaunchedEffect(playerView, player, useLibass) {
         playerView.syncLibassOverlay(
             player = player,
-            enabled = useLibass
+            enabled = useLibass,
+            
         )
     }
 
@@ -2516,7 +2518,6 @@ private fun PlayerView.syncLibassOverlay(
     player: ExoPlayer,
     enabled: Boolean
 ) {
-    // The new libass module always uses the GL overlay SurfaceView.
     val containerId = R.id.libass_overlay_container_gl
     val overlayContainer = findViewById<android.widget.FrameLayout>(containerId) ?: return
     val needsOverlay = enabled
@@ -2540,16 +2541,15 @@ private fun PlayerView.syncLibassOverlay(
     }
 
     overlayContainer.removeAssOverlayChildren()
-    val assSubtitleView = AssSubtitleSurfaceView(overlayContainer.context, assHandler)
-    // Wire video frame callback to drive subtitle rendering.
-    // The primary path (VideoFrameMetadataListener) provides vsync-pinned timing.
-    // When it doesn't fire (tunneled playback), AssPositionRenderer in the
-    // RenderersFactory provides position-based fallback on every render loop.
+    // SurfaceView with atlas GL pipeline for best performance.
+    // AssPositionRenderer provides position updates when VideoFrameMetadataListener
+    // is not active (tunneled playback).
+    val surfaceView = AssSubtitleSurfaceView(overlayContainer.context, assHandler)
     assHandler.videoFrameCallback = { presentationTimeUs, releaseTimeNs ->
-        assSubtitleView.requestRender(presentationTimeUs, releaseTimeNs)
+        surfaceView.requestRender(presentationTimeUs, releaseTimeNs)
     }
     overlayContainer.addView(
-        assSubtitleView,
+        surfaceView,
         android.widget.FrameLayout.LayoutParams(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
             android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -2560,7 +2560,8 @@ private fun PlayerView.syncLibassOverlay(
 
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
     for (index in 0 until childCount) {
-        if (getChildAt(index) is AssSubtitleSurfaceView) {
+        val child = getChildAt(index)
+        if (child is AssSubtitleSurfaceView) {
             return true
         }
     }
@@ -2569,7 +2570,8 @@ private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
 
 private fun android.widget.FrameLayout.removeAssOverlayChildren() {
     for (index in childCount - 1 downTo 0) {
-        if (getChildAt(index) is AssSubtitleSurfaceView) {
+        val child = getChildAt(index)
+        if (child is AssSubtitleSurfaceView) {
             removeViewAt(index)
         }
     }
