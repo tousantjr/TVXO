@@ -59,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -567,7 +568,9 @@ private fun AddRepositoryInline(
                         focusManager.clearFocus(force = true)
                     },
                     enabled = !isLoading && url.isNotBlank(),
-                    modifier = Modifier.semantics { role = Role.Button },
+                    modifier = Modifier
+                        .focusProperties { right = FocusRequester.Cancel }
+                        .semantics { role = Role.Button },
                     colors = ButtonDefaults.colors(
                         containerColor = NuvioTheme.colors.Secondary,
                         focusedContainerColor = NuvioTheme.colors.SecondaryVariant,
