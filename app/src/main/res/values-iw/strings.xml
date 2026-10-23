@@ -1917,13 +1917,13 @@
     <string name="audio_dialog_tab_tracks">שמע</string>
     <string name="audio_dialog_tab_mix">מיקס</string>
     <string name="audio_delay_label">השהיית שמע</string>
-    <string name="audio_delay_range">טווח: %1$.2f שנ׳ עד %2$.2f שנ׳</string>
+    <string name="audio_delay_range">טווח: ‎%1$.2f שנ׳ עד ‎%2$.2f שנ׳</string>
     <string name="audio_mix_label">הגברה (PCM)</string>
     <string name="audio_mix_value_db">%1$d dB</string>
     <string name="audio_mix_persist_on">שמירה בין הפעלות: פועל</string>
     <string name="audio_mix_persist_off">שמירה בין הפעלות: כבוי</string>
-    <string name="audio_mix_range">טווח: %1$d dB עד %2$d dB</string>
-    <string name="audio_mix_range_saved">טווח: %1$d dB עד %2$d dB (שמור)</string>
+    <string name="audio_mix_range">טווח: ‎%1$d dB עד ‎%2$d dB</string>
+    <string name="audio_mix_range_saved">טווח: ‎%1$d dB עד ‎%2$d dB (שמור)</string>
     <string name="audio_mix_unavailable">הגברה אינה זמינה במכשיר זה</string>
     <string name="audio_center_mix_label">Downmix: רמת מיקס מרכזי</string>
     <string name="audio_center_mix_value_db">%1$d dB</string>
