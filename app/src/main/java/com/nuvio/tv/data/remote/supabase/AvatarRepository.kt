@@ -158,10 +158,13 @@ class AvatarRepository @Inject constructor(
 
     suspend fun shareableImageUrl(profile: UserProfile): String? {
         val storageUrl = "${serverConfiguration.backendUrl.trimEnd('/')}/storage/v1/object/"
-        profile.avatarUrl?.trim()?.takeIf { it.isNotEmpty() }?.let { url -> return url.takeIf { it.startsWith(storageUrl) } }
+        profile.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            return url.takeIf { it.startsWith(storageUrl) }
+        }
         val avatarId = profile.avatarId ?: return null
-        standardMetadata.firstOrNull { it.id == avatarId }?.let { avatar ->
-            return avatarImageUrl(avatar.storagePath).takeIf { it.startsWith(storageUrl) }
+        val standard = standardMetadata.firstOrNull { it.id == avatarId }
+        if (standard != null) {
+            return avatarImageUrl(standard.storagePath).takeIf { it.startsWith(storageUrl) }
         }
         val avatar = memberMetadata.firstOrNull { it.id == avatarId } ?: return null
         val sanitizedPath = avatar.storagePath.trim().trimStart('/')
@@ -177,7 +180,7 @@ class AvatarRepository @Inject constructor(
 
     fun getAvatarImageUrl(avatarId: String, catalog: List<AvatarCatalogItem>): String? {
         return catalog.find { it.id == avatarId }?.imageUrl
-            ?: latestCachedMemberAvatar(avatarId)?.toURI()?.toString()
+            ?: latestCachedMemberAvatar(avatarId)?.toFileUriString()
             ?: memberMetadata.firstOrNull { it.id == avatarId }?.let { toMemberCatalogFallbackItem(it).imageUrl }
     }
 
@@ -219,7 +222,7 @@ class AvatarRepository @Inject constructor(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                Log.w(MemberAvatarTag, "Unable to refresh supporter avatars", error)
+                Log.w(MemberAvatarTag, "Unable to refresh supporter avatar catalog", error)
             }
         }
     }
@@ -227,7 +230,9 @@ class AvatarRepository @Inject constructor(
     private fun loadStoredCatalog(): StoredAvatarCatalogPayload? {
         val payload = memberCatalogStorage.loadAvatarCatalogPayload().orEmpty().trim()
         if (payload.isEmpty()) return null
-        return runCatching { json.decodeFromString<StoredAvatarCatalogPayload>(payload) }.getOrNull()
+        return runCatching {
+            json.decodeFromString<StoredAvatarCatalogPayload>(payload)
+        }.getOrNull()
     }
 
     private fun saveStoredCatalog() {
@@ -277,7 +282,7 @@ class AvatarRepository @Inject constructor(
         AvatarCatalogItem(
             id = item.id,
             displayName = item.displayName,
-            imageUrl = imageFile.toURI().toString(),
+            imageUrl = imageFile.toFileUriString(),
             category = item.category,
             sortOrder = item.sortOrder,
             bgColor = item.bgColor,
@@ -309,8 +314,8 @@ class AvatarRepository @Inject constructor(
 
     private fun memberAvatarFile(item: SupabaseMemberAvatarCatalogItem): File {
         val extension = item.storagePath.substringAfterLast('.', "img")
-            .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
-            ?: "img"
+        .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
+        ?: "img"
         return context.cacheDir.resolve("member_profile_avatars/${item.id}-v${item.assetVersion}.$extension")
     }
 
@@ -321,5 +326,14 @@ class AvatarRepository @Inject constructor(
             ?.maxByOrNull { file ->
                 file.name.removePrefix(prefix).substringBefore('.').toIntOrNull() ?: Int.MIN_VALUE
             }
+    }
+
+    private fun File.toFileUriString(): String {
+        val uri = toURI().toString()
+        return if (uri.startsWith("file:/") && !uri.startsWith("file:///")) {
+            uri.replaceFirst("file:/", "file:///")
+        } else {
+            uri
+        }
     }
 }
