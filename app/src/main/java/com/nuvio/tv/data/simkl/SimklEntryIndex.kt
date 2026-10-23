@@ -67,11 +67,24 @@ internal class SimklEntryIndex private constructor(
         }
 
         val oldIds = if (index in externalIdsByIndex.indices) externalIdsByIndex[index] else null
-        val nextExternalIds = externalIdsByIndex.copyOf(newEntries.size)
-        val nextProviderIds = providerItemIdByIndex.copyOf(newEntries.size)
-        if (index in nextExternalIds.indices) {
-            nextExternalIds[index] = newIds
-            nextProviderIds[index] = newProviderId
+        val oldProviderId = if (index in providerItemIdByIndex.indices) providerItemIdByIndex[index] else null
+        val idsArrayUnchanged = index in externalIdsByIndex.indices &&
+            newEntries.size == externalIdsByIndex.size &&
+            oldIds == newIds &&
+            oldProviderId == newProviderId
+        val nextExternalIds = if (idsArrayUnchanged) {
+            externalIdsByIndex
+        } else {
+            externalIdsByIndex.copyOf(newEntries.size).also {
+                if (index in it.indices) it[index] = newIds
+            }
+        }
+        val nextProviderIds = if (idsArrayUnchanged) {
+            providerItemIdByIndex
+        } else {
+            providerItemIdByIndex.copyOf(newEntries.size).also {
+                if (index in it.indices) it[index] = newProviderId
+            }
         }
 
         val nextAlias = if (oldIds == newIds) {
