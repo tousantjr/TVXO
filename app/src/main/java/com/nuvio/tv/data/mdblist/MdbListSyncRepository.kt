@@ -2,6 +2,7 @@ package com.nuvio.tv.data.mdblist
 
 import com.nuvio.tv.core.tracking.TrackingRefreshGate
 import com.nuvio.tv.core.tracking.TrackingRefreshIntent
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -132,15 +134,16 @@ class MdbListSyncRepository(
         val current = mutableState.value
         if (current.scope == scope && current.snapshot?.accountId == accountId) return current.snapshot
         val payload = storage.load(scope.profileId)
-        var snapshot = payload?.let { runCatching { json.decodeFromString<MdbListSyncSnapshot>(it) }.getOrNull() }
-            ?.takeIf { it.accountId == accountId } ?: MdbListSyncSnapshot(accountId)
-        val playbackPayload = storage.loadPlayback(scope.profileId)
-        if (!playbackPayload.isNullOrBlank()) {
-            val playback = runCatching { json.decodeFromString<List<MdbListPlayback>>(playbackPayload) }.getOrNull()
-            if (playback != null) {
-                snapshot = snapshot.copy(playback = playback)
+        val persistedSnapshot = payload?.let { runCatching { json.decodeFromString<MdbListSyncSnapshot>(it) }.getOrNull() }
+            ?.takeIf { it.accountId == accountId }
+        var snapshot = persistedSnapshot ?: MdbListSyncSnapshot(accountId)
+        storage.loadPlayback(scope.profileId)
+            ?.takeIf(String::isNotBlank)
+            ?.let { storagePlayback ->
+                decodePlaybackOverride(storagePlayback, persistedSnapshot, accountId)?.let { playback ->
+                    snapshot = snapshot.copy(playback = playback)
+                }
             }
-        }
         checkScope(scope)
         val projection = runCatching { MdbListProgressProjection(snapshot) }.getOrNull()
         val usable = if (projection != null) snapshot else MdbListSyncSnapshot(accountId)
@@ -163,22 +166,51 @@ class MdbListSyncRepository(
             previous.checkedAtEpochMs == snapshot.checkedAtEpochMs &&
             previous.isInitialized == snapshot.isInitialized &&
             previous.accountId == snapshot.accountId
+        val storedSnapshot = if (onlyPlaybackChanged) {
+            snapshot
+        } else {
+            snapshot.copy(storageRevision = UUID.randomUUID().toString())
+        }
         val projection = if (previous != null && previous.watched === snapshot.watched &&
             previous.playback === snapshot.playback && previous.dropped === snapshot.dropped) {
             currentProjection
         } else if (onlyPlaybackChanged && currentProjection !== MdbListProgressProjection.Empty) {
             currentProjection.withUpdatedPlayback(snapshot.playback)
-        } else MdbListProgressProjection(snapshot)
+        } else MdbListProgressProjection(storedSnapshot)
         if (onlyPlaybackChanged) {
-            val playbackPayload = json.encodeToString(snapshot.playback)
+            val playbackPayload = json.encodeToString(
+                MdbListPlaybackOverride(
+                    accountId = storedSnapshot.accountId,
+                    storageRevision = storedSnapshot.storageRevision,
+                    playback = storedSnapshot.playback
+                )
+            )
             storage.savePlayback(scope.profileId, playbackPayload) { checkScope(scope) }
         } else {
-            val payload = json.encodeToString(snapshot)
+            val payload = json.encodeToString(storedSnapshot)
             storage.save(scope.profileId, payload) { checkScope(scope) }
         }
         checkScope(scope)
         mutableProjection.value = MdbListProgressState(scope, projection)
-        mutableState.value = MdbListSyncState(scope, snapshot)
+        mutableState.value = MdbListSyncState(scope, storedSnapshot)
+    }
+
+    private fun decodePlaybackOverride(
+        payload: String,
+        persistedSnapshot: MdbListSyncSnapshot?,
+        accountId: Long
+    ): List<MdbListPlayback>? {
+        val override = runCatching {
+            json.decodeFromString<MdbListPlaybackOverride>(payload)
+        }.getOrNull()
+        if (override != null) {
+            return override.playback.takeIf {
+                persistedSnapshot != null && override.accountId == accountId &&
+                    override.storageRevision == persistedSnapshot.storageRevision
+            }
+        }
+        return runCatching { json.decodeFromString<List<MdbListPlayback>>(payload) }.getOrNull()
+            ?.takeIf { persistedSnapshot != null && persistedSnapshot.storageRevision == null }
     }
 
     private fun shouldRefresh(intent: TrackingRefreshIntent): Boolean {
@@ -211,3 +243,10 @@ class MdbListSyncRepository(
         const val ERROR_RETRY_MS = 60_000L
     }
 }
+
+@Serializable
+private data class MdbListPlaybackOverride(
+    val accountId: Long,
+    val storageRevision: String? = null,
+    val playback: List<MdbListPlayback>
+)

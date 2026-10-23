@@ -23,9 +23,32 @@ internal class MdbListProgressProjection private constructor(
 
     fun withUpdatedPlayback(newPlayback: List<MdbListPlayback>): MdbListProgressProjection {
         val newShowIdSiblings = buildShowIdSiblings(watchedShowIdSiblings, newPlayback)
+        val newDroppedById = if (droppedById.isEmpty()) {
+            droppedById
+        } else {
+            var updatedMap: MutableMap<String, List<Int?>>? = null
+            for (session in newPlayback) {
+                if (session.type == MdbListItemType.MOVIE) continue
+                val aliases = session.media.ids.aliases()
+                val droppedSeasons = aliases.firstNotNullOfOrNull { droppedById[it] }
+                if (droppedSeasons != null) {
+                    for (alias in aliases) {
+                        if (droppedById[alias] != droppedSeasons) {
+                            val map = updatedMap ?: HashMap(droppedById).also { updatedMap = it }
+                            map[alias] = droppedSeasons
+                        }
+                    }
+                }
+            }
+            updatedMap ?: droppedById
+        }
+
+        fun isDropped(contentId: String, season: Int? = null): Boolean =
+            newDroppedById[contentId]?.any { it == null || (season != null && it == season) } == true
+
         val newProgress = newPlayback.filter { session ->
             val watched = historyByKey["${session.type}:${session.media.ids.key}:${session.season ?: -1}:${session.episode ?: -1}"]
-            session.progress < COMPLETION_PERCENT && !isHidden(session.media.ids.contentId, session.season) &&
+            session.progress < COMPLETION_PERCENT && !isDropped(session.media.ids.contentId, session.season) &&
                 (watched == null || mdbListTimestamp(session.updatedAt) > mdbListTimestamp(watched.watchedAt))
         }.map { session ->
             progress(
@@ -42,7 +65,7 @@ internal class MdbListProgressProjection private constructor(
         return MdbListProgressProjection(
             mediaIndex = mediaIndex,
             watchedById = watchedById,
-            droppedById = droppedById,
+            droppedById = newDroppedById,
             historyByKey = historyByKey,
             watchedMovieIds = watchedMovieIds,
             watchedItems = watchedItems,

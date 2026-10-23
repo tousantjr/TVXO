@@ -25,22 +25,22 @@ class AndroidMdbListSyncStorage @Inject constructor(
         factory.get(profileId, FEATURE).data.first()[SNAPSHOT]
 
     override suspend fun save(profileId: Int, payload: String, checkScope: () -> Unit) {
-        clearPlayback(profileId, checkScope)
         factory.get(profileId, FEATURE).edit { preferences ->
             checkScope()
             if (factory.isProfileDeleted(profileId)) throw CancellationException("MDBList profile removed")
             preferences[SNAPSHOT] = payload
             preferences.remove(PLAYBACK)
         }
+        clearPlaybackBestEffort(profileId, checkScope)
     }
 
     override suspend fun remove(profileId: Int, checkScope: () -> Unit) {
-        clearPlayback(profileId, checkScope)
         factory.get(profileId, FEATURE).edit { preferences ->
             checkScope()
             preferences.remove(SNAPSHOT)
             preferences.remove(PLAYBACK)
         }
+        clearPlaybackBestEffort(profileId, checkScope)
     }
 
     override suspend fun loadPlayback(profileId: Int): String? {
@@ -61,6 +61,16 @@ class AndroidMdbListSyncStorage @Inject constructor(
         factory.get(profileId, PLAYBACK_FEATURE).edit { preferences ->
             checkScope()
             preferences[PLAYBACK] = ""
+        }
+    }
+
+    private suspend fun clearPlaybackBestEffort(profileId: Int, checkScope: () -> Unit) {
+        try {
+            clearPlayback(profileId, checkScope)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // The new snapshot revision already makes the old playback override unusable.
         }
     }
 
