@@ -18,6 +18,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -133,19 +135,22 @@ class AvatarRepository @Inject constructor(
         memberCatalogLoaded = true
         lastMemberRefreshAtMs = SystemClock.elapsedRealtime()
         saveStoredCatalog()
+        val downloadSemaphore = Semaphore(6)
         val catalog = coroutineScope {
             remote.map { item ->
                 async {
-                    try {
-                        toMemberCatalogItem(item, cacheMemberAvatar(item))
-                    } catch (error: CancellationException) {
-                        throw error
-                    } catch (error: Exception) {
-                        Log.w(MemberAvatarTag, "Unable to load supporter avatar ${item.id}", error)
-                        null
+                    downloadSemaphore.withPermit {
+                        try {
+                            toMemberCatalogItem(item, cacheMemberAvatar(item))
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            Log.w(MemberAvatarTag, "Unable to load supporter avatar ${item.id}", error)
+                            toMemberCatalogFallbackItem(item)
+                        }
                     }
                 }
-            }.awaitAll().filterNotNull()
+            }.awaitAll()
         }
         cachedMemberCatalog = catalog
         return catalog
@@ -159,8 +164,9 @@ class AvatarRepository @Inject constructor(
             return avatarImageUrl(avatar.storagePath).takeIf { it.startsWith(storageUrl) }
         }
         val avatar = memberMetadata.firstOrNull { it.id == avatarId } ?: return null
+        val sanitizedPath = avatar.storagePath.trim().trimStart('/')
         return try {
-            storage[MemberAvatarBucket].createSignedUrl(avatar.storagePath, 1.days)
+            storage[MemberAvatarBucket].createSignedUrl(sanitizedPath, 1.days)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -172,6 +178,7 @@ class AvatarRepository @Inject constructor(
     fun getAvatarImageUrl(avatarId: String, catalog: List<AvatarCatalogItem>): String? {
         return catalog.find { it.id == avatarId }?.imageUrl
             ?: latestCachedMemberAvatar(avatarId)?.toURI()?.toString()
+            ?: memberMetadata.firstOrNull { it.id == avatarId }?.let { toMemberCatalogFallbackItem(it).imageUrl }
     }
 
     fun invalidateCache() {
@@ -246,10 +253,25 @@ class AvatarRepository @Inject constructor(
             bgColor = item.bgColor
         )
 
-    private fun loadCachedMemberAvatar(item: SupabaseMemberAvatarCatalogItem): AvatarCatalogItem? {
-        val imageFile = memberAvatarFile(item).takeIf { it.isFile && it.length() > 0L } ?: return null
-        return toMemberCatalogItem(item, imageFile)
+    private fun loadCachedMemberAvatar(item: SupabaseMemberAvatarCatalogItem): AvatarCatalogItem {
+        val imageFile = memberAvatarFile(item).takeIf { it.isFile && it.length() > 0L }
+        return if (imageFile != null) {
+            toMemberCatalogItem(item, imageFile)
+        } else {
+            toMemberCatalogFallbackItem(item)
+        }
     }
+
+    private fun toMemberCatalogFallbackItem(item: SupabaseMemberAvatarCatalogItem): AvatarCatalogItem =
+        AvatarCatalogItem(
+            id = item.id,
+            displayName = item.displayName,
+            imageUrl = avatarImageUrl(item.storagePath.trim().trimStart('/')),
+            category = item.category,
+            sortOrder = item.sortOrder,
+            bgColor = item.bgColor,
+            memberOnly = true
+        )
 
     private fun toMemberCatalogItem(item: SupabaseMemberAvatarCatalogItem, imageFile: File) =
         AvatarCatalogItem(
@@ -272,9 +294,10 @@ class AvatarRepository @Inject constructor(
         val imageFile = memberAvatarFile(item)
         if (imageFile.isFile && imageFile.length() > 0L) return@withContext imageFile
 
+        val sanitizedPath = item.storagePath.trim().trimStart('/')
         val directory = imageFile.parentFile ?: return@withContext imageFile
         directory.mkdirs()
-        val imageBytes = storage[MemberAvatarBucket].downloadAuthenticated(item.storagePath)
+        val imageBytes = storage[MemberAvatarBucket].downloadAuthenticated(sanitizedPath)
         val temporaryFile = directory.resolve(".${imageFile.name}.tmp")
         temporaryFile.writeBytes(imageBytes)
         if (!temporaryFile.renameTo(imageFile)) {
