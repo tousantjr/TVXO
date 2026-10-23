@@ -1,37 +1,60 @@
 package com.nuvio.tv.data.simkl
 
+import com.nuvio.tv.core.tracking.TrackingExternalIds
+import com.nuvio.tv.core.tracking.parseTrackingExternalIds
 import com.nuvio.tv.domain.model.WatchProgress
 
-internal fun SimklSyncSnapshot.reconcileWatchedPlayback(): SimklSyncSnapshot {
+internal fun SimklSyncSnapshot.reconcileWatchedPlayback(
+    entryIndex: SimklEntryIndex? = null
+): SimklSyncSnapshot {
     if (playback.isEmpty()) return this
     val retainedPlayback = playback.filterNot { session ->
-        session.toWatchProgress(entries)?.let { progress ->
-            entries.any { entry ->
-                entry.hidesPlayback(progress) || entry.supersedesPlayback(progress)
+        val progress = session.toWatchProgress(entries, entryIndex) ?: return@filterNot false
+        if (entryIndex != null && entryIndex.matchesEntries(entries)) {
+            entryIndex.matchingEntriesForContent(
+                entries = entries,
+                contentId = progress.contentId,
+                trackingProviderItemId = progress.trackingProviderItemId
+            ).any { entry ->
+                entry.hidesMatchedPlayback(progress) || entry.supersedesMatchedPlayback(progress)
             }
-        } == true
+        } else {
+            val parsedContentIds = parseTrackingExternalIds(progress.contentId)
+            entries.any { entry ->
+                entry.matchesContentWithParsedIds(
+                    contentId = progress.contentId,
+                    parsedContentIds = parsedContentIds,
+                    trackingProviderItemId = progress.trackingProviderItemId
+                ) && (entry.hidesMatchedPlayback(progress) || entry.supersedesMatchedPlayback(progress))
+            }
+        }
     }
     return if (retainedPlayback.size == playback.size) this else copy(playback = retainedPlayback)
 }
 
-internal fun SimklSyncSnapshot.isHiddenFromContinueWatching(contentId: String): Boolean =
-    entries.any { entry ->
-        entry.status.hidesContinueWatching() &&
-            entry.matchesContent(contentId = contentId, trackingProviderItemId = null)
+internal fun SimklSyncSnapshot.isHiddenFromContinueWatching(
+    contentId: String,
+    entryIndex: SimklEntryIndex? = null
+): Boolean {
+    if (entryIndex != null && entryIndex.matchesEntries(entries)) {
+        return entryIndex.matchingEntriesForContent(entries, contentId, trackingProviderItemId = null)
+            .any { entry -> entry.status.hidesContinueWatching() }
     }
+    val parsedContentIds = parseTrackingExternalIds(contentId)
+    return entries.any { entry ->
+        entry.status.hidesContinueWatching() &&
+            entry.matchesContentWithParsedIds(
+                contentId = contentId,
+                parsedContentIds = parsedContentIds,
+                trackingProviderItemId = null
+            )
+    }
+}
 
 internal fun SimklListStatus?.hidesContinueWatching(): Boolean =
     this == SimklListStatus.ON_HOLD || this == SimklListStatus.DROPPED
 
-private fun SimklLibraryEntry.supersedesPlayback(progress: WatchProgress): Boolean {
-    if (
-        !matchesContent(
-            contentId = progress.contentId,
-            trackingProviderItemId = progress.trackingProviderItemId
-        )
-    ) {
-        return false
-    }
+private fun SimklLibraryEntry.supersedesMatchedPlayback(progress: WatchProgress): Boolean {
     if (isMovieEntry()) {
         if (!progress.contentType.equals("movie", ignoreCase = true)) return false
         if (progress.season != null || progress.episode != null) return false
@@ -59,16 +82,8 @@ private fun SimklLibraryEntry.supersedesPlayback(progress: WatchProgress): Boole
     return false
 }
 
-private fun SimklLibraryEntry.hidesPlayback(progress: WatchProgress): Boolean {
-    if (
-        !matchesContent(
-            contentId = progress.contentId,
-            trackingProviderItemId = progress.trackingProviderItemId
-        )
-    ) {
-        return false
-    }
-    return when {
+private fun SimklLibraryEntry.hidesMatchedPlayback(progress: WatchProgress): Boolean =
+    when {
         status.hidesContinueWatching() -> true
         status == SimklListStatus.COMPLETED ->
             parseSimklUtcEpochMs(lastWatchedAt)?.let { completedAt ->
@@ -76,14 +91,17 @@ private fun SimklLibraryEntry.hidesPlayback(progress: WatchProgress): Boolean {
             } == true
         else -> false
     }
-}
 
-private fun SimklLibraryEntry.matchesContent(
+internal fun SimklLibraryEntry.matchesContentWithParsedIds(
     contentId: String,
+    parsedContentIds: TrackingExternalIds,
     trackingProviderItemId: String?
 ): Boolean {
-    val providerItemId = media?.simklTrackingProviderItemId()
+    val currentMedia = media ?: return false
+    val providerItemId = currentMedia.simklTrackingProviderItemId()
     val sameProviderItem = providerItemId != null &&
         providerItemId.equals(trackingProviderItemId, ignoreCase = true)
-    return sameProviderItem || matchesSimklContentId(contentId)
+    if (sameProviderItem) return true
+    if (currentMedia.canonicalContentId().equals(contentId, ignoreCase = true)) return true
+    return parsedContentIds.sharesIdentityWith(currentMedia.toTrackingExternalIds())
 }

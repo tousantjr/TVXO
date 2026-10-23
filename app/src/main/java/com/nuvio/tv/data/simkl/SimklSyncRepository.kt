@@ -40,6 +40,12 @@ class SimklSyncRepository @Inject constructor(
     val state: StateFlow<SimklSyncState> = _state.asStateFlow()
     internal val projection: StateFlow<SimklSnapshotProjection> = _projection.asStateFlow()
 
+    internal fun currentEntryIndex(): SimklEntryIndex? {
+        val currentProjection = _projection.value
+        val currentEntries = _state.value.snapshot.entries
+        return currentProjection.entryIndex.takeIf { it.matchesEntries(currentEntries) }
+    }
+
     init {
         scope.launch {
             profileManager.activeProfileId.collect { profileId ->
@@ -139,9 +145,11 @@ class SimklSyncRepository @Inject constructor(
         snapshotMutex.withLock {
             if (!isCurrent(profileId, generation)) return@withLock
             val current = _state.value
+            val index = _projection.value.entryIndex.takeIf { it.matchesEntries(current.snapshot.entries) }
             val snapshot = current.snapshot.applyScrobbleResult(
                 result = result,
-                committedAtEpochMs = System.currentTimeMillis()
+                committedAtEpochMs = System.currentTimeMillis(),
+                entryIndex = index
             )
             if (snapshot == current.snapshot) return@withLock
             val onlyPlaybackChanged = snapshot.entries === current.snapshot.entries
@@ -169,9 +177,11 @@ class SimklSyncRepository @Inject constructor(
         snapshotMutex.withLock {
             if (!isCurrent(profileId, generation)) return@withLock
             val current = _state.value
+            val index = _projection.value.entryIndex.takeIf { it.matchesEntries(current.snapshot.entries) }
             val snapshot = current.snapshot.applyMutationReceipt(
                 receipt = receipt,
-                committedAtEpochMs = System.currentTimeMillis()
+                committedAtEpochMs = System.currentTimeMillis(),
+                entryIndex = index
             )
             if (snapshot == current.snapshot) return@withLock
             val projection = buildProjection(snapshot)

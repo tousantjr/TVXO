@@ -20,10 +20,12 @@ internal class SimklSnapshotProjection private constructor(
     private val hiddenContentIds: Set<String>,
     private val watchedAnimeEpisodes: Map<String, Set<Int>>,
     private val membershipByContent: Map<SimklProjectionMembershipKey, SimklProjectionMembership>,
-    private val baseWatchedMovieIds: Set<String> = emptySet()
+    private val baseWatchedMovieIds: Set<String> = emptySet(),
+    internal val entryIndex: SimklEntryIndex = SimklEntryIndex(emptyList())
 ) {
     fun withUpdatedPlayback(newSnapshot: SimklSyncSnapshot): SimklSnapshotProjection {
-        val newProgress = newSnapshot.toSimklProgressEntries()
+        val index = entryIndex.takeIf { it.matchesEntries(newSnapshot.entries) }
+        val newProgress = newSnapshot.toSimklProgressEntries(index)
         val newPlaybackByEpisode = linkedMapOf<SimklProjectionItemKey, WatchProgress>()
         newProgress.forEach { item ->
             newPlaybackByEpisode.putIfAbsent(
@@ -47,7 +49,8 @@ internal class SimklSnapshotProjection private constructor(
             hiddenContentIds = hiddenContentIds,
             watchedAnimeEpisodes = watchedAnimeEpisodes,
             membershipByContent = membershipByContent,
-            baseWatchedMovieIds = baseWatchedMovieIds
+            baseWatchedMovieIds = baseWatchedMovieIds,
+            entryIndex = index ?: SimklEntryIndex(newSnapshot.entries)
         )
     }
 
@@ -107,9 +110,10 @@ internal class SimklSnapshotProjection private constructor(
         val Empty = create(SimklSyncSnapshot())
 
         fun create(snapshot: SimklSyncSnapshot): SimklSnapshotProjection {
+            val entryIndex = SimklEntryIndex(snapshot.entries)
             val library = snapshot.toSimklLibraryProjection()
             val watched = snapshot.toSimklWatchedProjection()
-            val progress = snapshot.toSimklProgressEntries()
+            val progress = snapshot.toSimklProgressEntries(entryIndex)
             val canonicalIdByAlias = linkedMapOf<String, String>()
             val siblings = linkedMapOf<String, MutableSet<String>>()
             val hiddenContentIds = linkedSetOf<String>()
@@ -194,7 +198,8 @@ internal class SimklSnapshotProjection private constructor(
                 hiddenContentIds = hiddenContentIds,
                 watchedAnimeEpisodes = watchedAnimeEpisodes,
                 membershipByContent = membershipByContent,
-                baseWatchedMovieIds = baseWatchedMovieIds
+                baseWatchedMovieIds = baseWatchedMovieIds,
+                entryIndex = entryIndex
             )
         }
     }

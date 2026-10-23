@@ -74,8 +74,13 @@ fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjection {
     )
 }
 
-fun SimklSyncSnapshot.toSimklProgressEntries(): List<WatchProgress> = playback
-    .mapNotNull { session -> session.toWatchProgress(entries) }
+fun SimklSyncSnapshot.toSimklProgressEntries(): List<WatchProgress> =
+    toSimklProgressEntries(entryIndex = null)
+
+internal fun SimklSyncSnapshot.toSimklProgressEntries(
+    entryIndex: SimklEntryIndex?
+): List<WatchProgress> = playback
+    .mapNotNull { session -> session.toWatchProgress(entries, entryIndex) }
     .groupBy(::simklProgressKey)
     .mapNotNull { (_, candidates) -> candidates.maxByOrNull(WatchProgress::lastWatched) }
     .sortedByDescending(WatchProgress::lastWatched)
@@ -89,8 +94,34 @@ fun SimklSyncSnapshot.mediaReference(
     episode: Int? = null,
     episodeTitle: String? = null,
     posterUrl: String? = null
+): TrackingMediaReference = mediaReference(
+    contentId = contentId,
+    contentType = contentType,
+    title = title,
+    releaseInfo = releaseInfo,
+    season = season,
+    episode = episode,
+    episodeTitle = episodeTitle,
+    posterUrl = posterUrl,
+    entryIndex = null
+)
+
+internal fun SimklSyncSnapshot.mediaReference(
+    contentId: String,
+    contentType: String,
+    title: String? = null,
+    releaseInfo: String? = null,
+    season: Int? = null,
+    episode: Int? = null,
+    episodeTitle: String? = null,
+    posterUrl: String? = null,
+    entryIndex: SimklEntryIndex?
 ): TrackingMediaReference {
-    val entry = entries.firstOrNull { candidate -> candidate.matchesSimklContentId(contentId) }
+    val entry = if (entryIndex != null) {
+        entryIndex.firstMatchingContentId(entries, contentId)
+    } else {
+        entries.firstOrNull { candidate -> candidate.matchesSimklContentId(contentId) }
+    }
     val media = entry?.media
     val parsedIds = parseTrackingExternalIds(contentId)
     val ids = media?.toTrackingExternalIds()?.mergeMissing(parsedIds) ?: parsedIds
@@ -110,9 +141,19 @@ fun SimklSyncSnapshot.mediaReference(
     )
 }
 
-fun SimklSyncSnapshot.enrichMediaReference(reference: TrackingMediaReference): TrackingMediaReference {
-    val entry = entries.firstOrNull { candidate ->
-        candidate.media?.toTrackingExternalIds()?.sharesIdentityWith(reference.ids) == true
+fun SimklSyncSnapshot.enrichMediaReference(reference: TrackingMediaReference): TrackingMediaReference =
+    enrichMediaReference(reference, entryIndex = null)
+
+internal fun SimklSyncSnapshot.enrichMediaReference(
+    reference: TrackingMediaReference,
+    entryIndex: SimklEntryIndex?
+): TrackingMediaReference {
+    val entry = if (entryIndex != null) {
+        entryIndex.firstSharingIdentityWith(entries, reference.ids)
+    } else {
+        entries.firstOrNull { candidate ->
+            candidate.media?.toTrackingExternalIds()?.sharesIdentityWith(reference.ids) == true
+        }
     } ?: return reference
     val media = entry.media ?: return reference
     val kind = when {
@@ -263,16 +304,25 @@ private fun SimklLibraryEntry.toWatchedItem(
 )
 
 internal fun SimklPlaybackSession.toWatchProgress(
-    libraryEntries: List<SimklLibraryEntry> = emptyList()
+    libraryEntries: List<SimklLibraryEntry> = emptyList(),
+    entryIndex: SimklEntryIndex? = null
 ): WatchProgress? {
     val media = media ?: return null
     val parentId = media.canonicalContentId() ?: return null
     val isAnimeMovie = mediaType == SimklMediaType.ANIME && (
-        type == "movie" ||
-        libraryEntries.any { entry ->
-            entry.mediaType == SimklMediaType.ANIME &&
-                entry.animeType == "movie" &&
-                entry.media?.toTrackingExternalIds()?.sharesIdentityWith(media.toTrackingExternalIds()) == true
+        type == "movie" || run {
+            val sessionIds = media.toTrackingExternalIds()
+            if (entryIndex != null) {
+                entryIndex.firstSharingIdentityWith(libraryEntries, sessionIds) { entry ->
+                    entry.mediaType == SimklMediaType.ANIME && entry.animeType == "movie"
+                } != null
+            } else {
+                libraryEntries.any { entry ->
+                    entry.mediaType == SimklMediaType.ANIME &&
+                        entry.animeType == "movie" &&
+                        entry.media?.toTrackingExternalIds()?.sharesIdentityWith(sessionIds) == true
+                }
+            }
         }
     )
     val isMovie = mediaType == SimklMediaType.MOVIES ||
@@ -326,7 +376,7 @@ internal fun SimklMedia.simklTrackingProviderItemId(): String? = ids.simklIdValu
     ?.takeIf { it > 0L }
     ?.let { id -> "simkl:$id" }
 
-private fun TrackingExternalIds.sharesIdentityWith(other: TrackingExternalIds): Boolean =
+internal fun TrackingExternalIds.sharesIdentityWith(other: TrackingExternalIds): Boolean =
     (simkl != null && simkl == other.simkl) ||
         (!imdb.isNullOrBlank() && imdb.equals(other.imdb, ignoreCase = true)) ||
         (tmdb != null && tmdb == other.tmdb) ||
