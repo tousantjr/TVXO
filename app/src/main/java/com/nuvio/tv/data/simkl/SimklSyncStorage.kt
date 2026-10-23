@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.nuvio.tv.data.local.ProfileDataStoreFactory
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 interface SimklSyncStorage {
@@ -24,19 +25,19 @@ class AndroidSimklSyncStorage @Inject constructor(
         factory.get(profileId, FEATURE_NAME).data.first()[SNAPSHOT_KEY]
 
     override suspend fun save(profileId: Int, payload: String) {
-        clearPlayback(profileId)
         factory.get(profileId, FEATURE_NAME).edit { preferences ->
             preferences[SNAPSHOT_KEY] = payload
             preferences.remove(PLAYBACK_KEY)
         }
+        clearPlaybackBestEffort(profileId)
     }
 
     override suspend fun remove(profileId: Int) {
-        clearPlayback(profileId)
         factory.get(profileId, FEATURE_NAME).edit { preferences ->
             preferences.remove(SNAPSHOT_KEY)
             preferences.remove(PLAYBACK_KEY)
         }
+        clearPlaybackBestEffort(profileId)
     }
 
     override suspend fun loadPlayback(profileId: Int): String? {
@@ -54,6 +55,16 @@ class AndroidSimklSyncStorage @Inject constructor(
     override suspend fun clearPlayback(profileId: Int) {
         factory.get(profileId, PLAYBACK_FEATURE_NAME).edit { preferences ->
             preferences[PLAYBACK_KEY] = ""
+        }
+    }
+
+    private suspend fun clearPlaybackBestEffort(profileId: Int) {
+        try {
+            clearPlayback(profileId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // The new snapshot revision already makes the old playback override unusable.
         }
     }
 

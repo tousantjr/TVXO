@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.data.local.ProfileDataStoreFactory
+import java.io.IOException
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class SimklSyncRepositoryStorageTest {
@@ -225,7 +227,43 @@ class SimklSyncRepositoryStorageTest {
     }
 
     @Test
-    fun `AndroidSimklSyncStorage migrates legacy playback once writes tombstone and clears playback before saving snapshot`() = runTest {
+    fun `failed snapshot save or remove preserves the latest playback override`() = runTest {
+        val snapshotKey = stringPreferencesKey("snapshot")
+        val playbackKey = stringPreferencesKey("playback")
+        val opLog = mutableListOf<String>()
+        val storedSnapshot = """{"isInitialized":true}"""
+        val storedPlayback = """[{"id":42,"progress":50.0}]"""
+
+        val initialSync = emptyPreferences().toMutablePreferences().apply {
+            this[snapshotKey] = storedSnapshot
+        }.toPreferences()
+        val initialPlayback = emptyPreferences().toMutablePreferences().apply {
+            this[playbackKey] = storedPlayback
+        }.toPreferences()
+
+        val syncStore = RecordingPreferencesDataStore("sync", initialSync, opLog)
+        val playbackStore = RecordingPreferencesDataStore("playback", initialPlayback, opLog)
+        val factory = mockk<ProfileDataStoreFactory> {
+            every { get(1, "simkl_sync") } returns syncStore
+            every { get(1, "simkl_playback") } returns playbackStore
+        }
+        val storage = AndroidSimklSyncStorage(factory)
+
+        syncStore.failEdits = true
+        expectStorageFailure { storage.save(1, """{"isInitialized":true,"entries":[]}""") }
+        assertEquals(storedSnapshot, syncStore.value[snapshotKey])
+        assertEquals(storedPlayback, storage.loadPlayback(1))
+
+        syncStore.failEdits = false
+        storage.savePlayback(1, storedPlayback)
+        syncStore.failEdits = true
+        expectStorageFailure { storage.remove(1) }
+        assertEquals(storedSnapshot, syncStore.value[snapshotKey])
+        assertEquals(storedPlayback, storage.loadPlayback(1))
+    }
+
+    @Test
+    fun `AndroidSimklSyncStorage migrates legacy playback and saves the snapshot before clearing playback`() = runTest {
         val snapshotKey = stringPreferencesKey("snapshot")
         val playbackKey = stringPreferencesKey("playback")
         val opLog = mutableListOf<String>()
@@ -247,12 +285,12 @@ class SimklSyncRepositoryStorageTest {
         assertEquals("""[{"id":42,"progress":50.0}]""", storage.loadPlayback(1))
         assertEquals(1, syncStore.readCount)
 
-        // 2. save() clears playback first (writing "" tombstone), then writes snapshot & removes legacy playback key
+        // 2. save() commits the snapshot first, then clears the override (writing "" tombstone)
         opLog.clear()
         syncStore.resetReadCount()
         storage.save(1, """{"isInitialized":true,"entries":[]}""")
 
-        assertEquals(listOf("playback:edit", "sync:edit"), opLog)
+        assertEquals(listOf("sync:edit", "playback:edit"), opLog)
         assertEquals("", playbackStore.value[playbackKey])
         assertNull(syncStore.value[playbackKey])
         assertEquals("""{"isInitialized":true,"entries":[]}""", syncStore.value[snapshotKey])
@@ -262,11 +300,11 @@ class SimklSyncRepositoryStorageTest {
         assertNull(storage.loadPlayback(1))
         assertEquals(0, syncStore.readCount)
 
-        // 4. remove() clears playback first, then removes snapshot from simkl_sync
+        // 4. remove() removes the snapshot first, then clears the override
         storage.savePlayback(1, """[{"id":99,"progress":75.0}]""")
         opLog.clear()
         storage.remove(1)
-        assertEquals(listOf("playback:edit", "sync:edit"), opLog)
+        assertEquals(listOf("sync:edit", "playback:edit"), opLog)
         assertEquals("", playbackStore.value[playbackKey])
         assertNull(syncStore.value[snapshotKey])
     }
@@ -280,6 +318,7 @@ class SimklSyncRepositoryStorageTest {
         private val state = MutableStateFlow(initial)
         var readCount: Int = 0
             private set
+        var failEdits = false
 
         val value: Preferences
             get() = state.value
@@ -289,6 +328,7 @@ class SimklSyncRepositoryStorageTest {
         override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
             mutex.withLock {
                 opLog += "$name:edit"
+                if (failEdits) throw IOException("Disk unavailable")
                 transform(state.value).also { updated ->
                     state.value = updated
                 }
@@ -296,6 +336,15 @@ class SimklSyncRepositoryStorageTest {
 
         fun resetReadCount() {
             readCount = 0
+        }
+    }
+
+    private suspend fun expectStorageFailure(block: suspend () -> Unit) {
+        try {
+            block()
+            fail("Expected the storage write to fail")
+        } catch (_: IOException) {
+            Unit
         }
     }
 }

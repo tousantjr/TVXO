@@ -3,6 +3,7 @@ package com.nuvio.tv.data.simkl
 import android.util.Log
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.core.tracking.TrackingRefreshIntent
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -121,19 +123,20 @@ class SimklSyncRepository @Inject constructor(
             if (playback.size == current.snapshot.playback.size) return@withLock
             val snapshot = current.snapshot.copy(playback = playback)
             val onlyPlaybackChanged = snapshot.entries === current.snapshot.entries
+            val storedSnapshot = if (onlyPlaybackChanged) snapshot else snapshot.withFreshStorageRevision()
             val projection = if (onlyPlaybackChanged && _projection.value !== SimklSnapshotProjection.Empty) {
                 _projection.value.withUpdatedPlayback(snapshot)
             } else {
                 buildProjection(snapshot)
             }
             if (onlyPlaybackChanged) {
-                storage.savePlayback(profileId, encodePlayback(snapshot.playback))
+                storage.savePlayback(profileId, encodePlayback(storedSnapshot))
             } else {
-                storage.save(profileId, encodeSnapshot(snapshot))
+                storage.save(profileId, encodeSnapshot(storedSnapshot))
             }
             if (profileId == profileManager.activeProfileId.value) {
                 _projection.value = projection
-                _state.value = current.copy(snapshot = snapshot)
+                _state.value = current.copy(snapshot = storedSnapshot)
             }
         }
     }
@@ -153,19 +156,20 @@ class SimklSyncRepository @Inject constructor(
             )
             if (snapshot == current.snapshot) return@withLock
             val onlyPlaybackChanged = snapshot.entries === current.snapshot.entries
+            val storedSnapshot = if (onlyPlaybackChanged) snapshot else snapshot.withFreshStorageRevision()
             val projection = if (onlyPlaybackChanged && _projection.value !== SimklSnapshotProjection.Empty) {
                 _projection.value.withUpdatedPlayback(snapshot)
             } else {
                 buildProjection(snapshot, updatedIndex)
             }
             if (onlyPlaybackChanged) {
-                storage.savePlayback(profileId, encodePlayback(snapshot.playback))
+                storage.savePlayback(profileId, encodePlayback(storedSnapshot))
             } else {
-                storage.save(profileId, encodeSnapshot(snapshot))
+                storage.save(profileId, encodeSnapshot(storedSnapshot))
             }
             if (isCurrent(profileId, generation)) {
                 _projection.value = projection
-                _state.value = current.copy(snapshot = snapshot)
+                _state.value = current.copy(snapshot = storedSnapshot)
             }
         }
     }
@@ -185,17 +189,18 @@ class SimklSyncRepository @Inject constructor(
             )
             if (snapshot == current.snapshot) return@withLock
             val projection = buildProjection(snapshot)
-            storage.save(profileId, encodeSnapshot(snapshot))
+            val storedSnapshot = snapshot.withFreshStorageRevision()
+            storage.save(profileId, encodeSnapshot(storedSnapshot))
             if (isCurrent(profileId, generation)) {
                 _projection.value = projection
-                _state.value = current.copy(snapshot = snapshot)
+                _state.value = current.copy(snapshot = storedSnapshot)
             }
         }
     }
 
     private suspend fun loadProfile(profileId: Int) = loadMutex.withLock {
         if (loadedProfileId == profileId) return@withLock
-        var snapshot = storage.load(profileId)
+        val persistedSnapshot = storage.load(profileId)
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.let { payload ->
@@ -203,12 +208,12 @@ class SimklSyncRepository @Inject constructor(
                     .onFailure { error -> Log.w(TAG, "Unable to decode Simkl snapshot", error) }
                     .getOrNull()
             }
-            ?: SimklSyncSnapshot()
+        var snapshot = persistedSnapshot ?: SimklSyncSnapshot()
         val playbackOverride = storage.loadPlayback(profileId)
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.let { payload ->
-                runCatching { decodePlayback(payload) }
+                runCatching { decodePlaybackOverride(payload, persistedSnapshot) }
                     .onFailure { error -> Log.w(TAG, "Unable to decode Simkl playback override", error) }
                     .getOrNull()
             }
@@ -260,10 +265,11 @@ class SimklSyncRepository @Inject constructor(
         }
         authRepository.synchronizeUserSettings(merged.activities?.settings?.all)
         if (!isCurrent(profileId, generation)) return@withLock
-        storage.save(profileId, encodeSnapshot(merged))
+        val storedSnapshot = merged.withFreshStorageRevision()
+        storage.save(profileId, encodeSnapshot(storedSnapshot))
         if (isCurrent(profileId, generation)) {
             _projection.value = projection
-            _state.value = SimklSyncState(snapshot = merged, hasLoaded = true)
+            _state.value = SimklSyncState(snapshot = storedSnapshot, hasLoaded = true)
         }
     }
 
@@ -300,13 +306,37 @@ class SimklSyncRepository @Inject constructor(
     private suspend fun encodeSnapshot(snapshot: SimklSyncSnapshot): String =
         withContext(Dispatchers.Default) { json.encodeToString(snapshot) }
 
-    private suspend fun decodePlayback(payload: String): List<SimklPlaybackSession> =
-        withContext(Dispatchers.Default) { json.decodeFromString(payload) }
+    private suspend fun decodePlaybackOverride(
+        payload: String,
+        persistedSnapshot: SimklSyncSnapshot?
+    ): List<SimklPlaybackSession>? = withContext(Dispatchers.Default) {
+        val override = runCatching {
+            json.decodeFromString<SimklPlaybackOverride>(payload)
+        }.getOrNull()
+        if (override != null) {
+            return@withContext override.playback.takeIf {
+                persistedSnapshot != null && override.storageRevision == persistedSnapshot.storageRevision
+            }
+        }
+        runCatching { json.decodeFromString<List<SimklPlaybackSession>>(payload) }.getOrNull()
+            ?.takeIf { persistedSnapshot != null && persistedSnapshot.storageRevision == null }
+    }
 
-    private suspend fun encodePlayback(playback: List<SimklPlaybackSession>): String =
-        withContext(Dispatchers.Default) { json.encodeToString(playback) }
+    private suspend fun encodePlayback(snapshot: SimklSyncSnapshot): String =
+        withContext(Dispatchers.Default) {
+            json.encodeToString(SimklPlaybackOverride(snapshot.storageRevision, snapshot.playback))
+        }
+
+    private fun SimklSyncSnapshot.withFreshStorageRevision(): SimklSyncSnapshot =
+        copy(storageRevision = UUID.randomUUID().toString())
 
     private companion object {
         const val TAG = "SimklSync"
     }
 }
+
+@Serializable
+private data class SimklPlaybackOverride(
+    val storageRevision: String? = null,
+    val playback: List<SimklPlaybackSession>
+)
