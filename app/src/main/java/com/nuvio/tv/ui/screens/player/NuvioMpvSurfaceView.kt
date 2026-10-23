@@ -34,6 +34,11 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
     private var cachedTrackList: MpvTrackListCache? = null
     private var currentAspectMode: AspectMode = AspectMode.ORIGINAL
     private var pendingAspectRetryCount = 0
+    // mpv can seek a live HLS stream inside its cache, so `seekable` alone misses it. Its duration,
+    // though, is what has been loaded so far and keeps growing, while a VOD's stays put: the first
+    // duration seen for the current media, and whether it grew.
+    private var firstDurationMs = 0L
+    private var durationGrows = false
     private val aspectReapplyRunnable = Runnable {
         applyAspectModeInternal(currentAspectMode, allowRetry = true)
     }
@@ -200,6 +205,8 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         val path = if (initialized) mpv.getPropertyString("path") else null
         pathAtMediaRequest = mpvPathBaselineForRequest(url, requestedMediaUrl, pathAtMediaRequest, path)
         requestedMediaUrl = url
+        firstDurationMs = 0L
+        durationGrows = false
     }
 
     val hasPendingInitialMedia: Boolean
@@ -253,10 +260,19 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         return (seconds * 1000.0).roundToLong().coerceAtLeast(0L)
     }
 
-    /** Live HLS/DASH in mpv is typically reported as not seekable. VOD HLS is seekable. */
+    /**
+     * Live HLS/DASH in mpv is typically reported as not seekable. VOD HLS is seekable. A live
+     * stream mpv can seek in its cache shows by its duration growing.
+     */
     fun isLiveStreamNow(): Boolean {
         if (!initialized) return false
-        return mpv.getPropertyBoolean("seekable") == false
+        if (mpv.getPropertyBoolean("seekable") == false) return true
+        val duration = durationMs()
+        if (duration > 0L) {
+            if (firstDurationMs == 0L) firstDurationMs = duration
+            else if (duration > firstDurationMs + LIVE_DURATION_GROWTH_MS) durationGrows = true
+        }
+        return durationGrows
     }
 
     fun hasVideoTrackSelectedNow(): Boolean {
@@ -880,6 +896,7 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         private const val MPV_HWDEC_DISABLED = "no"
         /** `loadfile` insertion index; only meaningful for insert-at flags, -1 is mpv's default. */
         private const val LOADFILE_DEFAULT_INDEX = "-1"
+        private const val LIVE_DURATION_GROWTH_MS = 10_000L
         private const val MPV_COVER_FALLBACK_SCALE = 1.15f
         private const val MPV_MAX_VOLUME_PERCENT = 400.0
         private const val ASPECT_RETRY_DELAY_MS = 120L
