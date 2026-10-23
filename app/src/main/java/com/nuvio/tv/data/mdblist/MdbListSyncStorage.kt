@@ -25,27 +25,29 @@ class AndroidMdbListSyncStorage @Inject constructor(
         factory.get(profileId, FEATURE).data.first()[SNAPSHOT]
 
     override suspend fun save(profileId: Int, payload: String, checkScope: () -> Unit) {
+        clearPlayback(profileId, checkScope)
         factory.get(profileId, FEATURE).edit { preferences ->
             checkScope()
             if (factory.isProfileDeleted(profileId)) throw CancellationException("MDBList profile removed")
             preferences[SNAPSHOT] = payload
             preferences.remove(PLAYBACK)
         }
-        clearPlayback(profileId, checkScope)
     }
 
     override suspend fun remove(profileId: Int, checkScope: () -> Unit) {
+        clearPlayback(profileId, checkScope)
         factory.get(profileId, FEATURE).edit { preferences ->
             checkScope()
             preferences.remove(SNAPSHOT)
             preferences.remove(PLAYBACK)
         }
-        clearPlayback(profileId, checkScope)
     }
 
-    override suspend fun loadPlayback(profileId: Int): String? =
-        factory.get(profileId, PLAYBACK_FEATURE).data.first()[PLAYBACK]
-            ?: factory.get(profileId, FEATURE).data.first()[PLAYBACK]
+    override suspend fun loadPlayback(profileId: Int): String? {
+        val current = factory.get(profileId, PLAYBACK_FEATURE).data.first()[PLAYBACK]
+        if (current != null) return current.ifEmpty { null }
+        return factory.get(profileId, FEATURE).data.first()[PLAYBACK]
+    }
 
     override suspend fun savePlayback(profileId: Int, payload: String, checkScope: () -> Unit) {
         factory.get(profileId, PLAYBACK_FEATURE).edit { preferences ->
@@ -58,7 +60,7 @@ class AndroidMdbListSyncStorage @Inject constructor(
     override suspend fun clearPlayback(profileId: Int, checkScope: () -> Unit) {
         factory.get(profileId, PLAYBACK_FEATURE).edit { preferences ->
             checkScope()
-            preferences.remove(PLAYBACK)
+            preferences[PLAYBACK] = ""
         }
     }
 
