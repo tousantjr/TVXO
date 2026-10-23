@@ -19,6 +19,12 @@ internal class MdbListMediaIndex(snapshot: MdbListSyncSnapshot) {
     fun resolve(type: MdbListItemType, ids: MdbListIds): MdbListMedia =
         ids.aliases().firstNotNullOfOrNull { byAlias[(type == MdbListItemType.MOVIE) to it] }
             ?.let { it.copy(ids = it.ids.merged(ids)) } ?: MdbListMedia(ids)
+
+    fun resolveMedia(type: MdbListItemType, media: MdbListMedia): MdbListMedia {
+        val movie = type == MdbListItemType.MOVIE
+        return media.ids.aliases().mapNotNull { byAlias[movie to it] }
+            .fold(media, MdbListMedia::merged)
+    }
 }
 
 internal fun MdbListSyncSnapshot.normalizeMedia(): MdbListSyncSnapshot {

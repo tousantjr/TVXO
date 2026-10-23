@@ -5,7 +5,7 @@ import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.domain.model.WatchedItem
 
 internal class MdbListProgressProjection private constructor(
-    private val mediaIndex: MdbListMediaIndex,
+    internal val mediaIndex: MdbListMediaIndex,
     private val watchedById: Map<String, List<MdbListWatchedRecord>>,
     private val droppedById: Map<String, List<Int?>>,
     private val historyByKey: Map<String, MdbListWatchedRecord>,
@@ -16,12 +16,13 @@ internal class MdbListProgressProjection private constructor(
     val progress: List<WatchProgress>,
     private val episodeProgressById: Map<String, List<WatchProgress>>,
     private val seeds: List<WatchProgress>,
-    private val watchedShowAliases: List<Set<String>>
+    private val watchedShowIdSiblings: Map<String, Set<String>>
 ) {
+    internal fun watchedEpisodesForShow(ids: MdbListIds): Sequence<MdbListWatchedRecord> =
+        ids.aliases().asSequence().flatMap { alias -> watchedById[alias].orEmpty().asSequence() }
+
     fun withUpdatedPlayback(newPlayback: List<MdbListPlayback>): MdbListProgressProjection {
-        val playbackShowAliases = newPlayback.filter { it.type != MdbListItemType.MOVIE }.map { it.media.ids.aliases() }
-        val newShowIdSiblings = (watchedShowAliases + playbackShowAliases)
-            .flatMap { aliases -> aliases.map { it to aliases } }.toMap()
+        val newShowIdSiblings = buildShowIdSiblings(watchedShowIdSiblings, newPlayback)
         val newProgress = newPlayback.filter { session ->
             val watched = historyByKey["${session.type}:${session.media.ids.key}:${session.season ?: -1}:${session.episode ?: -1}"]
             session.progress < COMPLETION_PERCENT && !isHidden(session.media.ids.contentId, session.season) &&
@@ -50,7 +51,7 @@ internal class MdbListProgressProjection private constructor(
             progress = newProgress,
             episodeProgressById = newEpisodeProgressById,
             seeds = seeds,
-            watchedShowAliases = watchedShowAliases
+            watchedShowIdSiblings = watchedShowIdSiblings
         )
     }
 
@@ -102,10 +103,17 @@ internal class MdbListProgressProjection private constructor(
                     record.season?.let { season -> record.episode?.let { season to it } }
                 }
             }
-            val watchedShowAliases = snapshot.watched.filter { it.type != MdbListItemType.MOVIE }.map { it.media.ids.aliases() }
-            val playbackShowAliases = snapshot.playback.filter { it.type != MdbListItemType.MOVIE }.map { it.media.ids.aliases() }
-            val showIdSiblings = (watchedShowAliases + playbackShowAliases)
-                .flatMap { aliases -> aliases.map { it to aliases } }.toMap()
+            val watchedShowIdSiblings = buildMap<String, Set<String>> {
+                for (record in snapshot.watched) {
+                    if (record.type != MdbListItemType.MOVIE) {
+                        val aliases = record.media.ids.aliases()
+                        for (alias in aliases) {
+                            put(alias, aliases)
+                        }
+                    }
+                }
+            }
+            val showIdSiblings = buildShowIdSiblings(watchedShowIdSiblings, snapshot.playback)
 
             fun isDropped(contentId: String, season: Int? = null): Boolean =
                 droppedById[contentId]?.any { it == null || (season != null && it == season) } == true
@@ -147,8 +155,24 @@ internal class MdbListProgressProjection private constructor(
                 progress = progress,
                 episodeProgressById = episodeProgressById,
                 seeds = seeds,
-                watchedShowAliases = watchedShowAliases
+                watchedShowIdSiblings = watchedShowIdSiblings
             )
+        }
+
+        private fun buildShowIdSiblings(
+            watchedShowIdSiblings: Map<String, Set<String>>,
+            playback: List<MdbListPlayback>
+        ): Map<String, Set<String>> {
+            val playbackShows = playback.filter { it.type != MdbListItemType.MOVIE }
+            if (playbackShows.isEmpty()) return watchedShowIdSiblings
+            return watchedShowIdSiblings.toMutableMap().apply {
+                for (session in playbackShows) {
+                    val aliases = session.media.ids.aliases()
+                    for (alias in aliases) {
+                        put(alias, aliases)
+                    }
+                }
+            }
         }
 
         private fun progress(

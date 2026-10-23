@@ -51,28 +51,20 @@ internal fun decodeMdbListScrobbleReceipt(
     return MdbListScrobbleReceipt(resolved, action, progress, timestamp, body.number("id")?.takeIf { it > 0 })
 }
 
-internal fun MdbListSyncSnapshot.applyScrobble(receipt: MdbListScrobbleReceipt): MdbListSyncSnapshot {
+internal fun MdbListSyncSnapshot.applyScrobble(
+    receipt: MdbListScrobbleReceipt,
+    mediaIndex: MdbListMediaIndex? = null
+): MdbListSyncSnapshot {
     val target = receipt.target
-    val remainingPlayback = playback.filterNot(target::matches)
-    if (receipt.action == TrackingScrobbleAction.START) return copy(playback = remainingPlayback)
-    val watched = if (receipt.isWatched) this.watched.filterNot(target::matches) + target.watched(receipt.timestamp) else this.watched
-    val playback = if (receipt.isWatched) remainingPlayback else remainingPlayback + MdbListPlayback(
-        id = receipt.playbackId ?: this.playback.firstOrNull(target::matches)?.id,
-        type = target.type,
-        media = target.media,
-        progress = receipt.progress,
-        updatedAt = receipt.timestamp,
-        season = target.season,
-        episode = target.episode,
-        episodeTitle = target.episodeTitle,
-        episodeTmdbId = target.episodeTmdbId,
-        episodeTvdbId = target.episodeTvdbId
-    )
+    val remainingPlayback = if (playback.any(target::matches)) playback.filterNot(target::matches) else playback
+    if (receipt.action == TrackingScrobbleAction.START) {
+        return if (remainingPlayback === playback) this else copy(playback = remainingPlayback)
+    }
     if (!receipt.isWatched) {
         val newSession = MdbListPlayback(
             id = receipt.playbackId ?: this.playback.firstOrNull(target::matches)?.id,
             type = target.type,
-            media = resolveMediaForPlayback(target.type, target.media),
+            media = resolveMediaForPlayback(target.type, target.media, mediaIndex),
             progress = receipt.progress,
             updatedAt = receipt.timestamp,
             season = target.season,
@@ -86,21 +78,26 @@ internal fun MdbListSyncSnapshot.applyScrobble(receipt: MdbListScrobbleReceipt):
             .map { (_, records) -> records.maxBy { mdbListTimestamp(it.updatedAt) } }
         return copy(watched = this.watched, playback = normalizedPlayback)
     }
-    return copy(watched = watched, playback = playback).normalizeMedia()
+    val watched = this.watched.filterNot(target::matches) + target.watched(receipt.timestamp)
+    return copy(watched = watched, playback = remainingPlayback).normalizeMedia()
 }
 
 private fun MdbListSyncSnapshot.resolveMediaForPlayback(
     type: MdbListItemType,
-    media: MdbListMedia
+    media: MdbListMedia,
+    mediaIndex: MdbListMediaIndex? = null
 ): MdbListMedia {
-    val aliases = media.ids.aliases().toSet()
+    val aliases = media.ids.aliases()
     if (aliases.isEmpty()) return media
     val isMovie = type == MdbListItemType.MOVIE
-    var merged = media
-    watched.forEach { record ->
-        if ((record.type == MdbListItemType.MOVIE) == isMovie && record.media.ids.aliases().any { it in aliases }) {
-            merged = merged.merged(record.media)
+    var merged = mediaIndex?.resolveMedia(type, media) ?: run {
+        var acc = media
+        watched.forEach { record ->
+            if ((record.type == MdbListItemType.MOVIE) == isMovie && record.media.ids.aliases().any { it in aliases }) {
+                acc = acc.merged(record.media)
+            }
         }
+        acc
     }
     playback.forEach { record ->
         if ((record.type == MdbListItemType.MOVIE) == isMovie && record.media.ids.aliases().any { it in aliases }) {

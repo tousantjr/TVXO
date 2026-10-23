@@ -28,6 +28,7 @@ class AndroidSimklSyncStorage @Inject constructor(
             preferences[SNAPSHOT_KEY] = payload
             preferences.remove(PLAYBACK_KEY)
         }
+        clearPlayback(profileId)
     }
 
     override suspend fun remove(profileId: Int) {
@@ -35,25 +36,28 @@ class AndroidSimklSyncStorage @Inject constructor(
             preferences.remove(SNAPSHOT_KEY)
             preferences.remove(PLAYBACK_KEY)
         }
+        clearPlayback(profileId)
     }
 
     override suspend fun loadPlayback(profileId: Int): String? =
-        factory.get(profileId, FEATURE_NAME).data.first()[PLAYBACK_KEY]
+        factory.get(profileId, PLAYBACK_FEATURE_NAME).data.first()[PLAYBACK_KEY]
+            ?: factory.get(profileId, FEATURE_NAME).data.first()[PLAYBACK_KEY]
 
     override suspend fun savePlayback(profileId: Int, payload: String) {
-        factory.get(profileId, FEATURE_NAME).edit { preferences ->
+        factory.get(profileId, PLAYBACK_FEATURE_NAME).edit { preferences ->
             preferences[PLAYBACK_KEY] = payload
         }
     }
 
     override suspend fun clearPlayback(profileId: Int) {
-        factory.get(profileId, FEATURE_NAME).edit { preferences ->
+        factory.get(profileId, PLAYBACK_FEATURE_NAME).edit { preferences ->
             preferences.remove(PLAYBACK_KEY)
         }
     }
 
     private companion object {
         const val FEATURE_NAME = "simkl_sync"
+        const val PLAYBACK_FEATURE_NAME = "simkl_playback"
         val SNAPSHOT_KEY = stringPreferencesKey("snapshot")
         val PLAYBACK_KEY = stringPreferencesKey("playback")
     }

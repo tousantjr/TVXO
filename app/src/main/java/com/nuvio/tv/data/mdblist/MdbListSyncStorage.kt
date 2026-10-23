@@ -31,6 +31,7 @@ class AndroidMdbListSyncStorage @Inject constructor(
             preferences[SNAPSHOT] = payload
             preferences.remove(PLAYBACK)
         }
+        clearPlayback(profileId, checkScope)
     }
 
     override suspend fun remove(profileId: Int, checkScope: () -> Unit) {
@@ -39,13 +40,15 @@ class AndroidMdbListSyncStorage @Inject constructor(
             preferences.remove(SNAPSHOT)
             preferences.remove(PLAYBACK)
         }
+        clearPlayback(profileId, checkScope)
     }
 
     override suspend fun loadPlayback(profileId: Int): String? =
-        factory.get(profileId, FEATURE).data.first()[PLAYBACK]
+        factory.get(profileId, PLAYBACK_FEATURE).data.first()[PLAYBACK]
+            ?: factory.get(profileId, FEATURE).data.first()[PLAYBACK]
 
     override suspend fun savePlayback(profileId: Int, payload: String, checkScope: () -> Unit) {
-        factory.get(profileId, FEATURE).edit { preferences ->
+        factory.get(profileId, PLAYBACK_FEATURE).edit { preferences ->
             checkScope()
             if (factory.isProfileDeleted(profileId)) throw CancellationException("MDBList profile removed")
             preferences[PLAYBACK] = payload
@@ -53,7 +56,7 @@ class AndroidMdbListSyncStorage @Inject constructor(
     }
 
     override suspend fun clearPlayback(profileId: Int, checkScope: () -> Unit) {
-        factory.get(profileId, FEATURE).edit { preferences ->
+        factory.get(profileId, PLAYBACK_FEATURE).edit { preferences ->
             checkScope()
             preferences.remove(PLAYBACK)
         }
@@ -61,6 +64,7 @@ class AndroidMdbListSyncStorage @Inject constructor(
 
     private companion object {
         const val FEATURE = "mdblist_sync"
+        const val PLAYBACK_FEATURE = "mdblist_playback"
         val SNAPSHOT = stringPreferencesKey("snapshot")
         val PLAYBACK = stringPreferencesKey("playback")
     }
