@@ -81,7 +81,9 @@ internal fun MdbListSyncSnapshot.applyScrobble(
     if (mediaIndex != null) {
         return applyWatchedScrobbleWithIndex(target, receipt.timestamp, remainingPlayback, mediaIndex)
     }
-    val watched = this.watched.filterNot(target::matches) + target.watched(receipt.timestamp)
+    val resolvedTarget = target.copy(media = resolveMediaForPlayback(target.type, target.media, null))
+    val watched = this.watched.filterNot { record -> target.matches(record) || resolvedTarget.matches(record) } +
+        resolvedTarget.watched(receipt.timestamp)
     return copy(watched = watched, playback = remainingPlayback).normalizeMedia()
 }
 
