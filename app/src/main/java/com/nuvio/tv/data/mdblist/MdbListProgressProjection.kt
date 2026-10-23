@@ -163,16 +163,20 @@ internal class MdbListProgressProjection private constructor(
             watchedShowIdSiblings: Map<String, Set<String>>,
             playback: List<MdbListPlayback>
         ): Map<String, Set<String>> {
-            val playbackShows = playback.filter { it.type != MdbListItemType.MOVIE }
-            if (playbackShows.isEmpty()) return watchedShowIdSiblings
-            return watchedShowIdSiblings.toMutableMap().apply {
-                for (session in playbackShows) {
-                    val aliases = session.media.ids.aliases()
-                    for (alias in aliases) {
-                        put(alias, aliases)
-                    }
+            var overlay: MutableMap<String, Set<String>>? = null
+            for (session in playback) {
+                if (session.type == MdbListItemType.MOVIE) continue
+                val aliases = session.media.ids.aliases()
+                if (aliases.all { alias -> watchedShowIdSiblings[alias] == aliases && overlay?.containsKey(alias) != true }) {
+                    continue
+                }
+                val map = overlay ?: LinkedHashMap<String, Set<String>>(aliases.size * 2).also { overlay = it }
+                for (alias in aliases) {
+                    map[alias] = aliases
                 }
             }
+            val resolvedOverlay = overlay ?: return watchedShowIdSiblings
+            return OverlayShowIdSiblingsMap(watchedShowIdSiblings, resolvedOverlay)
         }
 
         private fun progress(
@@ -205,5 +209,40 @@ internal class MdbListProgressProjection private constructor(
             trackingProviderItemId = media.ids.mdblist?.let { "mdblist:$it" },
             completionThresholdOverride = COMPLETION_PERCENT / 100f
         )
+    }
+}
+
+private class OverlayShowIdSiblingsMap(
+    private val base: Map<String, Set<String>>,
+    private val overlay: Map<String, Set<String>>
+) : AbstractMap<String, Set<String>>() {
+    private val extraOverlayKeys: List<String> = overlay.keys.filter { !base.containsKey(it) }
+
+    override val size: Int = base.size + extraOverlayKeys.size
+
+    override fun isEmpty(): Boolean = size == 0
+
+    override fun get(key: String): Set<String>? = overlay[key] ?: base[key]
+
+    override fun containsKey(key: String): Boolean = overlay.containsKey(key) || base.containsKey(key)
+
+    override val entries: Set<Map.Entry<String, Set<String>>> = object : AbstractSet<Map.Entry<String, Set<String>>>() {
+        override val size: Int
+            get() = this@OverlayShowIdSiblingsMap.size
+
+        override fun iterator(): Iterator<Map.Entry<String, Set<String>>> = iterator {
+            for (entry in base.entries) {
+                val overrideValue = overlay[entry.key]
+                if (overrideValue != null) {
+                    yield( java.util.AbstractMap.SimpleImmutableEntry(entry.key, overrideValue))
+                } else {
+                    yield(entry)
+                }
+            }
+            for (key in extraOverlayKeys) {
+                val value = overlay[key] ?: continue
+                yield(java.util.AbstractMap.SimpleImmutableEntry(key, value))
+            }
+        }
     }
 }
