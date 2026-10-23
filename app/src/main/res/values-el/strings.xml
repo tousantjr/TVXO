@@ -385,6 +385,10 @@
   <string name="about_check_updates_subtitle">Λήψη τελευταίας έκδοσης</string>
   <string name="about_update_banner_title">Αυτόματο banner ενημέρωσης</string>
   <string name="about_update_banner_subtitle">Εμφάνιση banner όταν είναι διαθέσιμη νέα έκδοση</string>
+  <string name="about_update_auto_install_title">Αυτόματη εγκατάσταση ενημερώσεων</string>
+  <string name="about_update_auto_install_subtitle">Λήψη νέων εκδόσεων στο παρασκήνιο και εγκατάστασή τους όταν η συσκευή είναι σε αδράνεια</string>
+  <string name="about_update_auto_install_notice_title">Ειδοποίηση μετά από αυτόματες ενημερώσεις</string>
+  <string name="about_update_auto_install_notice_subtitle">Εμφάνιση banner στην επόμενη εκκίνηση αφού η εφαρμογή ενημερωθεί αυτόματα</string>
   <string name="about_update_channel_title">Κανάλι ενημερώσεων</string>
   <string name="about_update_channel_subtitle">Επιλέξτε τον τύπο ενημερώσεων εφαρμογής που θέλετε να λαμβάνετε</string>
   <string name="update_channel_stable">Σταθερό</string>
@@ -699,6 +703,9 @@
   <!-- PlaybackAudioSettings -->
   <string name="playback_true_black_letterbox">Πραγματικά μαύρες μπάρες</string>
   <string name="playback_true_black_letterbox_sub">Αφήστε τις μπάρες γύρω από την εικόνα άβαφες ώστε το HDR να παραμένει πραγματικά μαύρο. Κρατήστε το ανενεργό αν εμφανίζεται φωτεινή γραμμή στις μπάρες.</string>
+  <string name="playback_chapters_label">Κεφάλαια</string>
+  <string name="playback_exo_chapters_title">Εμφάνιση κεφαλαίων (ExoPlayer)</string>
+  <string name="playback_exo_chapters_sub">Ανάγνωση των κεφαλαίων των αρχείων MKV για σήμανσή τους στη γραμμή προόδου και μετάβαση μεταξύ τους. Πραγματοποιεί μερικά μικρά επιπλέον αιτήματα μόλις ξεκινήσει η αναπαραγωγή. Το mpv εμφανίζει πάντα κεφάλαια.</string>
   <string name="audio_trailer_section">Τρέιλερ</string>
   <string name="audio_autoplay_trailers">Αυτόματη αναπαραγωγή τρέιλερ</string>
   <string name="audio_autoplay_trailers_sub">Αυτόματη αναπαραγωγή τρέιλερ στην οθόνη λεπτομερειών μετά από περίοδο αδράνειας</string>
@@ -763,10 +770,16 @@
   <string name="sub_outline">Περίγραμμα</string>
   <string name="sub_outline_sub">Προσθήκη περιγράμματος γύρω από το κείμενο υπότιτλων για καλύτερη ορατότητα</string>
   <string name="sub_outline_color">Χρώμα περιγράμματος</string>
+  <string name="sub_hdr_style">Ξεχωριστό στυλ HDR / Dolby Vision</string>
+  <string name="sub_hdr_style_sub">Διαφορετικό χρώμα κειμένου και χαμηλότερη φωτεινότητα για τους υπότιτλους σε βίντεο HDR και Dolby Vision</string>
+  <string name="sub_hdr_text_color">Χρώμα κειμένου HDR</string>
+  <string name="sub_hdr_brightness">Φωτεινότητα υπότιτλων HDR</string>
   <string name="sub_advanced_section">Για προχωρημένους απόδοση υπότιτλων</string>
   <string name="sub_libass">Χρήση libass για υπότιτλους ASS/SSA</string>
-  <string name="sub_libass_sub">Πειραματικό: προχωρημένη απόδοση ASS/SSA (στυλ, τοποθέτηση, κινούμενα σχέδια)</string>
+  <string name="sub_libass_sub">Προχωρημένη απόδοση ASS/SSA (στυλ, τοποθέτηση, κινούμενα σχέδια)</string>
   <string name="sub_libass_mode">Λειτουργία απόδοσης Libass</string>
+  <string name="sub_libass_render_scale">Ανάλυση απόδοσης υποτίτλων</string>
+  <string name="sub_libass_render_scale_sub">Η χαμηλότερη ανάλυση βελτιώνει την απόδοση σε βαριά στοιχειοθεσία με κόστος την ευκρίνεια</string>
   <string name="sub_org_none">Κανένα (προεπιλεγμένη σειρά)</string>
   <string name="sub_org_by_lang">Ανά γλώσσα</string>
   <string name="sub_org_by_addon">Ανά πρόσθετο</string>
@@ -1647,6 +1660,8 @@
   <string name="player_engine_switching_title">Αλλαγή μηχανής αναπαραγωγής</string>
   <string name="player_engine_switching_message">Η εκκίνηση απέτυχε. Εναλλαγή σε %1$s…</string>
   <string name="player_engine_switching_manual_message">Εναλλαγή σε %1$s...</string>
+  <string name="player_engine_switch_title">Εναλλαγή σε %1$s;</string>
+  <string name="player_engine_switch_message">Το βίντεο θα φορτωθεί ξανά από το σημείο όπου βρίσκεστε.</string>
   <string name="playback_show_loading_status">Εμφάνιση κατάστασης φόρτωσης</string>
   <string name="playback_show_loading_status_sub">Εμφάνιση προόδου βήμα προς βήμα ενώ γίνεται αρχικοποίηση του προγράμματος αναπαραγωγής.</string>
   <string name="player_sync_line">Συγχρονισμός γραμμής</string>
@@ -1780,6 +1795,9 @@
   <string name="subtitle_style_bold">Έντονα</string>
   <string name="subtitle_style_text_color">Χρώμα κειμένου</string>
   <string name="subtitle_style_text_opacity">Αδιαφάνεια κειμένου</string>
+  <string name="subtitle_style_text_color_hdr">Χρώμα κειμένου (HDR)</string>
+  <string name="subtitle_style_text_opacity_hdr">Αδιαφάνεια κειμένου (HDR)</string>
+  <string name="subtitle_style_brightness_hdr">Φωτεινότητα (HDR)</string>
   <string name="subtitle_style_outline">Περίγραμμα</string>
   <string name="subtitle_style_bottom_offset">Μετατόπιση κάτω</string>
   <string name="subtitle_style_defaults">Προεπιλογές</string>
@@ -2196,6 +2214,7 @@
   <string name="update_checking">Έλεγχος ενημερώσεων…</string>
   <string name="update_waiting_for_stable">Θα λάβετε την επόμενη σταθερή έκδοση όταν γίνει διαθέσιμη</string>
   <string name="update_download_complete">Η λήψη ολοκληρώθηκε. Έτοιμο για εγκατάσταση.</string>
+  <string name="update_installed_automatically">Ενημερώθηκε αυτόματα όταν η συσκευή ήταν σε αδράνεια</string>
   <string name="update_up_to_date">Το σύστημα είναι ενημερωμένο. Τελευταίες αλλαγές:</string>
   <string name="update_close">Κλείσιμο</string>
   <string name="update_open_settings">Άνοιγμα Ρυθμίσεων</string>
@@ -2298,6 +2317,10 @@
   <string name="cd_sources">Πηγές</string>
   <string name="cd_switch_player_engine">Εναλλαγή μηχανής αναπαραγωγής</string>
   <string name="cd_episodes">Επεισόδια</string>
+  <string name="player_chapter_number">Κεφάλαιο %1$d</string>
+  <string name="player_chapters">Κεφάλαια</string>
+  <string name="player_chapters_title">Κεφάλαια (%1$d)</string>
+  <string name="player_chapter_remaining">Απομένουν %1$s</string>
   <string name="cd_playback_speed">Ταχύτητα αναπαραγωγής</string>
   <string name="cd_aspect_ratio">Αναλογία εικόνας</string>
   <string name="cd_open_external_player">Άνοιγμα σε εξωτερικό πρόγραμμα αναπαραγωγής</string>
@@ -3024,6 +3047,11 @@
   <string name="web_stream_badge_deleted">Το URL διακριτικού διαγράφηκε.</string>
   <string name="dv7_libdovi_mode_none_sub">Καμία παράκαμψη. Χρησιμοποιεί την αυτόματα επιλεγμένη λειτουργία μετατροπής.</string>
   <string name="diag_label_bridge_version">Έκδοση γέφυρας</string>
+  <string name="settings_stream_badges_in_player_title">Εμφάνιση στον player</string>
+  <string name="settings_stream_badges_in_player_description">Εμφάνιση badges για το βίντεο και τον ήχο που αναπαράγεται κάτω από τον τίτλο του player. Απαιτείται πακέτο badges που αντιστοιχεί σε απλό κείμενο, όπως 2160p ή Atmos.</string>
+  <string name="settings_stream_player_badges_title">Badges του player</string>
+  <string name="settings_stream_player_badges_description">Επιλέξτε το πακέτο badges που χρησιμοποιεί ο player.</string>
+  <string name="settings_stream_player_badges_same">Ίδια με τα badges ροών</string>
   <string name="settings_stream_addon_logo_title">Λογότυπο πρόσθετου</string>
   <string name="diag_value_not_available">Μη διαθέσιμο</string>
   <string name="player_report_loading_issue">Αναφορά προβλήματος φόρτωσης</string>
@@ -3279,4 +3307,6 @@
   <string name="autosync_toast_failed_no_reference">Ο συγχρονισμός απέτυχε: αυτό το βίντεο δεν έχει ενσωματωμένους υπότιτλους για σύγκριση.</string>
   <string name="autosync_toast_failed_unsupported">Ο συγχρονισμός απέτυχε: ο αυτόματος συγχρονισμός δεν υποστηρίζει αυτή τη μορφή υποτίτλων.</string>
   <string name="autosync_label_synced">Αυτόματα συγχρονισμένος</string>
+  <string name="stream_resume_from_time">Συνέχεια από %1$s</string>
+  <string name="stream_resume_from_percent">Συνέχεια από %1$d%%</string>
 </resources>
