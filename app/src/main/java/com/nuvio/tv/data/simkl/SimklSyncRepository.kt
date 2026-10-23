@@ -146,7 +146,7 @@ class SimklSyncRepository @Inject constructor(
             if (!isCurrent(profileId, generation)) return@withLock
             val current = _state.value
             val index = _projection.value.entryIndex.takeIf { it.matchesEntries(current.snapshot.entries) }
-            val snapshot = current.snapshot.applyScrobbleResult(
+            val (snapshot, updatedIndex) = current.snapshot.applyScrobbleResultWithIndex(
                 result = result,
                 committedAtEpochMs = System.currentTimeMillis(),
                 entryIndex = index
@@ -156,7 +156,7 @@ class SimklSyncRepository @Inject constructor(
             val projection = if (onlyPlaybackChanged && _projection.value !== SimklSnapshotProjection.Empty) {
                 _projection.value.withUpdatedPlayback(snapshot)
             } else {
-                buildProjection(snapshot)
+                buildProjection(snapshot, updatedIndex)
             }
             if (onlyPlaybackChanged) {
                 storage.savePlayback(profileId, encodePlayback(snapshot.playback))
@@ -288,8 +288,11 @@ class SimklSyncRepository @Inject constructor(
         }
     }
 
-    private suspend fun buildProjection(snapshot: SimklSyncSnapshot): SimklSnapshotProjection =
-        withContext(Dispatchers.Default) { SimklSnapshotProjection.create(snapshot) }
+    private suspend fun buildProjection(
+        snapshot: SimklSyncSnapshot,
+        entryIndex: SimklEntryIndex? = null
+    ): SimklSnapshotProjection =
+        withContext(Dispatchers.Default) { SimklSnapshotProjection.create(snapshot, entryIndex) }
 
     private suspend fun decodeSnapshot(payload: String): SimklSyncSnapshot =
         withContext(Dispatchers.Default) { json.decodeFromString(payload) }

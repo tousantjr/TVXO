@@ -8,11 +8,7 @@ internal class SimklEntryIndex private constructor(
     private val externalIdsByIndex: Array<TrackingExternalIds?>,
     private val providerItemIdByIndex: Array<String?>,
     private val byAlias: Map<String, IntArray>,
-    private val byTitle: Map<String, IntArray>,
-    private val patchedIndex: Int = -1,
-    private val patchedIds: TrackingExternalIds? = null,
-    private val patchedProviderId: String? = null,
-    private val patchedTitle: String? = null
+    private val byTitle: Map<String, IntArray>
 ) {
     constructor(entriesRef: List<SimklLibraryEntry>) : this(
         entriesRef = entriesRef,
@@ -34,7 +30,7 @@ internal class SimklEntryIndex private constructor(
             externalIds.forEachAliasKey { key ->
                 putIndex(aliasMap, key, index)
             }
-            media.title?.trim()?.takeIf(String::isNotEmpty)?.lowercase()?.let { normalizedTitle ->
+            media.normalizedTitleKey()?.let { normalizedTitle ->
                 putIndex(titleMap, normalizedTitle, index)
             }
         }
@@ -47,15 +43,19 @@ internal class SimklEntryIndex private constructor(
         index: Int,
         updatedEntry: SimklLibraryEntry
     ): SimklEntryIndex {
+        val oldEntry = entriesRef.getOrNull(index)
+        val oldTitle = oldEntry?.media?.normalizedTitleKey()
         val media = updatedEntry.media
         val newIds = media?.toTrackingExternalIds()
         val newProviderId = media?.simklTrackingProviderItemId()
+        val newTitle = media?.normalizedTitleKey()
+
         if (
-            patchedIndex < 0 &&
             index in externalIdsByIndex.indices &&
             newEntries.size == externalIdsByIndex.size &&
             externalIdsByIndex[index] == newIds &&
-            providerItemIdByIndex[index] == newProviderId
+            providerItemIdByIndex[index] == newProviderId &&
+            oldTitle == newTitle
         ) {
             return SimklEntryIndex(
                 entriesRef = newEntries,
@@ -65,29 +65,52 @@ internal class SimklEntryIndex private constructor(
                 byTitle = byTitle
             )
         }
+
+        val oldIds = if (index in externalIdsByIndex.indices) externalIdsByIndex[index] else null
+        val nextExternalIds = externalIdsByIndex.copyOf(newEntries.size)
+        val nextProviderIds = providerItemIdByIndex.copyOf(newEntries.size)
+        if (index in nextExternalIds.indices) {
+            nextExternalIds[index] = newIds
+            nextProviderIds[index] = newProviderId
+        }
+
+        val nextAlias = if (oldIds == newIds) {
+            byAlias
+        } else {
+            HashMap(byAlias).also { aliasMap ->
+                if (oldIds != null) {
+                    oldIds.forEachAliasKey { key ->
+                        removeIndex(aliasMap, key, index)
+                    }
+                }
+                if (newIds != null && index in nextExternalIds.indices) {
+                    newIds.forEachAliasKey { key ->
+                        putIndexSorted(aliasMap, key, index)
+                    }
+                }
+            }
+        }
+
+        val nextTitle = if (oldTitle == newTitle) {
+            byTitle
+        } else {
+            HashMap(byTitle).also { titleMap ->
+                if (oldTitle != null) {
+                    removeIndex(titleMap, oldTitle, index)
+                }
+                if (newTitle != null && index in nextExternalIds.indices) {
+                    putIndexSorted(titleMap, newTitle, index)
+                }
+            }
+        }
+
         return SimklEntryIndex(
             entriesRef = newEntries,
-            externalIdsByIndex = externalIdsByIndex,
-            providerItemIdByIndex = providerItemIdByIndex,
-            byAlias = byAlias,
-            byTitle = byTitle,
-            patchedIndex = index,
-            patchedIds = newIds,
-            patchedProviderId = newProviderId,
-            patchedTitle = media?.title?.trim()?.takeIf(String::isNotEmpty)?.lowercase()
+            externalIdsByIndex = nextExternalIds,
+            providerItemIdByIndex = nextProviderIds,
+            byAlias = nextAlias,
+            byTitle = nextTitle
         )
-    }
-
-    private fun externalIdsAt(index: Int): TrackingExternalIds? = when {
-        index == patchedIndex -> patchedIds
-        index in externalIdsByIndex.indices -> externalIdsByIndex[index]
-        else -> null
-    }
-
-    private fun providerIdAt(index: Int): String? = when {
-        index == patchedIndex -> patchedProviderId
-        index in providerItemIdByIndex.indices -> providerItemIdByIndex[index]
-        else -> null
     }
 
     fun firstSharingIdentityWith(
@@ -107,7 +130,7 @@ internal class SimklEntryIndex private constructor(
             for (idx in indices) {
                 if (idx >= bestIndex) break
                 val candidate = entries[idx]
-                val candidateIds = externalIdsAt(idx)
+                val candidateIds = externalIdsByIndex[idx]
                 if ((predicate == null || predicate(candidate)) &&
                     candidateIds != null &&
                     candidateIds.sharesIdentityWith(targetIds)
@@ -115,12 +138,6 @@ internal class SimklEntryIndex private constructor(
                     bestIndex = idx
                     break
                 }
-            }
-        }
-        if (patchedIndex in entries.indices && patchedIndex < bestIndex && patchedIds != null) {
-            val candidate = entries[patchedIndex]
-            if ((predicate == null || predicate(candidate)) && patchedIds.sharesIdentityWith(targetIds)) {
-                bestIndex = patchedIndex
             }
         }
         return if (bestIndex != Int.MAX_VALUE) entries[bestIndex] else null
@@ -136,11 +153,10 @@ internal class SimklEntryIndex private constructor(
         val parsed = parseTrackingExternalIds(contentId)
         val candidates = collectCandidateIndices(parsed, rawContentId = contentId)
         for (idx in candidates) {
-            if (idx !in entries.indices) continue
             val entry = entries[idx]
             val media = entry.media ?: continue
             if (media.canonicalContentId().equals(contentId, ignoreCase = true)) return entry
-            val candidateIds = externalIdsAt(idx) ?: continue
+            val candidateIds = externalIdsByIndex[idx] ?: continue
             if (parsed.sharesIdentityWith(candidateIds)) return entry
         }
         return null
@@ -165,9 +181,8 @@ internal class SimklEntryIndex private constructor(
         if (candidates.isEmpty()) return emptyList()
         val result = ArrayList<SimklLibraryEntry>(candidates.size)
         for (idx in candidates) {
-            if (idx !in entries.indices) continue
             val entry = entries[idx]
-            val providerId = providerIdAt(idx)
+            val providerId = providerItemIdByIndex[idx]
             val sameProviderItem = providerId != null &&
                 providerId.equals(trackingProviderItemId, ignoreCase = true)
             if (sameProviderItem) {
@@ -179,7 +194,7 @@ internal class SimklEntryIndex private constructor(
                 result.add(entry)
                 continue
             }
-            val candidateIds = externalIdsAt(idx) ?: continue
+            val candidateIds = externalIdsByIndex[idx] ?: continue
             if (parsed.sharesIdentityWith(candidateIds)) {
                 result.add(entry)
             }
@@ -199,10 +214,9 @@ internal class SimklEntryIndex private constructor(
         val candidates = collectCandidateIndicesForMedia(target, targetIds)
         var fallbackIndex = -1
         for (idx in candidates) {
-            if (idx !in entries.indices) continue
             val entry = entries[idx]
             val media = entry.media ?: continue
-            val candidateIds = externalIdsAt(idx) ?: media.toTrackingExternalIds()
+            val candidateIds = externalIdsByIndex[idx] ?: media.toTrackingExternalIds()
             if (media.matchesTargetWithIds(candidateIds, target, targetIds)) {
                 if (entry.mediaType == result.mediaType) return idx
                 if (fallbackIndex < 0) fallbackIndex = idx
@@ -221,9 +235,8 @@ internal class SimklEntryIndex private constructor(
         val targetIds = target.toTrackingExternalIds()
         val candidates = collectCandidateIndicesForMedia(target, targetIds)
         for (idx in candidates) {
-            if (idx !in entries.indices) continue
             val media = entries[idx].media ?: continue
-            val candidateIds = externalIdsAt(idx) ?: media.toTrackingExternalIds()
+            val candidateIds = externalIdsByIndex[idx] ?: media.toTrackingExternalIds()
             if (media.matchesTargetWithIds(candidateIds, target, targetIds)) {
                 return idx
             }
@@ -249,9 +262,6 @@ internal class SimklEntryIndex private constructor(
         parsed.forEachAliasKey { key ->
             byAlias[key]?.let(merged::addAll)
         }
-        if (patchedIndex >= 0) {
-            merged.add(patchedIndex)
-        }
         return merged.toSortedDistinctIntArray()
     }
 
@@ -263,14 +273,8 @@ internal class SimklEntryIndex private constructor(
         targetIds.forEachAliasKey { key ->
             byAlias[key]?.let(merged::addAll)
         }
-        target.title?.trim()?.takeIf(String::isNotEmpty)?.lowercase()?.let { normalizedTitle ->
+        target.normalizedTitleKey()?.let { normalizedTitle ->
             byTitle[normalizedTitle]?.let(merged::addAll)
-            if (patchedIndex >= 0 && patchedTitle == normalizedTitle) {
-                merged.add(patchedIndex)
-            }
-        }
-        if (patchedIndex >= 0 && patchedIds?.sharesIdentityWith(targetIds) == true) {
-            merged.add(patchedIndex)
         }
         return merged.toSortedDistinctIntArray()
     }
@@ -279,13 +283,6 @@ internal class SimklEntryIndex private constructor(
         private var data = IntArray(initialCapacity)
         var size = 0
             private set
-
-        fun add(element: Int) {
-            if (size == data.size) {
-                data = data.copyOf(data.size * 2)
-            }
-            data[size++] = element
-        }
 
         fun addAll(elements: IntArray) {
             if (elements.isEmpty()) return
@@ -327,8 +324,38 @@ internal class SimklEntryIndex private constructor(
                 map[key] = next
             }
         }
+
+        fun putIndexSorted(map: HashMap<String, IntArray>, key: String, index: Int) {
+            val existing = map[key]
+            if (existing == null) {
+                map[key] = intArrayOf(index)
+                return
+            }
+            if (existing.binarySearch(index) >= 0) return
+            val next = existing.copyOf(existing.size + 1)
+            next[existing.size] = index
+            next.sort()
+            map[key] = next
+        }
+
+        fun removeIndex(map: HashMap<String, IntArray>, key: String, index: Int) {
+            val existing = map[key] ?: return
+            val pos = existing.binarySearch(index)
+            if (pos < 0) return
+            if (existing.size == 1) {
+                map.remove(key)
+                return
+            }
+            val next = IntArray(existing.size - 1)
+            if (pos > 0) System.arraycopy(existing, 0, next, 0, pos)
+            if (pos < existing.lastIndex) System.arraycopy(existing, pos + 1, next, pos, existing.size - pos - 1)
+            map[key] = next
+        }
     }
 }
+
+private fun SimklMedia.normalizedTitleKey(): String? =
+    title?.trim()?.takeIf(String::isNotEmpty)?.lowercase()
 
 internal inline fun TrackingExternalIds.forEachAliasKey(action: (String) -> Unit) {
     simkl?.let { action("simkl:$it") }

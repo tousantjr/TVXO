@@ -2,17 +2,34 @@ package com.nuvio.tv.data.simkl
 
 import com.nuvio.tv.core.tracking.TrackingExternalIds
 
+internal data class SimklIndexedSnapshotUpdate(
+    val snapshot: SimklSyncSnapshot,
+    val entryIndex: SimklEntryIndex?
+)
+
 internal fun SimklSyncSnapshot.applyScrobbleResult(
     result: SimklScrobbleResult,
     committedAtEpochMs: Long,
     entryIndex: SimklEntryIndex? = null
-): SimklSyncSnapshot {
+): SimklSyncSnapshot = applyScrobbleResultWithIndex(result, committedAtEpochMs, entryIndex).snapshot
+
+internal fun SimklSyncSnapshot.applyScrobbleResultWithIndex(
+    result: SimklScrobbleResult,
+    committedAtEpochMs: Long,
+    entryIndex: SimklEntryIndex? = null
+): SimklIndexedSnapshotUpdate {
     val localCommittedAt = committedAtEpochMs.epochMsToUtcIso()
-        ?: return this
+        ?: return SimklIndexedSnapshotUpdate(this, entryIndex)
     return when (result.outcome) {
-        SimklScrobbleOutcome.START -> this.reconcileWatchedPlayback(entryIndex)
-        SimklScrobbleOutcome.PAUSE -> withPausedScrobble(result, localCommittedAt, entryIndex)
-            .reconcileWatchedPlayback(entryIndex)
+        SimklScrobbleOutcome.START -> SimklIndexedSnapshotUpdate(
+            snapshot = this.reconcileWatchedPlayback(entryIndex),
+            entryIndex = entryIndex
+        )
+        SimklScrobbleOutcome.PAUSE -> SimklIndexedSnapshotUpdate(
+            snapshot = withPausedScrobble(result, localCommittedAt, entryIndex)
+                .reconcileWatchedPlayback(entryIndex),
+            entryIndex = entryIndex
+        )
         SimklScrobbleOutcome.SCROBBLE -> withCompletedScrobble(
             result = result,
             committedAt = result.watchedAt
@@ -69,7 +86,7 @@ private fun SimklSyncSnapshot.withCompletedScrobble(
     result: SimklScrobbleResult,
     committedAt: String,
     entryIndex: SimklEntryIndex? = null
-): SimklSyncSnapshot {
+): SimklIndexedSnapshotUpdate {
     val updatedEntries = entries.toMutableList()
     val index = entries.indexOfMatchingEntry(result, entryIndex)
     val existing = updatedEntries.getOrNull(index)
@@ -94,7 +111,7 @@ private fun SimklSyncSnapshot.withCompletedScrobble(
         index = if (index >= 0) index else updatedEntries.lastIndex,
         updatedEntry = updated
     )
-    return copy(
+    val reconciledSnapshot = copy(
         entries = updatedEntries,
         playback = playback.filterNot { session ->
             val sessionMedia = session.media ?: return@filterNot false
@@ -105,6 +122,7 @@ private fun SimklSyncSnapshot.withCompletedScrobble(
             )
         }
     ).reconcileWatchedPlayback(updatedIndex)
+    return SimklIndexedSnapshotUpdate(reconciledSnapshot, updatedIndex)
 }
 
 private fun SimklLibraryEntry.withWatchedMovie(

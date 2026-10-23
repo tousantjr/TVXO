@@ -109,8 +109,13 @@ internal class SimklSnapshotProjection private constructor(
     companion object {
         val Empty = create(SimklSyncSnapshot())
 
-        fun create(snapshot: SimklSyncSnapshot): SimklSnapshotProjection {
-            val entryIndex = SimklEntryIndex(snapshot.entries)
+        fun create(
+            snapshot: SimklSyncSnapshot,
+            existingEntryIndex: SimklEntryIndex? = null
+        ): SimklSnapshotProjection {
+            val entryIndex = existingEntryIndex
+                ?.takeIf { it.matchesEntries(snapshot.entries) }
+                ?: SimklEntryIndex(snapshot.entries)
             val library = snapshot.toSimklLibraryProjection()
             val watched = snapshot.toSimklWatchedProjection()
             val progress = snapshot.toSimklProgressEntries(entryIndex)
