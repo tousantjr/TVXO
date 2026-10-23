@@ -234,6 +234,12 @@ class StreamScreenViewModel @Inject constructor(
         if (streamBadgePresentationJob?.isActive == true) return
 
         streamBadgePresentationJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            // Nothing can match without active filters, so skip rebuilding the
+            // stream lists for every chunk.
+            if (!streamBadgePresentation.hasActiveFilters()) {
+                badgedAddonNames = badgedAddonNames + newGroups.map { it.addonName }.toSet()
+                return@launch
+            }
             var pending = newGroups
             while (pending.isNotEmpty()) {
                 val allNewStreams = pending.flatMap { it.streams }
