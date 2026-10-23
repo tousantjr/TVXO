@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -1326,6 +1327,7 @@ private fun ScraperCard(
                         onClick = onTest,
                         enabled = !isTesting && scraper.enabled,
                         modifier = Modifier
+                            .focusProperties { left = FocusRequester.Cancel }
                             .onFocusChanged { isTestFocused = it.isFocused }
                             .semantics { role = Role.Button },
                         colors = ButtonDefaults.colors(
