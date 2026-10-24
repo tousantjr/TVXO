@@ -383,7 +383,7 @@ private fun SubtitleStyleSettingRow(
 @Composable
 private fun SubtitleStyleStepperButton(
     icon: ImageVector,
-    contentDescription: String,
+    contentDescription: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
