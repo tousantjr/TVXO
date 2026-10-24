@@ -7,6 +7,7 @@ package com.nuvio.tv.ui.screens.player
 
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.layout.boundsInWindow
+import android.graphics.RectF
 import com.nuvio.tv.ui.screens.detail.formatPlaybackTime
 import com.nuvio.tv.ui.theme.NuvioMotion
 
@@ -142,6 +143,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
+import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.core.party.PartyAction
 import com.nuvio.tv.core.party.PartyMedia
 import com.nuvio.tv.core.party.PartyNotice
@@ -2370,53 +2372,70 @@ private fun PlayerView.syncExoSurfaceLayout(
     if (resizeMode != targetResizeMode) {
         resizeMode = targetResizeMode
     }
-    applyExoAspectMode(aspectModeAppliedToExoSurface(tunnelingEnabled, aspectMode))
-    syncLibassOverlayOffset(aspectMode)
+    val appliedAspectMode = aspectModeAppliedToExoSurface(tunnelingEnabled, aspectMode)
+    applyExoAspectMode(appliedAspectMode)
+    setTag(
+        R.id.player_view_libass_geometry_context_tag,
+        LibassOverlayGeometryContext(
+            requestedAspectMode = aspectMode,
+            appliedAspectMode = appliedAspectMode,
+            tunnelingEnabled = tunnelingEnabled,
+            tunneledSurfaceFill = tunneledSurfaceFill
+        )
+    )
+    syncLibassOverlayGeometry()
     reportSubtitleTextMetrics()
 }
 
-private const val ASS_VIDEO_ASPECT_TOLERANCE = 0.01f
+private data class LibassOverlayGeometryContext(
+    val requestedAspectMode: AspectMode,
+    val appliedAspectMode: AspectMode,
+    val tunnelingEnabled: Boolean,
+    val tunneledSurfaceFill: Boolean
+)
 
-/**
- * libass renders overlays into the full output surface. Keep that surface unscaled so text is
- * proportioned correctly, then align it with the centred video rectangle by translating it over
- * letterbox or pillarbox bars. This applies only when the ASS script's PlayRes aspect ratio
- * matches the video: a differently shaped authoring canvas may intentionally use other
- * coordinates.
- */
-private fun PlayerView.syncLibassOverlayOffset(aspectMode: AspectMode) {
-    val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl) ?: return
-    overlay.translationX = 0f
-    overlay.translationY = 0f
+private const val LIBASS_OVERLAY_GEOMETRY_TAG = "LibassOverlayGeometry"
 
-    if (!overlay.hasAssOverlayChild()) return
+private fun PlayerView.syncLibassOverlayGeometry() {
+    val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+    val exoPlayer = player as? ExoPlayer
+    val assHandler = exoPlayer?.getAssHandlerCompat()
+    val context = getTag(R.id.player_view_libass_geometry_context_tag) as? LibassOverlayGeometryContext
+    val videoSize = exoPlayer?.videoSize
+    val overlayWidth = overlay?.width ?: 0
+    val overlayHeight = overlay?.height ?: 0
+    val videoBounds = contentFrame?.let(::transformedChildBoundsInParent)
+    val margins = videoBounds?.let { libassOverlayMargins(overlayWidth, overlayHeight, it) }
 
-    if (aspectMode != AspectMode.ORIGINAL) {
+    if (overlay?.hasAssOverlayChild() != true || assHandler == null || margins == null) {
+        logLibassOverlayGeometry(
+            "event=skip overlay=${overlayWidth}x${overlayHeight} hasOverlay=${overlay?.hasAssOverlayChild() == true} " +
+                "handler=${assHandler != null} videoBounds=$videoBounds"
+        )
         return
     }
 
-    val videoAspect = readExoVideoAspectRatio(this) ?: return
-    val viewAspect = readViewAspectRatio(width, height)
-    if (videoAspect <= 0f || viewAspect <= 0f) return
-
-    val assTrack = (player as? ExoPlayer)?.getAssHandlerCompat()?.track ?: return
-    val assWidth = assTrack.getWidth()
-    val assHeight = assTrack.getHeight()
-    if (assWidth <= 0 || assHeight <= 0) return
-
-    val assAspect = assWidth.toFloat() / assHeight
-    val aspectDifference = abs(assAspect - videoAspect) / videoAspect
-    if (aspectDifference > ASS_VIDEO_ASPECT_TOLERANCE) return
-
-    overlay.translationX = when {
-        videoAspect < viewAspect -> (width - height * videoAspect) / 2f
-        else -> 0f
-    }
-    overlay.translationY = when {
-        videoAspect > viewAspect -> (height - width / videoAspect) / 2f
-        else -> 0f
-    }
+    assHandler.setMargins(margins.top, margins.bottom, margins.left, margins.right)
+    assHandler.setUseMargins(false)
+    logLibassOverlayGeometry(
+        "event=apply requested=${context?.requestedAspectMode} applied=${context?.appliedAspectMode} " +
+            "tunneling=${context?.tunnelingEnabled} tunneledFill=${context?.tunneledSurfaceFill} " +
+            "overlay=${overlayWidth}x${overlayHeight} video=${videoSize?.width}x${videoSize?.height} " +
+            "par=${videoSize?.pixelWidthHeightRatio} content=${describeRect(videoBounds)} " +
+            "margins=top:${margins.top},bottom:${margins.bottom},left:${margins.left},right:${margins.right}"
+    )
 }
+
+private fun PlayerView.logLibassOverlayGeometry(message: String) {
+    if (!BuildConfig.DEBUG) return
+    if (getTag(R.id.player_view_libass_geometry_snapshot_tag) == message) return
+    setTag(R.id.player_view_libass_geometry_snapshot_tag, message)
+    Log.d(LIBASS_OVERLAY_GEOMETRY_TAG, message)
+}
+
+private fun describeRect(rect: RectF?): String =
+    rect?.let { "${it.left},${it.top},${it.right},${it.bottom}" } ?: "null"
 
 private data class SubtitleAppliedConfig(
     val style: SubtitleStyleSettings,
@@ -2628,7 +2647,7 @@ private fun PlayerView.syncLibassOverlay(
         )
     )
     setTag(R.id.libass_overlay_bound_player, player)
-    syncLibassOverlayOffset(getTag(R.id.player_view_aspect_mode_tag) as? AspectMode ?: AspectMode.ORIGINAL)
+    post { syncLibassOverlayGeometry() }
 }
 
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
