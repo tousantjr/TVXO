@@ -470,6 +470,22 @@ fun PlayerScreen(
                 Lifecycle.Event.ON_PAUSE -> {
                     viewModel.pauseForLifecycle()
                 }
+                Lifecycle.Event.ON_STOP -> {
+                    // This back stack entry also stops when the player is navigated away from or
+                    // exited, where the normal release has to run; only act when the app itself
+                    // left the foreground.
+                    val hostActivity = context as? androidx.activity.ComponentActivity
+                    if (
+                        hostActivity != null &&
+                        isAppBackgroundStop(
+                            isFinishing = hostActivity.isFinishing,
+                            isChangingConfigurations = hostActivity.isChangingConfigurations,
+                            hostState = hostActivity.lifecycle.currentState
+                        )
+                    ) {
+                        viewModel.releaseForBackground()
+                    }
+                }
                 Lifecycle.Event.ON_RESUME -> {
                     // Re-create the MediaSession so media controls work in foreground.
                     // Don't auto-resume playback — let the user press play.
