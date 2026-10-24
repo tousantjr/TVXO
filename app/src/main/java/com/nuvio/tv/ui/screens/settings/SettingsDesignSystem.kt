@@ -387,6 +387,11 @@ internal fun SettingsRailButton(
                     isFocused = nowFocused
                     if (nowFocused) onFocused()
                 }
+            }
+            .semantics {
+                contentDescription = title
+                role = Role.Tab
+                this.selected = isSelected
             },
         colors = CardDefaults.colors(
             containerColor = when {
@@ -416,12 +421,7 @@ internal fun SettingsRailButton(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = SettingsRailItemHeight)
-                .clearAndSetSemantics {
-                    contentDescription = title
-                    role = Role.Tab
-                    this.selected = isSelected
-                },
+                .heightIn(min = SettingsRailItemHeight),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(
@@ -473,6 +473,7 @@ internal fun SettingsRailButton(
                     FocusMarqueeText(
                         text = title,
                         focused = isFocused,
+                        modifier = Modifier.clearAndSetSemantics {},
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = if (isSelected || isFocused) FontWeight.SemiBold else FontWeight.Medium
                         ),
