@@ -84,8 +84,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -257,6 +255,7 @@ fun AddonManagerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(NuvioTheme.colors.Background)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -508,9 +507,8 @@ fun AddonManagerScreen(
             }
         }
 
-        // QR Code overlay — Popup renders above the entire screen
-        if (uiState.isQrModeActive) {
-            Popup(properties = PopupProperties(focusable = true)) {
+        if (uiState.isQrModeActive || uiState.pendingChange != null) {
+            if (uiState.isQrModeActive) {
                 QrCodeOverlay(
                     qrBitmap = uiState.qrCodeBitmap,
                     serverUrl = uiState.serverUrl,
@@ -519,18 +517,13 @@ fun AddonManagerScreen(
                     hasPendingChange = uiState.pendingChange != null
                 )
             }
-        }
 
-        // Confirmation dialog overlay
-        if (uiState.pendingChange != null) {
-            Popup(properties = PopupProperties(focusable = true)) {
-                uiState.pendingChange?.let { pending ->
-                    ConfirmAddonChangesDialog(
-                        pendingChange = pending,
-                        onConfirm = viewModel::confirmPendingChange,
-                        onReject = viewModel::rejectPendingChange
-                    )
-                }
+            uiState.pendingChange?.let { pending ->
+                ConfirmAddonChangesDialog(
+                    pendingChange = pending,
+                    onConfirm = viewModel::confirmPendingChange,
+                    onReject = viewModel::rejectPendingChange
+                )
             }
         }
 
