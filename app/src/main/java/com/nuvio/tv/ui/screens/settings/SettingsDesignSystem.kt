@@ -109,6 +109,15 @@ internal val SettingsZenRowShape = RoundedCornerShape(12.dp)
 internal val SettingsHorizonRowShape = RoundedCornerShape(10.dp)
 internal val SettingsHorizonGroupShape = RoundedCornerShape(16.dp)
 
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+internal fun settingsGroupShape(): RoundedCornerShape =
+    if (isFlatSettingsStyle()) {
+        SettingsHorizonGroupShape
+    } else {
+        RoundedCornerShape(SettingsSecondaryCardRadius)
+    }
+
 /**
  * Marks a row that holds several options side by side. Without it, moving into the row uses a
  * geometric search and lands on whichever option sits nearest the full width row above, which is
@@ -682,7 +691,7 @@ internal fun SettingsGroupCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(SettingsHorizonGroupShape)
+                    .clip(settingsGroupShape())
                     .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.55f))
                     .padding(NuvioTheme.spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs)
@@ -693,12 +702,12 @@ internal fun SettingsGroupCard(
         SettingsUiStyle.CLASSIC -> Column(
             modifier = modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(SettingsSecondaryCardRadius))
+                .clip(settingsGroupShape())
                 .background(NuvioTheme.colors.BackgroundCard)
                 .border(
                     width = NuvioTheme.spacing.hairline,
                     color = NuvioTheme.colors.Border,
-                    shape = RoundedCornerShape(SettingsSecondaryCardRadius)
+                    shape = settingsGroupShape()
                 )
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
