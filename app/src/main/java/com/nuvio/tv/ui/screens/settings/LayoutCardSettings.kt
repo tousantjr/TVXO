@@ -332,8 +332,7 @@ internal fun LayoutCardDepthSection(
 internal fun LayoutCustomPosterSection(
     uiState: LayoutSettingsUiState,
     onEvent: (LayoutSettingsEvent) -> Unit,
-    onConfigureViaPhone: () -> Unit,
-    focusRequester: FocusRequester
+    onConfigureViaPhone: () -> Unit
 ) {
     val pattern = uiState.customPosterUrlPattern
     val isActive = pattern.isNotBlank()
@@ -355,8 +354,7 @@ internal fun LayoutCustomPosterSection(
     SettingsActionRow(
         title = stringResource(R.string.layout_custom_poster_qr),
         subtitle = if (isActive) stringResource(R.string.layout_custom_poster_active) else null,
-        onClick = onConfigureViaPhone,
-        modifier = Modifier.focusRequester(focusRequester)
+        onClick = onConfigureViaPhone
     )
     if (isActive) {
         SettingsActionRow(
