@@ -917,7 +917,8 @@ internal fun QrCodeOverlay(
     instruction: String,
     onClose: () -> Unit,
     hasPendingChange: Boolean = false,
-    qrSize: Dp = 220.dp
+    qrSize: Dp = 220.dp,
+    modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -930,7 +931,7 @@ internal fun QrCodeOverlay(
     BackHandler { onClose() }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.85f)),
         contentAlignment = Alignment.Center
