@@ -316,14 +316,14 @@ internal fun SubtitleSettingsDialogs(
             title = stringResource(R.string.sub_libass_render_mode),
             options = listOf(
                 SettingsPickerOption(
-                    LibassRenderMode.VIDEO_EFFECT,
-                    stringResource(R.string.sub_libass_render_mode_video_effect),
-                    stringResource(R.string.sub_libass_render_mode_video_effect_sub)
-                ),
-                SettingsPickerOption(
                     LibassRenderMode.OVERLAY,
                     stringResource(R.string.sub_libass_render_mode_overlay),
                     stringResource(R.string.sub_libass_render_mode_overlay_sub)
+                ),
+                SettingsPickerOption(
+                    LibassRenderMode.VIDEO_EFFECT,
+                    stringResource(R.string.sub_libass_render_mode_video_effect),
+                    stringResource(R.string.sub_libass_render_mode_video_effect_sub)
                 )
             ),
             selectedValue = settings.libassRenderMode,

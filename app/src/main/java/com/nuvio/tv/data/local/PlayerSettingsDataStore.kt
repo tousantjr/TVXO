@@ -513,10 +513,10 @@ enum class LibassRenderScale(val scale: Float, val label: String) {
  *   is preserved but subtitle timing may not be perfectly accurate on some TVs.
  */
 enum class LibassRenderMode {
-    /** Frame-accurate subtitles; HDR tone-mapped to SDR. */
-    VIDEO_EFFECT,
     /** Preserves HDR output; subtitles may have a timing offset on TV hardware. */
-    OVERLAY;
+    OVERLAY,
+    /** Frame-accurate subtitles; HDR tone-mapped to SDR. */
+    VIDEO_EFFECT;
 
     companion object {
         val DEFAULT = OVERLAY

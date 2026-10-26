@@ -1050,11 +1050,14 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             if (useLibass) {
                 _exoPlayer?.getAssHandlerCompat()?.let { handler ->
-                    // OVERLAY mode: do NOT call setVideoEffects at all.
-                    // setVideoEffects forces DefaultVideoFrameProcessor into the pipeline
-                    // which tone-maps HDR to SDR regardless of whether the effect draws.
-                    // Without it, ExoPlayer passes video straight to the surface - HDR preserved.
-                    if (playerSettings.effectiveLibassRenderMode != LibassRenderMode.OVERLAY) {
+                    // Apply video effects only when an ASS track has been detected for
+                    // this stream. On first init, no tracks are known yet so effects are
+                    // skipped. When tracks scan finds ASS, the player is rebuilt and this
+                    // code runs again with hasDetectedAssSsaTrackForCurrentStream == true.
+                    // This avoids DVFP overhead on non-ASS content.
+                    val shouldApplyEffects = hasDetectedAssSsaTrackForCurrentStream &&
+                        playerSettings.effectiveLibassRenderMode != LibassRenderMode.OVERLAY
+                    if (shouldApplyEffects) {
                         val effect = com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler)
                         activeAssVideoEffect = effect
                         _exoPlayer?.setVideoEffects(listOf(effect))

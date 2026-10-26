@@ -393,16 +393,26 @@ internal fun PlayerRuntimeController.maybeAdjustLibassPipelineForTracks(tracks: 
     if (hasAssSsaTrack) {
         hasDetectedAssSsaTrackForCurrentStream = true
     }
+
+    // Rebuild to add video effects when ASS is actively selected and mode is VIDEO_EFFECT.
+    // setVideoEffects must be called before prepare(), so we need a full player rebuild.
+    val needsVideoEffectRebuild = tracks.hasSelectedAssSsaTextTrack() &&
+        activeAssVideoEffect == null &&
+        activePlayerUsesLibass &&
+        _uiState.value.libassRenderMode == com.nuvio.tv.data.local.LibassRenderMode.VIDEO_EFFECT
+
     // Don't rebuild just to drop libass, except when it's holding the MKV extractor on a DV
     // file and blocking conversion; then drop it so the DV extractor runs.
     val desiredUseLibass = requestedUseLibassByUser && hasDetectedAssSsaTrackForCurrentStream
-    if (desiredUseLibass == activePlayerUsesLibass) return
-    if (!desiredUseLibass) {
-        val libassBlockingDvConvert = activePlayerUsesLibass &&
-                isExperimentalDv7ToDv81ActiveForCurrentPlayback &&
-                tracks.hasDolbyVisionConvertibleVideoTrack()
-        if (!libassBlockingDvConvert) return
-    }
+    val needsLibassPipelineSwitch = desiredUseLibass != activePlayerUsesLibass &&
+        (desiredUseLibass || run {
+            val libassBlockingDvConvert = activePlayerUsesLibass &&
+                    isExperimentalDv7ToDv81ActiveForCurrentPlayback &&
+                    tracks.hasDolbyVisionConvertibleVideoTrack()
+            libassBlockingDvConvert
+        })
+
+    if (!needsLibassPipelineSwitch && !needsVideoEffectRebuild) return
 
     val player = _exoPlayer ?: return
     val resumePosition = player.currentPosition.takeIf { it > 0L }
@@ -426,6 +436,30 @@ private fun Tracks.hasAssSsaTextTrack(): Boolean {
     groups.forEach { trackGroup ->
         if (trackGroup.type != C.TRACK_TYPE_TEXT) return@forEach
         for (index in 0 until trackGroup.length) {
+            val format = trackGroup.getTrackFormat(index)
+            if (format.sampleMimeType == MimeTypes.TEXT_SSA) return true
+
+            val hasAssCodec = format.codecs
+                ?.split(',')
+                ?.asSequence()
+                ?.map { it.trim().lowercase(Locale.US) }
+                ?.any { codec ->
+                    codec == MimeTypes.TEXT_SSA ||
+                            codec == "s_text/ass" ||
+                            codec == "s_text/ssa" ||
+                            codec.endsWith("/x-ssa")
+                } == true
+            if (hasAssCodec) return true
+        }
+    }
+    return false
+}
+
+private fun Tracks.hasSelectedAssSsaTextTrack(): Boolean {
+    groups.forEach { trackGroup ->
+        if (trackGroup.type != C.TRACK_TYPE_TEXT || !trackGroup.isSelected) return@forEach
+        for (index in 0 until trackGroup.length) {
+            if (!trackGroup.isTrackSelected(index)) continue
             val format = trackGroup.getTrackFormat(index)
             if (format.sampleMimeType == MimeTypes.TEXT_SSA) return true
 
