@@ -1274,7 +1274,7 @@
     <string name="debrid_cloud_library">Bibliothèque cloud</string>
     <string name="debrid_cloud_library_description">Parcourir et lire les fichiers déjà présents dans vos comptes connectés.</string>
     <string name="debrid_enable_title">Résoudre les liens lisibles</string>
-    <string name="debrid_enable_subtitle">Demander un lien lisible à un service connecté lorsqu’un résultat en a besoin. Cela peut ajouter l’élément à ce service.</string>
+    <string name="debrid_enable_subtitle">Demander des liens lisibles à un service connecté lorsqu’un résultat en a besoin. Cela peut ajouter l’élément à ce service.</string>
     <string name="debrid_resolve_with">Résoudre avec</string>
     <string name="debrid_resolve_with_description">Choisissez le compte connecté qui gère les liens lisibles.</string>
     <string name="debrid_add_key_first">Connectez d’abord un compte.</string>
@@ -1341,7 +1341,7 @@
     <string name="debrid_stream_sort_size_asc">Plus petit en premier</string>
     <string name="debrid_stream_min_quality_title">Qualité minimale</string>
     <string name="debrid_stream_min_quality_subtitle">Masquer les sources en dessous de la résolution sélectionnée.</string>
-    <string name="debrid_stream_min_quality_any">Toutes qualités</string>
+    <string name="debrid_stream_min_quality_any">Toutes les qualités</string>
     <string name="debrid_stream_min_quality_720">720p et plus</string>
     <string name="debrid_stream_min_quality_1080">1080p et plus</string>
     <string name="debrid_stream_min_quality_2160">4K uniquement</string>
@@ -2557,6 +2557,12 @@
     <string name="cd_remove">Retirer</string>
     <string name="cd_preview">Aperçu</string>
     <string name="cd_test">Tester</string>
+    <string name="cd_enable_scraper">Activer %1$s</string>
+    <string name="cd_enable_addon">Activer %1$s</string>
+    <string name="cd_color_swatch">Couleur %1$s</string>
+    <string name="cd_emoji_option">Émoji %1$s</string>
+    <string name="cd_trailer_controls">Commandes de la bande-annonce</string>
+    <string name="cd_seek_bar">Barre de progression</string>
     <string name="cd_unlink">Dissocier</string>
     <string name="cd_nuvio_logo">NuvioTV</string>
     <string name="cd_trakt_logo">Logo Trakt</string>
@@ -3177,7 +3183,7 @@
         <item quantity="one">%d sélectionné</item>
         <item quantity="other">%d sélectionnés</item>
     </plurals>
-    <string name="debrid_size_range_any">Toutes tailles</string>
+    <string name="debrid_size_range_any">Toutes les tailles</string>
     <string name="debrid_size_range_up_to">Jusqu’à %1$d Go</string>
     <string name="debrid_size_range_min_plus">%1$d Go et plus</string>
     <string name="debrid_size_range_min_max">%1$d-%2$d Go</string>
@@ -3206,7 +3212,7 @@
     <string name="web_debrid_max_size_gb">Taille max. (Go)</string>
     <string name="web_debrid_restore_default">Rétablir les valeurs par défaut</string>
     <string name="web_debrid_save_settings">Enregistrer les paramètres</string>
-    <string name="web_debrid_status_load_error">Impossible de charger les paramètres Direct Debrid</string>
+    <string name="web_debrid_status_load_error">Impossible de charger les paramètres Debrid</string>
 
     <!-- Web config pages: shared save status -->
     <string name="web_status_saving">Enregistrement…</string>
