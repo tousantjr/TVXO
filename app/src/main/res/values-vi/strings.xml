@@ -2558,7 +2558,7 @@
     <string name="cd_preview">Xem trước</string>
     <string name="cd_test">Kiểm tra</string>
     <string name="cd_enable_scraper">Bật %1$s</string>
-    <string name="cd_enable_addon">Màu %1$s</string>
+    <string name="cd_enable_addon">Bật %1$s</string>
     <string name="cd_color_swatch">Màu %1$s</string>
     <string name="cd_emoji_option">Biểu tượng cảm xúc %1$s</string>
     <string name="cd_trailer_controls">Nút điều khiển trailer</string>
