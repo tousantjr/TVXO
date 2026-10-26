@@ -132,8 +132,8 @@
     <string name="error_meta_tried_issues">Опитани мета добавки: %1$s. Метаданните не можаха да бъдат заредени за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
     <string name="error_stream_no_supported_addon">Няма инсталирана добавка, която да поддържа потоци за \"%1$s\".</string>
     <string name="error_stream_tried_none">Опитах добавки за стрийминг: %1$s. Нито един от тях не върна стрийминг за id=%2$s (type=%3$s).</string>
-    <string name="error_stream_tried_generic">Изпробвах добавки за потоци: %1$s. Потоците не можаха да бъдат заредени за id=%2$s (type=%3$s).</string>
-    <string name="error_stream_tried_issues">Опитани са добавки за потоци: %1$s. Потоците не можаха да бъдат заредени за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
+    <string name="error_stream_tried_generic">Изпробвах добавки за потоци: %1$s. Източниците не можаха да бъдат заредени за id=%2$s (type=%3$s).</string>
+    <string name="error_stream_tried_issues">Опитани са добавки за потоци: %1$s. Източниците не можаха да бъдат заредени за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
     
     <string name="continue_watching">Продължи гледането</string>
     <string name="cw_upcoming">Предстоящи</string>
@@ -518,8 +518,8 @@
     <string name="essential_addon_continue_for_now">Продължи засега</string>
     <string name="essential_playback_basics">Основни принципи на възпроизвеждането</string>
     <string name="essential_subtitles_and_audio">Субтитри и аудио</string>
-    <string name="essential_stream_selection">Избор на поток</string>
-    <string name="stream_auto_play_first_stream">Първи поток</string>
+    <string name="essential_stream_selection">Избор на източник</string>
+    <string name="stream_auto_play_first_stream">Първи източник</string>
     <string name="stream_auto_play_manual_short">Ръчно</string>
     <string name="stream_auto_play_smart_match">Интелигентно съвпадение</string>
     <string name="essential_subtitle_language">Език на субтитрите</string>
@@ -527,7 +527,7 @@
     <string name="audio_lang_media_default">Медия по подразбиране</string>
     <string name="essential_playback_header_title">Възпроизвеждане</string>
     <string name="essential_playback_header_subtitle">Прости настройки за възпроизвеждане, субтитри, аудио и P2P.</string>
-    <string name="essential_stream_selection_subtitle">Изберете ръчно или пуснете автоматично първия наличен поток.</string>
+    <string name="essential_stream_selection_subtitle">Изберете ръчно или пуснете автоматично първия наличен източник.</string>
     <string name="essential_autoplay_next_episode">Автоматично пускане на следващия епизод</string>
     <string name="essential_autoplay_next_episode_subtitle">Продължете към следващия епизод след края на стрийма.</string>
     <string name="external_auto_next_loading">Зареждане на следващия епизод…</string>
@@ -593,7 +593,7 @@
     <string name="advanced_playback_issue_reports">Отчети за проблеми с възпроизвеждането</string>
     <string name="advanced_playback_issue_reports_subtitle">Показване на бутони за докладване по време на възпроизвеждане, продължително зареждане и грешки при възпроизвеждане</string>
     <string name="advanced_player_stats_hud">Наслагване на статистика за възпроизвеждане</string>
-    <string name="advanced_player_stats_hud_subtitle">Показване на бутон в информацията за потока, за да се превключват показанията на процесора, паметта, буфера, битрейта и температурата в реално време по време на възпроизвеждане</string>
+    <string name="advanced_player_stats_hud_subtitle">Показване на бутон в информацията за източника, за да се превключват показанията на процесора, паметта, буфера, битрейта и температурата в реално време по време на възпроизвеждане</string>
     <string name="sentry_enable_dialog_title">Да се включат ли отчетите за сривове?</string>
     <string name="sentry_enable_dialog_subtitle">Отчетите за сривове помагат за идентифициране на специфични за устройството повреди, без да се изисква от вас да възпроизвеждате проблема с ADB регистрационни файлове.</string>
     <string name="sentry_disable_dialog_title">Да се изключат ли отчетите за сривове?</string>
@@ -603,7 +603,7 @@
     <string name="sentry_sent_title">Изпратено</string>
     <string name="sentry_sent_body">Сривове, текущи ANR, стекови трасирания, версия на приложението, тип компилация, разновидност, метаданни за устройството и операционната система, плюс безопасни мрежови навигационни данни с метод, хост, път, състояние, продължителност и тип изключение.</string>
     <string name="sentry_not_sent_title">Не е изпратено</string>
-    <string name="sentry_not_sent_body">Пароли, токени за достъп, токени за опресняване, тела на заявки, тела на отговори, заглавки, „бисквитки“, снимки на екрана, йерархия на изгледи, преиграване на сесия, сурови диагностични данни и стойности на заявки или фрагменти за URL адреси на поток.</string>
+    <string name="sentry_not_sent_body">Пароли, токени за достъп, токени за опресняване, тела на заявки, тела на отговори, заглавки, „бисквитки“, снимки на екрана, йерархия на изгледи, преиграване на сесия, сурови диагностични данни и стойности на заявки или фрагменти за URL адреси на източник.</string>
     <string name="sentry_keep_enabled">Продължи включено</string>
     <string name="sentry_turn_off">Изключване</string>
     <string name="sentry_turn_on">Включване</string>
@@ -725,8 +725,8 @@
     
     <string name="playback_section_player_title">Играч</string>
     <string name="playback_section_player_title_desc">Плейър по подразбиране, вътрешен енджин и резервно копие при грешка.</string>
-    <string name="playback_section_stream_selection">Избор на поток</string>
-    <string name="playback_section_stream_selection_desc">Как се избира поток, когато натиснете бутона за възпроизвеждане.</string>
+    <string name="playback_section_stream_selection">Избор на източник</string>
+    <string name="playback_section_stream_selection_desc">Как се избира източник, когато натиснете бутона за възпроизвеждане.</string>
     <string name="playback_section_up_next">Следващото</string>
     <string name="playback_section_up_next_desc">Автоматично пускане на следващия епизод и предложения за пускане след него.</string>
     <string name="playback_section_skip">Пропускане на сегменти</string>
@@ -774,7 +774,7 @@
     <string name="playback_engine_exoplayer">ExoPlayer</string>
     <string name="playback_engine_mvplayer">Libmpv (Бета версия)</string>
     <string name="playback_auto_switch_internal_player_on_error">Грешка при автоматично превключване на двигателя при стартиране</string>
-    <string name="playback_auto_switch_internal_player_on_error_sub">Ако стартирането на потока е неуспешно, превключването между ExoPlayer и libmpv се извършва автоматично.</string>
+    <string name="playback_auto_switch_internal_player_on_error_sub">Ако стартирането на източника е неуспешно, превключването между ExoPlayer и libmpv се извършва автоматично.</string>
     <string name="playback_external_forward_subtitles">Пренасочване на субтитри към външен плейър</string>
     <string name="playback_external_forward_subtitles_sub">Извличане на субтитри на предпочитания от вас език от добавките и прехвърлянето им към външния плейър.</string>
     <string name="playback_external_send_skip_segments">Изпращане на времеви отметки за увод и завършек</string>
@@ -840,7 +840,7 @@
     <string name="audio_force_optical_passthrough_sub">Транскодира многоканални формати (TrueHD, DTS, AAC и др.) в Dolby Digital 5.1 в реално време за оптични/SPDIF връзки.</string>
 <!-- DV7 Handling Mode -->
     <string name="dv7_handling_title">Обработка на Dolby Vision</string>
-    <string name="dv7_handling_dialog_subtitle">Изберете как да се обработват DV потоците по време на възпроизвеждане.</string>
+    <string name="dv7_handling_dialog_subtitle">Изберете как да се обработват DV източниците по време на възпроизвеждане.</string>
     <string name="dv7_mode_auto">Автоматично (препоръчително)</string>
     <string name="dv7_mode_auto_desc">Разпознава вашия дисплей и избира най-добрия режим. Ако възникнат проблеми с възпроизвеждането, опитайте базовия слой HDR10.</string>
     <string name="dv7_mode_hdr10_base_layer">HDR10 базов слой</string>
@@ -872,7 +872,7 @@
     <string name="dv7_libdovi_mode_4_title" translatable="false">Режим 4 — 8.4 (статичен)</string>
     <string name="dv7_libdovi_mode_4_sub" translatable="false">Конвертиране в статичен профил 8.4.</string>
     <string name="audio_mpv_hi10p_gnext_sw_title">Hi10P G-NEXT SW резервен вариант (само за MPV)</string>
-    <string name="audio_mpv_hi10p_gnext_sw_subtitle">Използвайте софтуерно декодиране G-NEXT, когато детайлите на потока идентифицират H.264 Hi10P. Изключено по подразбиране; активирайте само ако възпроизвеждането на Hi10P замръзва или е неуспешно.</string>
+    <string name="audio_mpv_hi10p_gnext_sw_subtitle">Използвайте софтуерно декодиране G-NEXT, когато детайлите на източника идентифицират H.264 Hi10P. Изключено по подразбиране; активирайте само ако възпроизвеждането на Hi10P замръзва или е неуспешно.</string>
     <string name="audio_mpv_hwdec_title">Хардуерно декодиране (само за MPV)</string>
     <string name="audio_mpv_hwdec_dialog_subtitle">Изберете как libmpv трябва да използва хардуерни декодери.</string>
     <string name="audio_mpv_hwdec_legacy_direct_copy">Наследен (директно -> копиране)</string>
@@ -932,17 +932,17 @@
     <string name="autoplay_preload_next_episode_sub">Започнете търсене на източници във фонов режим, преди да се появи бутонът за следващ епизод.</string>
     
     <string name="autoplay_reuse_last_link">Използване на последна връзка</string>
-    <string name="autoplay_reuse_last_link_sub">Автоматично възпроизвеждане на последния работещ поток за същия филм/епизод, когато кешът е все още валиден</string>
+    <string name="autoplay_reuse_last_link_sub">Автоматично възпроизвеждане на последния работещ източник за същия филм/епизод, когато кешът е все още валиден</string>
     <string name="autoplay_last_link_cache">Продължителност на кеша на последната връзка</string>
     <string name="cache_duration_hour_one">%1$d час</string>
     <string name="cache_duration_hour_other">%1$d часа</string>
     <string name="cache_duration_day_one">%1$d ден</string>
     <string name="cache_duration_day_other">%1$d дни</string>
     <string name="cache_duration_days_hours">%1$dd %2$dh</string>
-    <string name="autoplay_mode_manual">Ръчно (изберете поток)</string>
+    <string name="autoplay_mode_manual">Ръчно (изберете източник)</string>
     <string name="autoplay_mode_first">Автоматично възпроизвеждане на първия източник</string>
     <string name="autoplay_mode_regex">Автоматично възпроизвеждане на съвпадение с регулярни изрази</string>
-    <string name="autoplay_stream_selection">Автоматичен избор на поток</string>
+    <string name="autoplay_stream_selection">Автоматичен избор на източник</string>
     <string name="autoplay_post_play_recommendations">Препоръки след игра</string>
     <string name="autoplay_post_play_recommendations_sub">Показване на препоръки близо до края на филми и сериали.</string>
     <string name="autoplay_post_play_movie_threshold">Време за препоръчване на филми</string>
@@ -950,7 +950,7 @@
     <string name="autoplay_next_episode">Автоматично пускане на следващия епизод</string>
     <string name="autoplay_next_episode_sub">Следващият епизод да се стартира автоматично, когато се появи подкана.</string>
     <string name="autoplay_next_episode_fallback">Резервен режим, когато групата за маратонско гледане не успее</string>
-    <string name="autoplay_next_episode_fallback_sub">Автоматично избиране на първия наличен поток, ако не е намерена група за маратонско гледане. Когато е изключено, вместо това се показва инструментът за избор на поток.</string>
+    <string name="autoplay_next_episode_fallback_sub">Автоматично избиране на първия наличен източник, ако не е намерена група за маратонско гледане. Когато е изключено, вместо това се показва инструментът за избор на източник.</string>
     <string name="autoplay_prefer_binge_group">Предпочитана група за маратонско гледане (следващ епизод)</string>
     <string name="autoplay_prefer_binge_group_sub">Първо опитайте същия профил на източника (същата група добавки/качество) преди нормалните правила за автоматично възпроизвеждане.</string>
     <string name="autoplay_reuse_binge_group">Повторно използване на група за маратонско гледане</string>
@@ -966,7 +966,7 @@
     <string name="autoplay_scope_addons">Само инсталирани добавки</string>
     <string name="autoplay_scope_plugins">Само активирани плъгини</string>
     <string name="autoplay_scope">Обхват на източника за автоматично възпроизвеждане</string>
-    <string name="autoplay_timeout_title">Време за изчакване при избор на поток</string>
+    <string name="autoplay_timeout_title">Време за изчакване при избор на източник</string>
     <string name="autoplay_timeout_sub">Изчакайте времето за добавяне на добавки, преди да изберете.</string>
     <string name="autoplay_timeout_instant">Незабавно</string>
     <string name="autoplay_timeout_unlimited">Неограничен</string>
@@ -985,7 +985,7 @@
     <string name="autoplay_scope_plugins_desc">Автоматичното възпроизвеждане взема предвид само потоци, идващи от активирани плъгини.</string>
     <string name="autoplay_threshold_pct_desc">Показване по процент на възпроизвеждане, когато няма наличен времеви отпечатък за завършване.</string>
     <string name="autoplay_threshold_min_desc">Показване на този брой минути преди края на епизода, когато няма наличен времеви отпечатък за завършек.</string>
-    <string name="autoplay_regex_matches">Съвпадения с името/заглавието/описанието/добавката/url адреса на потока. Пример: 4K|2160p|Remux</string>
+    <string name="autoplay_regex_matches">Съвпадения с името/заглавието/описанието/добавката/url адреса на източника. Пример: 4K|2160p|Remux</string>
     <string name="autoplay_regex_presets">Предварителни настройки</string>
     <string name="autoplay_invalid_regex">Невалиден шаблон за регулярни изрази</string>
     
@@ -1051,7 +1051,7 @@
     <string name="layout_ratings_show">Покажи</string>
     <string name="layout_ratings_hide">Скриване</string>
     <string name="layout_ratings_hide_unwatched">Скриване на негледаните</string>
-    <string name="layout_section_streams">Потоци</string>
+    <string name="layout_section_streams">Източници</string>
     <string name="layout_section_streams_desc">Настройки за показване на резултати от стрийминг и панели с изходни данни на плейъра.</string>
     <string name="layout_section_continue_watching">Продължи гледането</string>
     <string name="layout_section_continue_watching_desc">Настройки за секцията „Продължи гледането“.</string>
@@ -1325,7 +1325,7 @@
     <string name="debrid_stream_max_results_title">Максимален брой резултати</string>
     <string name="debrid_stream_max_results_subtitle">Ограничете броя на показваните източници за директно дебитиране.</string>
     <string name="debrid_stream_max_results_all">Всички потоци</string>
-    <string name="debrid_stream_max_results_count">%1$d потока</string>
+    <string name="debrid_stream_max_results_count">%1$d източника</string>
     <string name="debrid_stream_sort_title">Сортиране на резултатите</string>
     <string name="debrid_stream_sort_subtitle">Изберете как да се подредят резултатите.</string>
     <string name="debrid_stream_sort_original">Първоначален ред</string>
@@ -1408,9 +1408,9 @@
     <string name="settings_stream_addon_logo_description">Показване на логото и името на добавката до източниците на стрийминг.</string>
     <string name="settings_stream_display_section">Дисплей</string>
     <string name="settings_stream_badge_position_title">Позиция на значката</string>
-    <string name="settings_stream_badge_position_description">Изберете дали значките за Fusion и размер да се показват над или под картите на потока.</string>
+    <string name="settings_stream_badge_position_description">Изберете дали значките за Fusion и размер да се показват над или под картите на източника.</string>
     <string name="settings_stream_badge_position_dialog_title">Позиция на значката</string>
-    <string name="settings_stream_badge_position_dialog_description">Изберете къде да се показват значките на потока в картите на потока.</string>
+    <string name="settings_stream_badge_position_dialog_description">Изберете къде да се показват значките на източника в картите на източника.</string>
     <string name="settings_stream_badge_position_top">Най-горе</string>
     <string name="settings_stream_badge_position_bottom">Долу</string>
     <string name="settings_stream_badge_urls_title">URL адреси на значки на Fusion</string>
@@ -1766,18 +1766,18 @@
     <string name="stream_retry">Повторен опит</string>
     <string name="stream_no_streams">Няма намерени потоци</string>
     <string name="stream_no_streams_hint">Опитайте да инсталирате още добавки, за да намерите потоци</string>
-    <string name="stream_finding_source">Търсене на източник на поток</string>
-    <string name="debrid_resolving_stream">Разрешаване на debrid поток</string>
-    <string name="debrid_stale_stream">Този резултат от Debrid е изтекъл. Освежаване на потоците.</string>
+    <string name="stream_finding_source">Търсене на източник на източник</string>
+    <string name="debrid_resolving_stream">Разрешаване на debrid източник</string>
+    <string name="debrid_stale_stream">Този резултат от Debrid е изтекъл. Освежаване на източниците.</string>
     <string name="debrid_missing_api_key">Добавете ключ за Debrid API в Настройки.</string>
     <string name="debrid_not_cached">Не е кеширано в тази услуга.</string>
-    <string name="debrid_resolution_failed">Не можа да се разреши този Debrid поток.</string>
+    <string name="debrid_resolution_failed">Не можа да се разреши този Debrid източник.</string>
     <string name="youtube_resolving_stream">Зареждане на YouTube видео</string>
     <string name="youtube_resolution_failed">Не можа да се зареди това видео в YouTube.</string>
     <string name="stream_type_torrent">Торент</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">P2P стрийминг</string>
-    <string name="p2p_consent_body">Този поток използва технология peer-to-peer (P2P). С активирането на P2P, вие потвърждавате и се съгласявате, че:\n\n\u2022 Вашият IP адрес ще бъде видим за други потребители в мрежата\n\u2022 Вие носите пълна отговорност за съдържанието, до което осъществявате достъп\n\u2022 Вие потвърждавате, че имате законното право да стриймвате това съдържание във вашата юрисдикция\n\u2022 Nuvio не хоства, не разпространява и не контролира никакво P2P съдържание\n\u2022 Nuvio не носи отговорност за каквито и да е правни последици, произтичащи от използването на P2P стрийминг от ваша страна\n\nВие използвате тази функция изцяло на ваш собствен риск. P2P може да бъде деактивиран по всяко време в Настройки.</string>
+    <string name="p2p_consent_body">Този източник използва технология peer-to-peer (P2P). С активирането на P2P, вие потвърждавате и се съгласявате, че:\n\n\u2022 Вашият IP адрес ще бъде видим за други потребители в мрежата\n\u2022 Вие носите пълна отговорност за съдържанието, до което осъществявате достъп\n\u2022 Вие потвърждавате, че имате законното право да стриймвате това съдържание във вашата юрисдикция\n\u2022 Nuvio не хоства, не разпространява и не контролира никакво P2P съдържание\n\u2022 Nuvio не носи отговорност за каквито и да е правни последици, произтичащи от използването на P2P стрийминг от ваша страна\n\nВие използвате тази функция изцяло на ваш собствен риск. P2P може да бъде деактивиран по всяко време в Настройки.</string>
     <string name="p2p_consent_enable">Активиране на P2P</string>
     <string name="p2p_consent_cancel">Отказ</string>
     <string name="settings_p2p_title">P2P стрийминг</string>
@@ -1814,8 +1814,8 @@
     <string name="stream_episode_label">Сезон %1$d Епизод %2$d</string>
     
     <string name="player_no_external_player">Не е намерен външен играч</string>
-    <string name="player_loading_preparing">Подготовка на потока…</string>
-    <string name="player_loading_detecting_format">Откриване на формат на потока…</string>
+    <string name="player_loading_preparing">Подготовка на източника…</string>
+    <string name="player_loading_detecting_format">Откриване на формат на източника…</string>
     <string name="external_player_loading_skip_segments">Зареждане на интро/аутро сегменти…</string>
     <string name="player_loading_subtitles">Извличане на субтитри…</string>
     <string name="player_loading_subtitles_from">Извличане на субтитри от %1$d добавки…</string>
@@ -1878,7 +1878,7 @@
     <string name="player_more_speed">Скорост на възпроизвеждане</string>
     <string name="player_more_aspect_ratio">Съотношение на страните</string>
     <string name="player_more_open_external">Отваряне във външен плейър</string>
-    <string name="player_error_no_stream_url">Не е предоставен URL адрес на потока</string>
+    <string name="player_error_no_stream_url">Не е предоставен URL адрес на източника</string>
     
     
     <string name="stream_info_section_source">ИЗТОЧНИК</string>
@@ -1907,7 +1907,7 @@
     <string name="sources_reload">Презареждане</string>
     <string name="sources_close">Затвори</string>
     <string name="sources_playing">Възпроизвежда се</string>
-    <string name="sources_no_streams">Няма намерени потоци</string>
+    <string name="sources_no_streams">Няма намерени източници</string>
     
     <string name="episodes_panel_close">Затвори</string>
     <string name="episodes_panel_back">Назад</string>
@@ -1915,7 +1915,7 @@
     <string name="episodes_panel_no_streams">Няма намерени потоци</string>
     <string name="episodes_panel_no_episodes">Няма налични епизоди</string>
     <string name="episodes_panel_title">Епизоди</string>
-    <string name="episodes_panel_streams_title">Потоци</string>
+    <string name="episodes_panel_streams_title">Източници</string>
     <string name="player_speed_normal">Нормално</string>
     <string name="player_aspect_fit">Размер (оригинален)</string>
     <string name="player_aspect_stretch">Разтягане</string>
@@ -2308,7 +2308,7 @@
     <string name="plugin_enable_plugins_title">Активиране на доставчиците на плъгини глобално</string>
     <string name="plugin_enable_plugins_subtitle">Използване на доставчици на плъгини по време на откриване на поточно предаване</string>
     <string name="plugin_group_by_repository_title">Групиране на доставчиците на плъгини по хранилище</string>
-    <string name="plugin_group_by_repository_subtitle">В „Потоци“ се показва един доставчик на хранилище вместо един на източник</string>
+    <string name="plugin_group_by_repository_subtitle">В „Източници“ се показва един доставчик на хранилище вместо един на източник</string>
     <string name="plugin_add_repository">Добавяне на хранилище</string>
     <string name="plugin_add_btn">Добавяне</string>
     <string name="plugin_manage_from_phone_title">Управление от телефон</string>
@@ -2332,7 +2332,7 @@
     <string name="plugin_risky_enable_confirm">Активиране</string>
     <string name="plugin_updated_format">Актуализирано: %1$s</string>
     <string name="plugin_test_btn">Тест</string>
-    <string name="plugin_test_results">Резултати от теста (%1$d потока)</string>
+    <string name="plugin_test_results">Резултати от теста (%1$d източника)</string>
     <string name="plugin_and_more">... и още %1$d</string>
     <string name="plugin_providers_count">%1$d доставчици</string>
     <string name="plugin_enabled">Активирано</string>
@@ -2343,7 +2343,7 @@
     <string name="plugin_error_refresh">Неуспешно обновяване: %1$s</string>
     <string name="plugin_error_test">Тестът е неуспешен: %1$s</string>
     <string name="plugin_test_no_results">Няма намерени резултати</string>
-    <string name="plugin_test_found_streams">Намерени са %1$d потока</string>
+    <string name="plugin_test_found_streams">Намерени са %1$d източника</string>
     <string name="plugin_version">Версия %1$s</string>
     
     <string name="profile_selection_title">Кой гледа?</string>
@@ -2538,7 +2538,7 @@
     <string name="cd_playback_speed">Скорост на възпроизвеждане</string>
     <string name="cd_aspect_ratio">Съотношение на страните</string>
     <string name="cd_open_external_player">Отваряне във външен плейър</string>
-    <string name="cd_stream_info">Информация за потока</string>
+    <string name="cd_stream_info">Информация за източника</string>
     <string name="cd_more_actions">Още действия</string>
     <string name="cd_close_more_actions">Затваряне на още действия</string>
     <string name="cd_back">Назад</string>
@@ -2909,21 +2909,21 @@
     <string name="player_torrent_stats">%1$d играчи · %2$d начални точки · %3$d%%</string>
     <string name="player_torrent_connecting_peers">Свързване с пиъри…</string>
     <string name="player_torrent_fetching_metadata">Извличане на метаданни за торент…</string>
-    <string name="player_torrent_preparing_stream">Подготовка на торент поток…</string>
+    <string name="player_torrent_preparing_stream">Подготовка на торент източник…</string>
     <string name="player_torrent_connecting_status">%1$s · %2$s · %3$s</string>
     <string name="player_torrent_loading_status">%1$s изтеглени · %2$s · %3$s</string>
     <string name="player_track_audio_fallback">Аудио %1$d</string>
     <string name="player_track_subtitle_fallback">Субтитри %1$d</string>
 
 <!-- Player runtime: error recovery --> 
-    <string name="player_error_stream_blocked">\n\nИзточникът на потока е блокиран или ограничен. Опитайте с друг източник.</string>
+    <string name="player_error_stream_blocked">\n\nИзточникът на източника е блокиран или ограничен. Опитайте с друг източник.</string>
     <string name="player_error_stream_removed">\n\nВръзката към стрийма е изтекла или е премахната. Опитайте с друг източник.</string>
     <string name="player_error_stream_expired">\n\nВръзката към стрийма е изтекла. Опитайте с друг източник.</string>
-    <string name="player_error_stream_rate_limited">\n\nТвърде много заявки към източника на потока. Изчакайте малко и опитайте отново.</string>
+    <string name="player_error_stream_rate_limited">\n\nТвърде много заявки към източника на източника. Изчакайте малко и опитайте отново.</string>
     <string name="player_error_stream_unavailable">\n\nСтрийм сървърът в момента не е наличен. Опитайте с друг източник.</string>
-    <string name="player_error_source_invalid_content">Грешка в източника: Източникът на потока върна невалидно или невъзпроизводимо съдържание. Връзката може да е изтекла или сървърът да е върнал страница за грешка вместо видео.\n\nОпитайте с друг източник. [%1$s]</string>
+    <string name="player_error_source_invalid_content">Грешка в източника: Източникът на източника върна невалидно или невъзпроизводимо съдържание. Връзката може да е изтекла или сървърът да е върнал страница за грешка вместо видео.\n\nОпитайте с друг източник. [%1$s]</string>
     <string name="player_error_decoder">Грешка в декодера</string>
-    <string name="player_error_unsupported_format">Този поток използва формат, който вашето устройство може да не поддържа. Опитайте с друг източник. [%1$s]</string>
+    <string name="player_error_unsupported_format">Този източник използва формат, който вашето устройство може да не поддържа. Опитайте с друг източник. [%1$s]</string>
     <string name="player_error_initialize_failed">Инициализирането на играча не бе успешно</string>
     <string name="player_error_mpv_surface_failed">Неуспешно инициализиране на libmpv повърхността</string>
     <string name="player_error_mpv_playback_failed">Неуспешно инициализиране на възпроизвеждането на libmpv</string>
@@ -3047,9 +3047,9 @@
     <string name="search_error_failed">Търсенето е неуспешно</string>
 
 <!-- Stream / TMDB / addons fallbacks --> 
-    <string name="stream_unknown">Неизвестен поток</string>
+    <string name="stream_unknown">Неизвестен източник</string>
     <string name="stream_embedded_group">Вградени потоци</string>
-    <string name="stream_embedded_fallback_name">Вграждане на поток</string>
+    <string name="stream_embedded_fallback_name">Вграждане на източник</string>
     <string name="stream_quality_unknown">Неизвестно</string>
     <string name="stream_addon_unknown">Неизвестен</string>
     <string name="tmdb_unknown_entity">Неизвестен</string>
@@ -3082,14 +3082,14 @@
     <string name="network_fast_error_token_missing">fast.com: токенът не е намерен в пакета</string>
 
 <!-- Torrent service errors --> 
-    <string name="torrent_error_start_timeout">Торент потокът не стартира в рамките на %1$ds</string>
+    <string name="torrent_error_start_timeout">Торент източникът не стартира в рамките на %1$ds</string>
 
 <!-- Player runtime: stream / external link errors --> 
     <string name="player_torrent_starting_engine">Стартиране на P2P двигателя…</string>
     <string name="player_torrent_rebuffer_status">%1$s буфериран</string>
     <string name="player_stream_error_invalid_external_url">Невалиден външен URL адрес</string>
     <string name="player_stream_error_open_external_link_failed">Не може да се отвори външна връзка</string>
-    <string name="player_stream_error_invalid_url">Невалиден URL адрес на потока</string>
+    <string name="player_stream_error_invalid_url">Невалиден URL адрес на източника</string>
     <string name="player_stream_error_missing_content_type">Липсващ тип съдържание</string>
 
 <!-- Meta repository: addon detail error fragments --> 
@@ -3197,7 +3197,7 @@
 <!-- Web config page: Direct Debrid formatter -->
     <string name="web_debrid_title">Настройки за директен дебит</string>
     <string name="web_debrid_intro_title">Персонализиране на Debrid потоци</string>
-    <string name="web_debrid_intro_copy">Настройте етикетите на потоците, филтрите и сортирането, използвани за резултатите от директния дебит.</string>
+    <string name="web_debrid_intro_copy">Настройте етикетите на източниците, филтрите и сортирането, използвани за резултатите от директния дебит.</string>
     <string name="web_debrid_tab_formatter">Форматираща програма</string>
     <string name="web_debrid_tab_rules">Филтри и сортиране</string>
     <string name="web_debrid_template_fields">Полета на шаблона</string>
@@ -3223,7 +3223,7 @@
     <string name="web_stream_badge_imported">Импортиран URL адрес на значката.</string>
     <string name="web_stream_badge_import_error">Импортирането на значката е неуспешно.</string>
     <string name="web_stream_badge_deleted">URL адресът на значката е изтрит.</string>
-    <string name="web_stream_badge_load_error">Не можаха да се заредят настройките за значката на потока</string>
+    <string name="web_stream_badge_load_error">Не можаха да се заредят настройките за значката на източника</string>
     <string name="web_stream_badge_error_url_required">Въведете JSON URL адрес на значка.</string>
     <string name="web_stream_badge_error_url_scheme">URL адресът на значката трябва да започва с http:// или https://.</string>
     <string name="web_stream_badge_error_import_limit">Можете да импортирате до %1$d URL адреса на значки.</string>
@@ -3262,7 +3262,7 @@
     <string name="playback_buffer_allow_large_sub">Премахва ограничението за памет на устройството от плъзгача „Размер на целевия буфер“, позволявайки стойности до 2GB. Може да доведе до срив на устройства с по-малко от 2GB RAM.</string>
     <string name="playback_cache_header">Дисков кеш</string>
     <string name="playback_cache_vod">Кеш на VOD диск</string>
-    <string name="playback_cache_vod_sub">Запазва изтеглените байтове на диска за текущия поток. Удължава незабавното търсене назад отвъд буфера за обратно предаване в паметта и оцелява при кратки прекъсвания на мрежата. Важи само за прогресивни потоци (без HLS/DASH).</string>
+    <string name="playback_cache_vod_sub">Запазва изтеглените байтове на диска за текущия източник. Удължава незабавното търсене назад отвъд буфера за обратно предаване в паметта и оцелява при кратки прекъсвания на мрежата. Важи само за прогресивни потоци (без HLS/DASH).</string>
     <string name="playback_cache_auto_size">Автоматично оразмеряване</string>
     <string name="playback_cache_auto_size_sub">Когато е включено, размерът на кеша се определя от свободното дисково пространство. Изключете, за да изберете размер ръчно.</string>
     <string name="playback_cache_vod_size">Размер на кеша на VOD</string>
@@ -3285,7 +3285,7 @@
 
 <!-- Playback diagnostics card -->
     <string name="diag_last_playback_title">Диагностика на последното възпроизвеждане</string>
-    <string name="diag_no_data">Все още няма данни за възпроизвеждане. Пуснете поток и се върнете тук, за да видите подробности за DV решенията за това възпроизвеждане.</string>
+    <string name="diag_no_data">Все още няма данни за възпроизвеждане. Пуснете източник и се върнете тук, за да видите подробности за DV решенията за това възпроизвеждане.</string>
     <string name="diag_section_source_hardware">Източник и хардуер</string>
     <string name="diag_section_source_hardware_sub">Направете снимка на тази карта, ако съобщавате за проблем.</string>
     <string name="diag_label_host">Хост</string>
@@ -3311,7 +3311,7 @@
     <string name="diag_label_disk_cache_usage">Използване на кеш паметта на диска</string>
     <string name="diag_value_disk_cache_on">Включено - %1$s</string>
     <string name="diag_value_disk_cache_unavailable">Не е налично</string>
-    <string name="diag_value_disk_cache_not_used">Изключено - не се използва за този поток</string>
+    <string name="diag_value_disk_cache_not_used">Изключено - не се използва за този източник</string>
     <string name="diag_value_disk_cache_usage">%1$s прочетено, %2$s премахнато</string>
     <string name="diag_section_outcome">Резултат</string>
     <string name="diag_label_hdr_format_intended">HDR формат (предназначен)</string>
@@ -3330,7 +3330,7 @@
     <string name="diag_value_never_rendered">Никога не се рендира</string>
 
 <!-- Player errors -->
-    <string name="player_error_play_stream_failed">Възпроизвеждането на избрания поток не бе успешно</string>
+    <string name="player_error_play_stream_failed">Възпроизвеждането на избрания източник не бе успешно</string>
 
 <!-- Size and speed units -->
     <string name="unit_size_b">%1$d Б</string>
@@ -3348,8 +3348,8 @@
     <string name="collections_editor_tmdb_collection_fallback">TMDB колекция %1$d</string>
 
 <!-- Stream Throughput Speed & Chunk Diagnostic Test -->
-    <string name="stream_test_section_header">Диагностика на пропускателната способност на потока</string>
-    <string name="stream_test_card_title">Изпълнете тест за скоростта на последно възпроизведен поток</string>
+    <string name="stream_test_section_header">Диагностика на пропускателната способност на източника</string>
+    <string name="stream_test_card_title">Изпълнете тест за скоростта на последно възпроизведен източник</string>
     <string name="stream_test_server_label">Сървър: %1$s</string>
     <string name="stream_test_no_stream">Няма записано възпроизвеждане. Пуснете видеоклипа, за да изпълните диагностични тестове на неговия хост.</string>
     <string name="stream_test_btn_start">Стартиране на теста</string>
