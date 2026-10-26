@@ -2398,6 +2398,7 @@ private const val LIBASS_OVERLAY_GEOMETRY_TAG = "LibassOverlayGeometry"
 
 private fun PlayerView.syncLibassOverlayGeometry() {
     val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
+    val assOverlayView = overlay?.findAssOverlayChild()
     val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
     val exoPlayer = player as? ExoPlayer
     val assHandler = exoPlayer?.getAssHandlerCompat()
@@ -2408,9 +2409,9 @@ private fun PlayerView.syncLibassOverlayGeometry() {
     val videoBounds = contentFrame?.let(::transformedChildBoundsInParent)
     val margins = videoBounds?.let { libassOverlayMargins(overlayWidth, overlayHeight, it) }
 
-    if (overlay?.hasAssOverlayChild() != true || assHandler == null || margins == null) {
+    if (assOverlayView == null || assHandler == null || margins == null) {
         logLibassOverlayGeometry(
-            "event=skip overlay=${overlayWidth}x${overlayHeight} hasOverlay=${overlay?.hasAssOverlayChild() == true} " +
+            "event=skip overlay=${overlayWidth}x${overlayHeight} hasOverlay=${assOverlayView != null} " +
                 "handler=${assHandler != null} videoBounds=$videoBounds"
         )
         return
@@ -2418,6 +2419,7 @@ private fun PlayerView.syncLibassOverlayGeometry() {
 
     assHandler.setMargins(margins.top, margins.bottom, margins.left, margins.right)
     assHandler.setUseMargins(false)
+    assOverlayView.invalidateSubtitles()
     logLibassOverlayGeometry(
         "event=apply requested=${context?.requestedAspectMode} applied=${context?.appliedAspectMode} " +
             "tunneling=${context?.tunnelingEnabled} tunneledFill=${context?.tunneledSurfaceFill} " +
@@ -2658,6 +2660,16 @@ private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
         }
     }
     return false
+}
+
+private fun android.widget.FrameLayout.findAssOverlayChild(): AssSubtitleSurfaceView? {
+    for (index in 0 until childCount) {
+        val child = getChildAt(index)
+        if (child is AssSubtitleSurfaceView) {
+            return child
+        }
+    }
+    return null
 }
 
 private fun android.widget.FrameLayout.removeAssOverlayChildren() {
