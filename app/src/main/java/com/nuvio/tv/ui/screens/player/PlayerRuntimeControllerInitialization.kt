@@ -1046,6 +1046,14 @@ internal fun PlayerRuntimeController.initializePlayer(
             activePlayerUsesLibass = useLibass
             libassPipelineSwitchInFlight = false
 
+            if (useLibass) {
+                _exoPlayer?.getAssHandlerCompat()?.let { handler ->
+                    _exoPlayer?.setVideoEffects(
+                        listOf(com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler))
+                    )
+                }
+            }
+
             _exoPlayer?.apply {
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

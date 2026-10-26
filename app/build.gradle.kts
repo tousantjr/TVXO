@@ -507,6 +507,7 @@ dependencies {
     implementation(libs.media3.decoder)
     implementation(libs.media3.session)
     implementation(libs.media3.container)
+    implementation("androidx.media3:media3-effect:1.8.0")
 
     // Transitive dependencies required by forked local AARs (not bundled in AARs):
     // - Guava: needed by lib-common (ImmutableList/ImmutableSet in Tracks, Player API)

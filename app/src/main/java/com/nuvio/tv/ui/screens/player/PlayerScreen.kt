@@ -2539,7 +2539,7 @@ private fun PlayerView.syncLibassOverlay(
 ) {
     val containerId = R.id.libass_overlay_container_gl
     val overlayContainer = findViewById<android.widget.FrameLayout>(containerId) ?: return
-    val needsOverlay = enabled
+    val needsOverlay = false // TEST: disabled — subtitles via setVideoEffects
     val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
     val hasOverlayChild = overlayContainer.hasAssOverlayChild()
 
