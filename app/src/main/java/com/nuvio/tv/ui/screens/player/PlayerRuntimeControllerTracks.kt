@@ -396,10 +396,18 @@ internal fun PlayerRuntimeController.maybeAdjustLibassPipelineForTracks(tracks: 
 
     // Rebuild to add video effects when ASS is actively selected and mode is VIDEO_EFFECT.
     // setVideoEffects must be called before prepare(), so we need a full player rebuild.
+    // Skip rebuild for DV content - DVFP corrupts Dolby Vision output.
+    val hasDvVideoTrack = tracks.groups.any { group ->
+        group.isSelected && group.type == C.TRACK_TYPE_VIDEO &&
+            (0 until group.length).any { i ->
+                group.getTrackFormat(i).sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION
+            }
+    }
     val needsVideoEffectRebuild = tracks.hasSelectedAssSsaTextTrack() &&
         activeAssVideoEffect == null &&
         activePlayerUsesLibass &&
-        _uiState.value.libassRenderMode == com.nuvio.tv.data.local.LibassRenderMode.VIDEO_EFFECT
+        _uiState.value.libassRenderMode == com.nuvio.tv.data.local.LibassRenderMode.VIDEO_EFFECT &&
+        !hasDvVideoTrack
 
     // Don't rebuild just to drop libass, except when it's holding the MKV extractor on a DV
     // file and blocking conversion; then drop it so the DV extractor runs.
