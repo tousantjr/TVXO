@@ -1210,7 +1210,7 @@
     <string name="mdblist_tracking_description">Синхронизиране на историята на гледанията и напредъка на възпроизвеждането на всички устройства</string>
     <string name="mdblist_connected_as">Свързан като %1$s</string>
     <string name="mdblist_account_fallback">Потребител от MDBList</string>
-    <string name="mdblist_insuficient_scope">MDBList не е предоставил разрешение за актуализиране на историята на гледане. Свържете се отново и разрешете достъп за запис.</string>
+
     <string name="mdblist_awaiting_instruction">Сканирайте QR кода или въведете този код на адреса по-долу.</string>
     <string name="mdblist_qr_description">QR код за свързване на вашия MDBList акаунт</string>
     <string name="mdblist_status_enter_code">Одобрете връзката във вашия MDBList акаунт.</string>
@@ -2989,8 +2989,8 @@
     <string name="trakt_library_error_auth_expired">Удостоверяването на Trakt е изтекло</string>
     <string name="trakt_library_error_list_not_found">Списъкът с трактати не е намерен</string>
     <string name="trakt_library_error_list_limit_reached">Достигнат е лимитът на списъка с трактати. Необходимо е надграждане.</string>
-    <string name="trakt_error_insuficient_ids_mark_watched">Недостатъчно идентификатори на Trakt за маркиране като гледано</string>
-    <string name="trakt_error_request_failed">Заявката за Trakt е неуспешна</string>
+    
+    <string name="trakt_error_request_failed">Заявката в Trakt е неуспешна</string>
     <string name="simkl_account_title">Simkl акаунт</string>
     <string name="simkl_description">Свържете Simkl за синхронизиране на списъци, история на гледане, напредък на възпроизвеждане и Scrobbles.</string>
     <string name="simkl_connect">Свързване със Simkl</string>
