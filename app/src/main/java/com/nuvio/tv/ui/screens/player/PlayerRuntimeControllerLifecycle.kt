@@ -84,6 +84,7 @@ internal fun PlayerRuntimeController.releasePlayer(
         runCatching { player.release() }
     }
     _exoPlayer = null
+    activeAssVideoEffect = null
     _loadControl = null
     currentBitrateAwareLoadControl = null
     currentParallelChunkOverheadMb = 0

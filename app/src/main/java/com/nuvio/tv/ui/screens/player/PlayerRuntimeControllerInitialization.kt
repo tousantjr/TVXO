@@ -77,6 +77,7 @@ import com.nuvio.tv.data.local.Dv7HandlingMode
 import com.nuvio.tv.data.local.FrameRateMatchingMode
 import com.nuvio.tv.data.local.SUBTITLE_LANGUAGE_FORCED
 import com.nuvio.tv.data.local.InternalPlayerEngine
+import com.nuvio.tv.data.local.LibassRenderMode
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.repository.PlaybackIssueErrorInput
 import com.nuvio.tv.domain.model.Subtitle
@@ -658,7 +659,8 @@ internal fun PlayerRuntimeController.initializePlayer(
             _uiState.update {
                 it.copy(
                     useLibass = useLibass,
-                    libassRenderType = playerSettings.libassRenderType
+                    libassRenderType = playerSettings.libassRenderType,
+                    libassRenderMode = playerSettings.effectiveLibassRenderMode
                 )
             }
             // ── Track Selector Setup ──
@@ -1048,9 +1050,19 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             if (useLibass) {
                 _exoPlayer?.getAssHandlerCompat()?.let { handler ->
-                    _exoPlayer?.setVideoEffects(
-                        listOf(com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler))
-                    )
+                    // OVERLAY mode: do NOT call setVideoEffects at all.
+                    // setVideoEffects forces DefaultVideoFrameProcessor into the pipeline
+                    // which tone-maps HDR to SDR regardless of whether the effect draws.
+                    // Without it, ExoPlayer passes video straight to the surface - HDR preserved.
+                    if (playerSettings.effectiveLibassRenderMode != LibassRenderMode.OVERLAY) {
+                        val effect = com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler)
+                        activeAssVideoEffect = effect
+                        _exoPlayer?.setVideoEffects(listOf(effect))
+                    } else {
+                        activeAssVideoEffect = null
+                    }
+                    // Propagate any saved subtitle delay to libass.
+                    handler.subtitleDelayUs = subtitleDelayUs.get() + streamSubtitleDelayUs.get()
                 }
             }
 
