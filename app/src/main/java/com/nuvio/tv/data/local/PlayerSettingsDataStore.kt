@@ -519,7 +519,7 @@ enum class LibassRenderMode {
     OVERLAY;
 
     companion object {
-        val DEFAULT = VIDEO_EFFECT
+        val DEFAULT = OVERLAY
 
         fun fromStoredString(value: String?): LibassRenderMode = when (value) {
             VIDEO_EFFECT.name -> VIDEO_EFFECT
