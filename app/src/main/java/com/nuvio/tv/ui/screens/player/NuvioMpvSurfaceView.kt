@@ -48,19 +48,13 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         initialized = true
     }
 
-    fun setMedia(
-        url: String,
-        headers: Map<String, String>,
-        startPositionMs: Long = 0L,
-        useForcedSubtitles: Boolean = false
-    ) {
+    fun setMedia(url: String, headers: Map<String, String>, startPositionMs: Long = 0L) {
         ensureInitialized()
         val requestKey = buildMediaRequestKey(url = url, headers = headers) +
             "#start=${startPositionMs.coerceAtLeast(0L)}"
         if (hasQueuedInitialMedia && requestKey == lastMediaRequestKey) {
             return
         }
-        applyDefaultTrackSelectionForNewLoad(useForcedSubtitles)
         applyHeaders(headers)
         markMediaRequested(url)
         val startOption = startPositionMs
@@ -104,6 +98,7 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
             hasQueuedInitialMedia = true
         }
         lastMediaRequestKey = requestKey
+        applyDefaultTrackSelectionForNewLoad()
         scheduleAspectModeRefresh(resetRetryCount = true)
     }
 
@@ -130,14 +125,9 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         mpv.command("loadfile", url, "replace", LOADFILE_DEFAULT_INDEX, options)
     }
 
-    fun setMediaUsingLoadfile(
-        url: String,
-        headers: Map<String, String>,
-        useForcedSubtitles: Boolean = false
-    ) {
+    fun setMediaUsingLoadfile(url: String, headers: Map<String, String>) {
         ensureInitialized()
         val requestKey = buildMediaRequestKey(url = url, headers = headers)
-        applyDefaultTrackSelectionForNewLoad(useForcedSubtitles)
         applyHeaders(headers)
         markMediaRequested(url)
         pendingInitialMediaUrl = null
@@ -152,6 +142,7 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         }
         hasQueuedInitialMedia = true
         lastMediaRequestKey = requestKey
+        applyDefaultTrackSelectionForNewLoad()
         scheduleAspectModeRefresh(resetRetryCount = true)
     }
 
@@ -169,11 +160,11 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         }
     }
 
-    private fun applyDefaultTrackSelectionForNewLoad(useForcedSubtitles: Boolean) {
+    private fun applyDefaultTrackSelectionForNewLoad() {
         runCatching {
-            // Keep mpv's audio default, but let app logic select subtitles in forced-only mode.
+            // Let mpv choose the default streams for every new media load.
             mpv.setPropertyString("aid", "auto")
-            mpv.setPropertyString("sid", if (useForcedSubtitles) "no" else "auto")
+            mpv.setPropertyString("sid", "auto")
             mpv.setPropertyBoolean("sub-visibility", true)
         }.onFailure {
             Log.w(TAG, "Failed to reset default A/V track selection: ${it.message}")
