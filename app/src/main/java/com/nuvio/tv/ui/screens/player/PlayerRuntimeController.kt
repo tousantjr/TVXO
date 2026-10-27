@@ -707,6 +707,7 @@ class PlayerRuntimeController(
     internal var requestedUseLibassByUser: Boolean = false
     internal var libassPipelineOverrideForCurrentStream: Boolean? = null
     internal var activePlayerUsesLibass: Boolean = false
+    internal var activeAssVideoEffect: com.nuvio.tv.libass.media.effect.AssVideoEffectAsync? = null
     internal var libassPipelineSwitchInFlight: Boolean = false
     internal var hasDetectedAssSsaTrackForCurrentStream: Boolean = false
     internal var libassPipelineDecisionStreamUrl: String? = null
