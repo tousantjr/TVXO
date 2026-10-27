@@ -139,6 +139,7 @@ internal fun PlayerRuntimeController.applyAudioDelay(delayMs: Int) {
 internal fun PlayerRuntimeController.applyEffectiveAudioDelay() {
     val totalMs = audioDelayParts.totalMs
     audioDelayUs.set(totalMs.toLong() * 1000L)
+    _exoPlayer?.getAssHandlerCompat()?.let { it.audioDelayUs = totalMs.toLong() * 1000L }
     _uiState.update { it.copy(audioDelayMs = totalMs) }
     if (isUsingMpvEngine()) {
         mpvView?.setAudioDelayMs(totalMs)

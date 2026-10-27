@@ -1066,6 +1066,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                     }
                     // Propagate any saved subtitle delay to libass.
                     handler.subtitleDelayUs = subtitleDelayUs.get() + streamSubtitleDelayUs.get()
+                    handler.audioDelayUs = audioDelayUs.get()
                 }
             }
 
