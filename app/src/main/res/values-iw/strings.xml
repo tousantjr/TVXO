@@ -1799,9 +1799,9 @@
     <string name="settings_p2p_cache_size_title">גודל מטמון טורנט</string>
     <string name="settings_p2p_cache_size_description">נתוני טורנט שהורדו נשמרים במכשיר זה להפעלה חוזרת מהירה יותר</string>
     <string name="settings_p2p_cache_none">ללא מטמון קבוע</string>
-    <string name="settings_p2p_cache_2_gb">2 GB</string>
-    <string name="settings_p2p_cache_5_gb">5 GB</string>
-    <string name="settings_p2p_cache_10_gb">10 GB</string>
+    <string name="settings_p2p_cache_2_gb">‎2 GB</string>
+    <string name="settings_p2p_cache_5_gb">‎5 GB</string>
+    <string name="settings_p2p_cache_10_gb">‎10 GB</string>
     <string name="settings_p2p_clear_cache_title">ניקוי מטמון טורנט</string>
     <string name="settings_p2p_clear_cache_usage">%1$s בשימוש כרגע</string>
     <string name="settings_p2p_clear_cache_usage_pending">השימוש נמדד לאחר הפעלת P2P; ניתן לבחור כדי לנקות נתוני טורנט שמורים במטמון</string>
