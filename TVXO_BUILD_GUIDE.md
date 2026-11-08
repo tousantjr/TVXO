@@ -78,6 +78,17 @@ Workflow file: `ci/tvxo-release.yml` (manual trigger only). It is stored in `ci/
 
 The first release, `1.1.0-beta.13.1`, was built locally with the real keystore (`./gradlew :app:assembleFullRelease -PlivetvBuildNumber=1 -PlivetvVersionName=1.1.0-beta.13.1`, signing through the `TVXO_KEYSTORE_*` env vars) and published through the GitHub REST API. It used the same tag, title, prerelease flag and asset names the workflow produces. The `downloader` release's `TVXO.apk` is the **arm64-v8a** APK.
 
+Published on 2026-11-08 from commit `59d674eb` (https://github.com/tousantjr/TVXO/releases/tag/1.1.0-beta.13.1). versionCode is `107601`. All APKs are signed with cert SHA-256 `85:D5:6A:EC:96:BB:75:F9:A0:AB:52:B4:85:1E:97:D2:74:F8:8A:1D:84:DD:ED:2B:11:72:49:7B:FA:AC:FB:63` (APK Signature Scheme v2):
+
+| Asset | Size (bytes) |
+|---|---|
+| `TVXO-1.1.0-beta.13.1-arm64-v8a-release.apk` | 70,613,327 |
+| `TVXO-1.1.0-beta.13.1-armeabi-v7a-release.apk` | 68,814,829 |
+| `TVXO-1.1.0-beta.13.1-universal-release.apk` | 171,881,674 |
+| `downloader/TVXO.apk` (copy of arm64-v8a) | 70,613,327 |
+
+History note: to publish without the `workflows` permission, the branch history was rewritten with `git filter-repo --path .github/workflows --invert-paths`. All other history is kept; 54 commits that only touched workflow files dropped out. The original history is kept only in the local backup branches `tvxo-rebrand-backup-original` / `tvxo-rebrand-backup-with-ci` on the build machine, not on GitHub.
+
 ### What the workflow does
 
 1. Open Actions > **TVXO Release** > Run workflow, choose the branch (`main`), and optionally type release notes.
