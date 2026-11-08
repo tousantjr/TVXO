@@ -61,9 +61,9 @@ The workflow stops with an error naming any missing required signing secret.
 
 ## 4. Build with GitHub Actions
 
-Workflow file: `ci/tvxo-release.yml` (manual trigger only). It is stored in `ci/` and is **not active yet**: the GitHub App used to publish this repo has no `workflows` or Actions-secrets permission, so it could not push files under `.github/workflows/`. To switch it on, see "Enable automatic CI later" below.
+Workflow file: `.github/workflows/tvxo-release.yml` (manual trigger only). **Active since 2026-11-08**: it was added through the GitHub website together with the 4 Actions secrets. To release, open **Actions > TVXO Release > Run workflow**. `ci/tvxo-release.yml` is the reference copy; if you edit the workflow, keep both copies the same. The GitHub App that publishes this repo still cannot push changes under `.github/workflows/`, so edit the active file on the website.
 
-### Enable automatic CI later
+### Enable automatic CI (already done, kept for reference / re-setup)
 
 1. On github.com open the repo > **Add file > Create new file**, name it `.github/workflows/tvxo-release.yml`, paste the full contents of `ci/tvxo-release.yml`, and commit to `main`. (Files under `.github/workflows/` can be created from the website with your own account; the GitHub App cannot.)
 2. Open **Settings > Secrets and variables > Actions > New repository secret** and add these 4 secrets:
