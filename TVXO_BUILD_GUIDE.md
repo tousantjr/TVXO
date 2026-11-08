@@ -61,7 +61,24 @@ The workflow stops with an error naming any missing required signing secret.
 
 ## 4. Build with GitHub Actions
 
-Workflow: `.github/workflows/tvxo-release.yml` (manual trigger only).
+Workflow file: `ci/tvxo-release.yml` (manual trigger only). It is stored in `ci/` and is **not active yet**: the GitHub App used to publish this repo has no `workflows` or Actions-secrets permission, so it could not push files under `.github/workflows/`. To switch it on, see "Enable automatic CI later" below.
+
+### Enable automatic CI later
+
+1. On github.com open the repo > **Add file > Create new file**, name it `.github/workflows/tvxo-release.yml`, paste the full contents of `ci/tvxo-release.yml`, and commit to `main`. (Files under `.github/workflows/` can be created from the website with your own account; the GitHub App cannot.)
+2. Open **Settings > Secrets and variables > Actions > New repository secret** and add these 4 secrets:
+   - `TVXO_KEYSTORE_BASE64`: the keystore file base64-encoded on one line, e.g. `base64 -w0 tvxo-release.jks`
+   - `TVXO_KEYSTORE_PASSWORD`
+   - `TVXO_KEY_ALIAS` (`tvxo`)
+   - `TVXO_KEY_PASSWORD` (same as the store password for the current keystore)
+3. Optionally add the other secrets from section 3.
+4. Run **Actions > TVXO Release > Run workflow**. The build number continues from the highest existing release tag, so after the manually published `1.1.0-beta.13.1` the next CI build is `1.1.0-beta.13.2`.
+
+### First release (published manually)
+
+The first release, `1.1.0-beta.13.1`, was built locally with the real keystore (`./gradlew :app:assembleFullRelease -PlivetvBuildNumber=1 -PlivetvVersionName=1.1.0-beta.13.1`, signing through the `TVXO_KEYSTORE_*` env vars) and published through the GitHub REST API. It used the same tag, title, prerelease flag and asset names the workflow produces. The `downloader` release's `TVXO.apk` is the **arm64-v8a** APK.
+
+### What the workflow does
 
 1. Open Actions > **TVXO Release** > Run workflow, choose the branch (`main`), and optionally type release notes.
 2. The workflow:
@@ -74,7 +91,7 @@ Workflow: `.github/workflows/tvxo-release.yml` (manual trigger only).
      - `TVXO-<VERSION>-arm64-v8a-release.apk` (the one for your Sony Bravia 8 II and most modern Google TVs)
      - `TVXO-<VERSION>-armeabi-v7a-release.apk`
      - `TVXO-<VERSION>-universal-release.apk`
-   - updates a fixed release tagged `downloader` whose asset `TVXO.apk` (the universal APK) is replaced on every run. The link `https://github.com/tousantjr/TVXO/releases/download/downloader/TVXO.apk` always gives the newest build. That tag is not a version number, so the in-app updater ignores it.
+   - updates a fixed release tagged `downloader` whose asset `TVXO.apk` (the arm64-v8a APK, falling back to universal) is replaced on every run. The link `https://github.com/tousantjr/TVXO/releases/download/downloader/TVXO.apk` always gives the newest build. That tag is not a version number, so the in-app updater ignores it.
 
 The upstream workflows (`apply-kit`, `build-release-check`, `build-test-app`, `merge-nuvio-update`, `release-to-users`) were deleted. They targeted homelessbrian repos and the upstream key.
 
@@ -187,7 +204,7 @@ Settings > Live TV > Playlists & Guides now offers only **"Add Xtream Codes Logi
 - `ReportServer.kt`, `LoadReportDialog.kt`: "Discord message" changed to "chat message".
 - `UpdateRepository.kt`: test-channel fallback asset name `TVXO-Test.apk`.
 - 124 PNG icons, banners and wordmarks regenerated from the TVXO logo (`branding/tvxo_logo_source.jpg`) by `scripts/tvxo_brand_art.py`, plus new adaptive icons (`mipmap-anydpi-v26`, 10 foreground PNGs, black background colour) and `branding/tvxo_assets_preview.png`.
-- `.github/workflows`: 5 upstream workflows deleted, new `tvxo-release.yml`. `.github/ISSUE_TEMPLATE`: homelessbrian link removed, names rebranded.
+- `.github/workflows`: removed from the published history (all upstream workflows and ours); our release workflow is kept, inactive, at `ci/tvxo-release.yml`. `.github/ISSUE_TEMPLATE`: homelessbrian link removed, names rebranded.
 - `README.md` replaced: the upstream README with its Discord/Ko-fi badges and Downloader code was removed and is still in git history. New `NOTICE` and this guide.
 
 ## 12. Local build result (2026-11-08, Linux build machine)
