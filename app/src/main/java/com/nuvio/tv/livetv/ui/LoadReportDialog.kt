@@ -131,7 +131,7 @@ fun LoadReportDialog(onDismiss: () -> Unit) {
                     LiveText("Connect this TV to Wi-Fi to send the report from your phone.", size = 11.sp, color = NuvioTheme.colors.TextSecondary)
                 } else {
                     LiveText(
-                        "1. Put your phone on the same Wi-Fi as this TV.\n2. Scan this code with your phone's camera, or type the address below.\n3. Tap Copy short report (it fits in one Discord message), then paste it in your message.",
+                        "1. Put your phone on the same Wi-Fi as this TV.\n2. Scan this code with your phone's camera, or type the address below.\n3. Tap Copy short report (it fits in one chat message), then paste it in your message.",
                         size = 11.sp, color = NuvioTheme.colors.TextSecondary
                     )
                 }

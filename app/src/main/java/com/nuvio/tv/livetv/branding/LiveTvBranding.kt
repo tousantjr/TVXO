@@ -7,7 +7,7 @@ import com.nuvio.tv.R
  * them), so Nuvio's artwork stays untouched and future Nuvio updates merge cleanly.
  */
 object LiveTvBranding {
-    const val APP_NAME = "Nuvio + IPTV"
+    const val APP_NAME = "TVXO"
     const val TAGLINE = "Live TV  ·  On Demand  ·  Streaming"
 
     /** The "Nuvio + IPTV" version of a theme's Nuvio wordmark. */

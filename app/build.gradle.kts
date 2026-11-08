@@ -116,14 +116,36 @@ val useLocalFfmpegDecoder = truthy(
         ?: env("USE_LOCAL_FFMPEG_DECODER")
         ?: localProperties.getProperty("USE_LOCAL_FFMPEG_DECODER")
 )
-val releaseStoreFilePath = env("NUVIO_RELEASE_STORE_FILE")
-    ?: localProperties.getProperty("NUVIO_RELEASE_STORE_FILE")
-val releaseKeyAliasValue = env("NUVIO_RELEASE_KEY_ALIAS")
-    ?: localProperties.getProperty("NUVIO_RELEASE_KEY_ALIAS", "nuviotv")
-val releaseKeyPasswordValue = env("NUVIO_RELEASE_KEY_PASSWORD")
-    ?: localProperties.getProperty("NUVIO_RELEASE_KEY_PASSWORD", "815787")
-val releaseStorePasswordValue = env("NUVIO_RELEASE_STORE_PASSWORD")
-    ?: localProperties.getProperty("NUVIO_RELEASE_STORE_PASSWORD", "815787")
+// TVXO: release signing comes ONLY from environment variables (CI secrets) or an untracked
+// keystore.properties file in the project root (see keystore.properties.example). There are no
+// built-in fallback keys or passwords: upstream's committed keystores/passwords are never used.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use(::load)
+}
+fun signingValue(envName: String, propName: String): String? =
+    env(envName)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: keystoreProperties.getProperty(propName)?.trim()?.takeIf { it.isNotEmpty() }
+val releaseStoreFilePath = signingValue("TVXO_KEYSTORE_FILE", "storeFile")
+val releaseStorePasswordValue = signingValue("TVXO_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAliasValue = signingValue("TVXO_KEY_ALIAS", "keyAlias")
+val releaseKeyPasswordValue = signingValue("TVXO_KEY_PASSWORD", "keyPassword")
+val hasReleaseSigning = releaseStoreFilePath != null && releaseStorePasswordValue != null &&
+    releaseKeyAliasValue != null && releaseKeyPasswordValue != null
+
+// TVXO: the in-app updater checks GitHub Releases of this single "owner/repo" value.
+// Change it in gradle.properties (tvxo.updateRepo) or override with -Ptvxo.updateRepo=... / env TVXO_UPDATE_REPO.
+val tvxoUpdateRepo: String = (env("TVXO_UPDATE_REPO")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: (findProperty("tvxo.updateRepo") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "tousantjr/TVXO")
+check(Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").matches(tvxoUpdateRepo)) {
+    "tvxo.updateRepo must look like owner/repo, got '$tvxoUpdateRepo'"
+}
+val tvxoUpdateOwner = tvxoUpdateRepo.substringBefore('/')
+val tvxoUpdateRepoName = tvxoUpdateRepo.substringAfter('/')
+
+// TVXO: application IDs (Kotlin namespace stays com.nuvio.tv, see TVXO_BUILD_GUIDE.md).
+val tvxoApplicationId = "com.tvxo.tv"
 
 android {
     namespace = "com.nuvio.tv"
@@ -131,7 +153,7 @@ android {
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "com.nuvio.tv"
+        applicationId = tvxoApplicationId
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 24
         targetSdk = 36
@@ -151,8 +173,8 @@ android {
         buildConfigField("String", "SIMKL_APP_NAME", buildConfigString(resolveProperty(devProperties, localProperties, "SIMKL_APP_NAME", "nuvio")))
         buildConfigField("String", "MDBLIST_CLIENT_ID", buildConfigString(resolveProperty(devProperties, localProperties, "MDBLIST_CLIENT_ID")))
         buildConfigField("String", "TMDB_API_KEY", "\"${localProperties.getProperty("TMDB_API_KEY", "")}\"")
-        buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "https://nuvio.tv/tv-login")}\"")
-        buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "https://nuvio.tv/link")}\"")
+        buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "")}\"")
+        buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "")}\"")
         buildConfigField("boolean", "DOVI_NATIVE_ENABLED", enableDoviNative.toString())
         buildConfigField("boolean", "DOVI_EXTRACTOR_HOOK_READY", doviExtractorHookReady.toString())
         if (enableDoviNative) {
@@ -167,8 +189,8 @@ android {
                 }
             }
         }
-        buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(localProperties.getProperty("SUPPORTERS_API_BASE_URL", "https://nuvio.tv/")))
-        buildConfigField("String", "SUPPORT_URL", buildConfigString(localProperties.getProperty("SUPPORT_URL", "https://nuvio.tv/support")))
+        buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(localProperties.getProperty("SUPPORTERS_API_BASE_URL", "")))
+        buildConfigField("String", "SUPPORT_URL", buildConfigString(localProperties.getProperty("SUPPORT_URL", "")))
         buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", "")}\"")
         buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", "")}\"")
         buildConfigField("String", "PLAYBACK_REPORTS_BASE_URL", buildConfigString(localProperties.getProperty("PLAYBACK_REPORTS_BASE_URL", "")))
@@ -177,8 +199,10 @@ android {
         buildConfigField("String", "SENTRY_DSN", buildConfigString(sentryDsn))
 
         // In-app updater (GitHub Releases)
-        buildConfigField("String", "GITHUB_OWNER", "\"homelessbrian\"")
-        buildConfigField("String", "GITHUB_REPO", "\"NuvioPlusIPTV\"")
+        buildConfigField("String", "GITHUB_OWNER", buildConfigString(tvxoUpdateOwner))
+        buildConfigField("String", "GITHUB_REPO", buildConfigString(tvxoUpdateRepoName))
+        // TVXO: About > Privacy policy row is shown only when this is set (local.properties TVXO_PRIVACY_POLICY_URL).
+        buildConfigField("String", "TVXO_PRIVACY_POLICY_URL", buildConfigString(localProperties.getProperty("TVXO_PRIVACY_POLICY_URL", "")))
     }
 
     flavorDimensions += "distribution"
@@ -194,7 +218,7 @@ android {
         }
         create("playstore") {
             dimension = "distribution"
-            applicationId = "com.nuvio.app"
+            applicationId = "$tvxoApplicationId.playstore"
             buildConfigField("boolean", "FEATURE_PLUGINS_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_UPDATES_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_TRAILERS_ENABLED", "false")
@@ -213,17 +237,20 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = releaseKeyAliasValue
-            keyPassword = releaseKeyPasswordValue
-            storeFile = releaseStoreFilePath?.let(::file) ?: file("../nuviotv.jks")
-            storePassword = releaseStorePasswordValue
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = releaseKeyAliasValue
+                keyPassword = releaseKeyPasswordValue
+                storeFile = rootProject.file(releaseStoreFilePath!!)
+                storePassword = releaseStorePasswordValue
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            // TVXO: debug builds use the standard Android debug key (never the release key).
+            signingConfig = signingConfigs.getByName("debug")
             isDebuggable = parseBooleanProperty(providers.gradleProperty("debuggable").orNull)
             isMinifyEnabled = false
 
@@ -234,15 +261,15 @@ android {
             buildConfigField("String", "SUPABASE_URL", buildConfigString(resolveProperty(devProperties, localProperties, "NUVIO_SUPABASE_URL")))
             buildConfigField("String", "SUPABASE_ANON_KEY", buildConfigString(resolveProperty(devProperties, localProperties, "NUVIO_SUPABASE_ANON_KEY")))
             buildConfigField("String", "SUPABASE_FALLBACK_URL", buildConfigString(resolveProperty(devProperties, localProperties, "NUVIO_SUPABASE_FALLBACK_URL")))
-            buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${devProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "https://nuvio.tv/tv-login")}\"")
-            buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${devProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "https://nuvio.tv/link")}\"")
+            buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${devProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "")}\"")
+            buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${devProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "")}\"")
             buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${devProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
             buildConfigField("String", "INTRODB_API_URL", "\"${devProperties.getProperty("INTRODB_API_URL", "")}\"")
             buildConfigField("String", "TRAILER_API_URL", "\"${devProperties.getProperty("TRAILER_API_URL", "")}\"")
             buildConfigField("String", "IMDB_RATINGS_API_BASE_URL", "\"${devProperties.getProperty("IMDB_RATINGS_API_BASE_URL", "")}\"")
             buildConfigField("String", "IMDB_TAPFRAME_API_BASE_URL", "\"${devProperties.getProperty("IMDB_TAPFRAME_API_BASE_URL", "")}\"")
-            buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(resolveProperty(devProperties, localProperties, "SUPPORTERS_API_BASE_URL", "https://nuvio.tv/")))
-            buildConfigField("String", "SUPPORT_URL", buildConfigString(resolveProperty(devProperties, localProperties, "SUPPORT_URL", "https://nuvio.tv/support")))
+            buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(resolveProperty(devProperties, localProperties, "SUPPORTERS_API_BASE_URL", "")))
+            buildConfigField("String", "SUPPORT_URL", buildConfigString(resolveProperty(devProperties, localProperties, "SUPPORT_URL", "")))
             buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${devProperties.getProperty("AVATAR_PUBLIC_BASE_URL", localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", ""))}\"")
             buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${devProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", ""))}\"")
             buildConfigField("String", "PLAYBACK_REPORTS_BASE_URL", buildConfigString(resolveProperty(devProperties, localProperties, "PLAYBACK_REPORTS_BASE_URL")))
@@ -256,10 +283,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (useDebugReleaseSigning) {
-                signingConfigs.getByName("debug")
-            } else {
-                signingConfigs.getByName("release")
+            // TVXO: without TVXO_* signing values the release APK is left unsigned (CI fails early instead).
+            signingConfig = when {
+                useDebugReleaseSigning -> signingConfigs.getByName("debug")
+                hasReleaseSigning -> signingConfigs.getByName("release")
+                else -> null
             }
 
             buildConfigField("boolean", "IS_DEBUG_BUILD", "false")
@@ -269,15 +297,15 @@ android {
             buildConfigField("String", "SUPABASE_URL", buildConfigString(localProperties.getProperty("NUVIO_SUPABASE_URL", "")))
             buildConfigField("String", "SUPABASE_ANON_KEY", buildConfigString(localProperties.getProperty("NUVIO_SUPABASE_ANON_KEY", "")))
             buildConfigField("String", "SUPABASE_FALLBACK_URL", buildConfigString(localProperties.getProperty("NUVIO_SUPABASE_FALLBACK_URL", "")))
-            buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "https://nuvio.tv/tv-login")}\"")
-            buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "https://nuvio.tv/link")}\"")
+            buildConfigField("String", "TV_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("TV_LOGIN_WEB_BASE_URL", "")}\"")
+            buildConfigField("String", "DEVICE_LOGIN_WEB_BASE_URL", "\"${localProperties.getProperty("DEVICE_LOGIN_WEB_BASE_URL", "")}\"")
             buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${localProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
             buildConfigField("String", "INTRODB_API_URL", "\"${localProperties.getProperty("INTRODB_API_URL", "")}\"")
             buildConfigField("String", "TRAILER_API_URL", "\"${localProperties.getProperty("TRAILER_API_URL", "")}\"")
             buildConfigField("String", "IMDB_RATINGS_API_BASE_URL", "\"${localProperties.getProperty("IMDB_RATINGS_API_BASE_URL", "")}\"")
             buildConfigField("String", "IMDB_TAPFRAME_API_BASE_URL", "\"${localProperties.getProperty("IMDB_TAPFRAME_API_BASE_URL", "")}\"")
-            buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(localProperties.getProperty("SUPPORTERS_API_BASE_URL", "https://nuvio.tv/")))
-            buildConfigField("String", "SUPPORT_URL", buildConfigString(localProperties.getProperty("SUPPORT_URL", "https://nuvio.tv/support")))
+            buildConfigField("String", "SUPPORTERS_API_BASE_URL", buildConfigString(localProperties.getProperty("SUPPORTERS_API_BASE_URL", "")))
+            buildConfigField("String", "SUPPORT_URL", buildConfigString(localProperties.getProperty("SUPPORT_URL", "")))
             buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", "")}\"")
             buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", "")}\"")
             buildConfigField("String", "PLAYBACK_REPORTS_BASE_URL", buildConfigString(localProperties.getProperty("PLAYBACK_REPORTS_BASE_URL", "")))
@@ -401,7 +429,8 @@ val livetvTesterKey = if (livetvIsTestBuild) {
     (System.getenv("LIVETV_TESTER_KEY") ?: localProperties.getProperty("LIVETV_TESTER_KEY", "")).trim()
 } else ""
 android.defaultConfig.buildConfigField("String", "NUVIO_CHANNEL", "\"${if (livetvIsTestBuild) "test" else "stable"}\"")
-android.defaultConfig.buildConfigField("String", "TEST_UPDATES_URL", "\"https://livetv-cloud.nuvioplusiptv.workers.dev\"")
+// TVXO: upstream's tester-only update service (a homelessbrian Cloudflare Worker) is not used.
+android.defaultConfig.buildConfigField("String", "TEST_UPDATES_URL", "\"\"")
 android.defaultConfig.buildConfigField("String", "TESTER_KEY", buildConfigString(livetvTesterKey))
 if (livetvIsTestBuild) {
     // 1767225600 = 2026-01-01 00:00 UTC, in seconds.
@@ -417,18 +446,19 @@ if (livetvIsTestBuild) {
 }
 
 androidComponents {
+    // TVXO application IDs:
+    //   full release  -> com.tvxo.tv            (the app you ship; updates in place)
+    //   full debug    -> com.tvxo.tv.debug      (installs next to the release build)
+    //   test builds   -> com.tvxo.tv.test       (-PlivetvTestBuild=true)
+    //   playstore     -> com.tvxo.tv.playstore  (upstream Play Store variant, not used by TVXO)
     onVariants(selector().withBuildType("debug")) { variant ->
         val isPlaystore = variant.productFlavors.any { it.second == "playstore" }
-        variant.applicationId.set(if (isPlaystore) "com.nuvio.appdebug" else "com.nuvio.livetv")
+        variant.applicationId.set(if (isPlaystore) "$tvxoApplicationId.playstore.debug" else "$tvxoApplicationId.debug")
     }
-    // Live TV fork: release builds get their own app ID too, so they install next to official
-    // Nuvio and update the fork's earlier builds in place.
     onVariants(selector().withBuildType("release")) { variant ->
         val isPlaystore = variant.productFlavors.any { it.second == "playstore" }
-        // Test builds (-PlivetvTestBuild=true) get their own ID, so they install next to the
-        // real app instead of replacing it.
         val testBuild = (findProperty("livetvTestBuild") as String?)?.toBoolean() == true
-        if (!isPlaystore) variant.applicationId.set(if (testBuild) "com.nuvio.livetv.test" else "com.nuvio.livetv")
+        if (!isPlaystore) variant.applicationId.set(if (testBuild) "$tvxoApplicationId.test" else tvxoApplicationId)
     }
     // Only the full flavor ships the in-app updater.
     onVariants(selector().withFlavor("distribution" to "full")) { variant ->

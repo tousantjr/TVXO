@@ -214,7 +214,7 @@ fun SideMenuSettingsContent(initialFocusRequester: FocusRequester? = null) {
                 SettingsGroupCard(title = "How the Menu Looks") {
                     SettingsToggleRow(
                         title = "Line Above Live TV",
-                        subtitle = "The thin line between Nuvio's pages and the Live TV pages. Off: the pages sit a little closer together.",
+                        subtitle = "The thin line between TVXO's pages and the Live TV pages. Off: the pages sit a little closer together.",
                         checked = s.sideMenuLine,
                         onToggle = { update { it.copy(sideMenuLine = !it.sideMenuLine) } }
                     )

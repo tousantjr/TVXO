@@ -144,7 +144,9 @@ fun AboutSettingsContent(
                                 UpdateChannelSettings(initialFocusRequester, modifier = firstRowModifier)
                             }
 
-                            SettingsActionRow(
+                            // TVXO: privacy policy row only when TVXO_PRIVACY_POLICY_URL is configured.
+                            val tvxoPrivacyUrl = BuildConfig.TVXO_PRIVACY_POLICY_URL
+                            if (tvxoPrivacyUrl.isNotBlank()) SettingsActionRow(
                                 title = stringResource(R.string.about_privacy_policy),
                                 subtitle = stringResource(R.string.about_privacy_policy_subtitle),
                                 trailingIcon = Icons.Default.OpenInNew,
@@ -159,7 +161,7 @@ fun AboutSettingsContent(
                                 onClick = {
                                     val intent = Intent(
                                         Intent.ACTION_VIEW,
-                                        Uri.parse("https://nuvio.tv/privacy-policy")
+                                        Uri.parse(tvxoPrivacyUrl)
                                     )
                                     context.startActivity(intent)
                                 }
@@ -178,6 +180,14 @@ fun AboutSettingsContent(
                                 title = stringResource(R.string.about_licenses_attributions),
                                 subtitle = stringResource(R.string.about_licenses_attributions_subtitle),
                                 trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                modifier = if (!AppFeaturePolicy.inAppUpdatesEnabled && tvxoPrivacyUrl.isBlank()) {
+                                    firstRowModifier.then(
+                                        if (initialFocusRequester != null) Modifier.focusRequester(initialFocusRequester)
+                                        else Modifier
+                                    )
+                                } else {
+                                    Modifier
+                                },
                                 onClick = onNavigateToLicensesAttributions
                             )
                         }

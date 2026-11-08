@@ -99,7 +99,7 @@ textarea{width:100%;box-sizing:border-box;margin-top:10px;height:55vh;background
 #full{display:none}
 </style></head><body>
 <h1>${esc(title)}</h1>
-${if (short != null) """<p><b>Copy short report</b> fits in one Discord message and keeps everything important. Send the full one only if you're asked for it.</p>
+${if (short != null) """<p><b>Copy short report</b> fits in one chat message and keeps everything important. Send the full one only if you're asked for it.</p>
 <button onclick="copyIt('s')">Copy short report</button><button class="alt" onclick="copyIt('r')">Copy full report</button>""" else """<p>Tap <b>Copy report</b>, then paste it into your message to the developer.</p>
 <button onclick="copyIt('r')">Copy report</button>"""} <a href="">Reload</a>
 <div id="msg"></div>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">TVXO</string>
     <string name="tv_channel_continue_watching">視聴を続ける</string>
     <string name="type_movie">映画</string>
     <string name="type_movies">映画</string>
@@ -98,7 +98,7 @@
 
     <string name="home_no_addons">アドオンがインストールされていません。追加して始めましょう</string>
     <string name="home_no_catalog_addons">カタログアドオンがインストールされていません。コンテンツを表示するにはカタログアドオンをインストールしてください</string>
-    <string name="auth_notice_nuvio_logged_out">Nuvioからサインアウトされました。再度サインインしてください</string>
+    <string name="auth_notice_nuvio_logged_out">TVXOからサインアウトされました。再度サインインしてください</string>
     <string name="auth_notice_trakt_logged_out">Traktからサインアウトされました。再接続してください</string>
     <string name="error_generic">エラーが発生しました</string>
 
@@ -369,7 +369,7 @@
     <string name="appearance_settings_style">設定スタイル</string>
     <string name="appearance_settings_style_subtitle">設定画面の表示方法を選択</string>
     <string name="appearance_launcher_artwork">ランチャーアートワーク</string>
-    <string name="appearance_launcher_artwork_subtitle">TVのホーム画面にNuvioを表示する方法を選択</string>
+    <string name="appearance_launcher_artwork_subtitle">TVのホーム画面にTVXOを表示する方法を選択</string>
     <string name="ambient_mode_title">アンビエントモード</string>
     <string name="ambient_mode_subtitle">TVがアイドル状態のときにカタログのアートワークを表示</string>
     <string name="ambient_mode_enabled_subtitle">リモコン入力がない状態が続くとバックドロップで画面を埋める</string>
@@ -389,7 +389,7 @@
     <string name="appearance_app_icon_picker_title">アプリアイコンとバナーを選択</string>
     <string name="appearance_app_icon_picker_subtitle">各スタイルには対応する正方形アイコンとTVバナーがあります</string>
     <string name="appearance_app_icon_confirmation_title">アプリアイコンを変更しますか？</string>
-    <string name="appearance_app_icon_confirmation_message">%1$sに変更するとNuvioが閉じます。TVバナーの更新にはデバイスの再起動が必要な場合があります。続けるにはOKを選択してください。</string>
+    <string name="appearance_app_icon_confirmation_message">%1$sに変更するとTVXOが閉じます。TVバナーの更新にはデバイスの再起動が必要な場合があります。続けるにはOKを選択してください。</string>
     <string name="appearance_app_icon_change_failed">アイコンとバナーを変更できませんでした。もう一度お試しください。</string>
     <string name="appearance_app_icon_original">オリジナル</string>
     <string name="appearance_app_icon_arctic_blue">アークティックブルー</string>
@@ -428,13 +428,13 @@
     <string name="update_channel_beta_description">早期アップデート。バグ、機能の破損、予期しない動作が含まれる可能性があります。</string>
     <string name="about_privacy_policy">プライバシーポリシー</string>
     <string name="about_privacy_policy_subtitle">プライバシーポリシーを表示</string>
-    <string name="support_nuvio_name">Nuvioを支援</string>
+    <string name="support_nuvio_name">TVXOを支援</string>
     <string name="about_supporters_contributors">サポーター &amp; 貢献者</string>
     <string name="about_supporters_contributors_subtitle">感謝の認定とプロジェクトクレジット</string>
     <string name="about_licenses_attributions">ライセンス &amp; 帰属</string>
     <string name="about_licenses_attributions_subtitle">データソース、謝辞、Androidライセンス</string>
     <string name="licenses_attributions_title">ライセンス &amp; 帰属</string>
-    <string name="licenses_attributions_subtitle">Nuvio TVが使用するデータプロバイダー、サービス、Android再生ライセンス</string>
+    <string name="licenses_attributions_subtitle">TVXOが使用するデータプロバイダー、サービス、Android再生ライセンス</string>
     <string name="licenses_attributions_section_app">アプリライセンス</string>
     <string name="licenses_attributions_section_data">データ &amp; サービス</string>
     <string name="licenses_attributions_section_playback">Android再生ライセンス</string>
@@ -444,21 +444,21 @@
     <string name="licenses_attributions_nuvio_title">Nuvio TV</string>
     <string name="licenses_attributions_nuvio_body">ソースコードとライセンス条項はプロジェクトリポジトリで入手可能です。GNU General Public License v3.0 の下でライセンスされています。</string>
     <string name="licenses_attributions_tmdb_title">The Movie Database (TMDB)</string>
-    <string name="licenses_attributions_tmdb_body">Nuvioは映画・TVのメタデータ、アートワーク、予告編、キャスト、制作詳細、コレクション、レコメンドにTMDB APIを使用しています。この製品はTMDB APIを使用していますが、TMDBによって承認または認定されていません。</string>
+    <string name="licenses_attributions_tmdb_body">TVXOは映画・TVのメタデータ、アートワーク、予告編、キャスト、制作詳細、コレクション、レコメンドにTMDB APIを使用しています。この製品はTMDB APIを使用していますが、TMDBによって承認または認定されていません。</string>
     <string name="licenses_attributions_trakt_title">Trakt</string>
-    <string name="licenses_attributions_trakt_body">NuvioはTraktと接続し、アカウント認証、視聴履歴、進行状況同期、ライブラリデータ、評価、リスト、コメントを利用します。NuvioはTraktと提携または承認されていません。</string>
+    <string name="licenses_attributions_trakt_body">TVXOはTraktと接続し、アカウント認証、視聴履歴、進行状況同期、ライブラリデータ、評価、リスト、コメントを利用します。TVXOはTraktと提携または承認されていません。</string>
     <string name="licenses_attributions_simkl_title">Simkl</string>
-    <string name="licenses_attributions_simkl_body">Nuvioはアカウント認証、ウォッチリスト、視聴履歴、再生進行状況、スクロブルのためにSimklと接続します。映画、TV、アニメのトラッキングデータはSimklから提供されます。NuvioはSimklと提携または承認されていません。</string>
+    <string name="licenses_attributions_simkl_body">TVXOはアカウント認証、ウォッチリスト、視聴履歴、再生進行状況、スクロブルのためにSimklと接続します。映画、TV、アニメのトラッキングデータはSimklから提供されます。TVXOはSimklと提携または承認されていません。</string>
     <string name="licenses_attributions_premiumize_title">Premiumize</string>
-    <string name="licenses_attributions_premiumize_body">NuvioはPremiumizeと接続し、アカウント認証、クラウドライブラリアクセス、キャッシュチェック、クラウド再生機能を利用します。NuvioはPremiumizeと提携または承認されていません。</string>
+    <string name="licenses_attributions_premiumize_body">TVXOはPremiumizeと接続し、アカウント認証、クラウドライブラリアクセス、キャッシュチェック、クラウド再生機能を利用します。TVXOはPremiumizeと提携または承認されていません。</string>
     <string name="licenses_attributions_torbox_title">TorBox</string>
-    <string name="licenses_attributions_torbox_body">NuvioはTorBoxと接続し、アカウント認証、クラウドライブラリアクセス、キャッシュチェック、クラウド再生機能を利用します。NuvioはTorBoxと提携または承認されていません。</string>
+    <string name="licenses_attributions_torbox_body">TVXOはTorBoxと接続し、アカウント認証、クラウドライブラリアクセス、キャッシュチェック、クラウド再生機能を利用します。TVXOはTorBoxと提携または承認されていません。</string>
     <string name="licenses_attributions_mdblist_title">MDBList</string>
-    <string name="licenses_attributions_mdblist_body">Nuvioは評価、視聴履歴、再生トラッキングにMDBListを使用します。NuvioはMDBListと提携または承認されていません。</string>
+    <string name="licenses_attributions_mdblist_body">TVXOは評価、視聴履歴、再生トラッキングにMDBListを使用します。TVXOはMDBListと提携または承認されていません。</string>
     <string name="licenses_attributions_introdb_title">IntroDB</string>
-    <string name="licenses_attributions_introdb_body">Nuvioはコミュニティ提供のイントロ、リキャップ、クレジット、プレビューのタイムスタンプにIntroDB APIを使用します(スキップコントロール用)。NuvioはIntroDBと提携または承認されていません。</string>
+    <string name="licenses_attributions_introdb_body">TVXOはコミュニティ提供のイントロ、リキャップ、クレジット、プレビューのタイムスタンプにIntroDB APIを使用します(スキップコントロール用)。TVXOはIntroDBと提携または承認されていません。</string>
     <string name="licenses_attributions_imdb_title">IMDb非商用データセット</string>
-    <string name="licenses_attributions_imdb_body">NuvioはIMDb非商用データセット(title.ratings.tsv.gzを含む)を使用し、IMDb評価と投票数を取得します。情報提供: IMDb (https://www.imdb.com)。許可を得て使用。IMDbデータは個人・非商用利用に限ります。</string>
+    <string name="licenses_attributions_imdb_body">TVXOはIMDb非商用データセット(title.ratings.tsv.gzを含む)を使用し、IMDb評価と投票数を取得します。情報提供: IMDb (https://www.imdb.com)。許可を得て使用。IMDbデータは個人・非商用利用に限ります。</string>
     <string name="licenses_attributions_exoplayer_title">AndroidX Media3 ExoPlayer 1.8.0</string>
     <string name="licenses_attributions_exoplayer_body">Android再生エンジンとして使用。Apache License, Version 2.0 の下でライセンスされています。</string>
     <string name="licenses_attributions_libmpv_title">libmpv / libmpv-android</string>
@@ -483,7 +483,7 @@
     <string name="tracking_accounts_title">アカウント</string>
     <string name="tracking_accounts_subtitle">トラッキングサービスを接続・管理</string>
     <string name="tracking_sources_title">ソース</string>
-    <string name="tracking_sources_subtitle">Nuvioがライブラリと視聴進行状況を読み取る場所を選択。再生スクロブルはすべての接続サービスに送信されます。</string>
+    <string name="tracking_sources_subtitle">TVXOがライブラリと視聴進行状況を読み取る場所を選択。再生スクロブルはすべての接続サービスに送信されます。</string>
     <string name="tracking_trakt_features_title">Trakt機能</string>
     <string name="tracking_trakt_features_subtitle">Trakt固有の履歴、レビュー、レコメンド</string>
     <string name="tracking_simkl_features_title">Simkl機能</string>
@@ -500,8 +500,8 @@
     <string name="tracking_status_connecting">接続中</string>
     <string name="tracking_finish_connection">接続承認を完了</string>
     <string name="tracking_connecting_provider">%1$s接続を開始中…</string>
-    <string name="tracking_watch_progress_dialog_subtitle">Nuvioが再開と視聴を続けるに読み取るサービスを選択。スクロブルは接続されているすべてのサービスでアクティブなままです。</string>
-    <string name="tracking_library_source_dialog_subtitle">Nuvioがライブラリに読み取るサービスを選択。再生スクロブルはすべての接続サービスに送信されます。</string>
+    <string name="tracking_watch_progress_dialog_subtitle">TVXOが再開と視聴を続けるに読み取るサービスを選択。スクロブルは接続されているすべてのサービスでアクティブなままです。</string>
+    <string name="tracking_library_source_dialog_subtitle">TVXOがライブラリに読み取るサービスを選択。再生スクロブルはすべての接続サービスに送信されます。</string>
     <string name="tracking_trakt_progress_required">Traktが視聴進行状況ソースの場合に利用可能</string>
     <string name="trakt_name">Trakt</string>
     <string name="simkl_name">Simkl</string>
@@ -511,7 +511,7 @@
     <string name="settings_advanced_subtitle">パフォーマンス、ナビゲーション、キャッシュ、診断</string>
     <string name="experience_mode_essential">基本</string>
     <string name="experience_mode_advanced">詳細</string>
-    <string name="experience_mode_choose_title">Nuvioのエクスペリエンスを選択</string>
+    <string name="experience_mode_choose_title">TVXOのエクスペリエンスを選択</string>
     <string name="experience_mode_choose_subtitle">シンプルに始めるか、すべてのカスタマイズを解除。いつでも切り替え可能です。</string>
     <string name="experience_mode_essential_card_subtitle">基本設定、アドオン、再生の基本、Trakt、アカウント設定に焦点。</string>
     <string name="experience_mode_advanced_card_subtitle">すべての設定、レイアウト制御、カタログ順序、コレクション、プラグイン、診断。</string>
@@ -621,8 +621,8 @@
     <string name="buffer_safe_status">安全: デバイスの推奨限界内です。</string>
     <string name="buffer_unsafe_warning">警告: %2$sデバイスの推奨安全限界(%1$d MB)を超えています。アプリがクラッシュする可能性があります。</string>
     <string name="buffer_auto_limit_active">自動スケーリング安全限界: %d MB</string>
-    <string name="advanced_nuvio_focus_scroll">Nuvioフォーカススクロール</string>
-    <string name="advanced_nuvio_focus_scroll_subtitle">Nuvioのカスタムグローバルフォーカススクロールアニメーションと位置決めを使用します。</string>
+    <string name="advanced_nuvio_focus_scroll">TVXOフォーカススクロール</string>
+    <string name="advanced_nuvio_focus_scroll_subtitle">TVXOのカスタムグローバルフォーカススクロールアニメーションと位置決めを使用します。</string>
     <string name="advanced_rgb565">RGB565画像デコード</string>
     <string name="advanced_rgb565_subtitle">対象となる不透明画像に低メモリの16ビットカラーを使用。変更するとアプリが再起動します。</string>
     <string name="advanced_memory_only_vertical_scroll">メモリのみの垂直スクロール</string>
@@ -665,20 +665,20 @@
     <string name="action_close">閉じる</string>
 
     <string name="supporters_contributors_title">サポーター &amp; 貢献者</string>
-    <string name="supporters_contributors_subtitle">Nuvioを支援するサポーターとTV・モバイルで開発する貢献者</string>
+    <string name="supporters_contributors_subtitle">TVXOを支援するサポーターとTV・モバイルで開発する貢献者</string>
     <string name="supporters_contributors_supporters_copy">サポーターと寄付者はプロジェクトの継続を支え、インフラを維持し、新機能の実現を後押しします</string>
-    <string name="supporters_contributors_donate_copy">Nuvioは無料のオープンソースプロジェクトです。サポートしたい方は、開発・インフラの維持にご協力いただけます</string>
+    <string name="supporters_contributors_donate_copy">TVXOは無料のオープンソースプロジェクトです。サポートしたい方は、開発・インフラの維持にご協力いただけます</string>
     <string name="supporters_contributors_donation_progress_title">今月のサーバー &amp; メンテナンス</string>
     <string name="supporters_contributors_donation_progress_complete">達成済み。追加のサポートは開発に充てられます。</string>
     <string name="supporters_contributors_donation_progress_remaining">100% を超えると、追加のサポートは開発に充てられます。</string>
     <string name="supporters_contributors_loading_donation_progress">資金調達の進捗を読み込み中…</string>
-    <string name="supporters_contributors_donate_button">Nuvioに寄付</string>
+    <string name="supporters_contributors_donate_button">TVXOに寄付</string>
     <string name="supporters_contributors_qr_title">QRをスキャンして寄付</string>
-    <string name="supporters_contributors_qr_subtitle">スマートフォンでリンクを開いてNuvioをサポート</string>
+    <string name="supporters_contributors_qr_subtitle">スマートフォンでリンクを開いてTVXOをサポート</string>
     <string name="supporters_contributors_qr_hint">カメラをQRコードに向けるか、下のボタンを使用してください</string>
     <string name="supporters_contributors_back_button">詳細に戻る</string>
-    <string name="supporter_membership_title">Nuvioサポーターメンバーシップ</string>
-    <string name="supporter_membership_description">Nuvioを支援することで、コア体験を誰でも無料で利用できるまま、インフラと継続的な開発を支えることができます。</string>
+    <string name="supporter_membership_title">TVXOサポーターメンバーシップ</string>
+    <string name="supporter_membership_description">TVXOを支援することで、コア体験を誰でも無料で利用できるまま、インフラと継続的な開発を支えることができます。</string>
     <string name="supporter_membership_view">メンバーシップを見る</string>
     <string name="supporter_membership_manage">メンバーシップを管理</string>
     <string name="supporter_membership_refresh">更新</string>
@@ -691,7 +691,7 @@
     <string name="supporter_membership_tier_supporter">サポーター</string>
     <string name="supporter_membership_tier_supporter_plus">サポータープラス</string>
     <string name="supporter_membership_connected_title">Patreonが接続されています</string>
-    <string name="supporter_membership_connected_description">このPatreonアカウントにはアクティブなNuvio階層が見つかりませんでした。利用可能なオプションを表示するか、Patreonメンバーシップを変更した後に更新してください。</string>
+    <string name="supporter_membership_connected_description">このPatreonアカウントにはアクティブなTVXO階層が見つかりませんでした。利用可能なオプションを表示するか、Patreonメンバーシップを変更した後に更新してください。</string>
     <string name="supporter_membership_scan_support">スキャンしてメンバーシップを表示</string>
     <string name="supporter_membership_scan_support_description">スマートフォンでサポーターメンバーシップページを開きます。</string>
     <string name="supporter_membership_scan_manage">スキャンしてメンバーシップを管理</string>
@@ -706,13 +706,13 @@
     <string name="supporters_no_message">メッセージなし</string>
     <string name="supporters_level_supporter">サポーター</string>
     <string name="supporters_level_supporter_plus">サポーター+</string>
-    <string name="supporters_since">%1$sからNuvioを支援</string>
-    <string name="supporters_since_unknown">Nuvioを支援中</string>
+    <string name="supporters_since">%1$sからTVXOを支援</string>
+    <string name="supporters_since_unknown">TVXOを支援中</string>
     <string name="supporters_open_donations">寄付ページを開く</string>
     <string name="sponsors_loading">スポンサーを読み込み中…</string>
     <string name="sponsors_empty">まだスポンサーが見つかりません</string>
     <string name="sponsors_error_title">スポンサーを読み込めませんでした</string>
-    <string name="sponsors_detail_copy">スポンサーは開発のさまざまな部分を支援することでNuvioを前進させます。</string>
+    <string name="sponsors_detail_copy">スポンサーは開発のさまざまな部分を支援することでTVXOを前進させます。</string>
     <string name="sponsors_channel_unavailable">スポンサーチャンネルは利用できません。</string>
     <string name="sponsors_open_channel">スポンサーチャンネルを開く</string>
     <string name="contributors_loading">GitHub貢献者を読み込み中…</string>
@@ -777,7 +777,7 @@
     <string name="playback_auto_switch_internal_player_on_error">起動エラー時にエンジンを自動切り替え</string>
     <string name="playback_auto_switch_internal_player_on_error_sub">ストリーム起動に失敗した場合、ExoPlayerとlibmpvを自動で切り替えます。</string>
     <string name="playback_release_decoder_on_background">バックグラウンドでデコーダーを解放</string>
-    <string name="playback_release_decoder_on_background_sub">Nuvioがバックグラウンドに行ったときにビデオデコーダーを解放します。アプリに戻った後にデコーダーエラーで再生が失敗する場合にオンにしてください。プレーヤーは戻ったとき、スクリーンセーバー後にもリロードされます</string>
+    <string name="playback_release_decoder_on_background_sub">TVXOがバックグラウンドに行ったときにビデオデコーダーを解放します。アプリに戻った後にデコーダーエラーで再生が失敗する場合にオンにしてください。プレーヤーは戻ったとき、スクリーンセーバー後にもリロードされます</string>
     <string name="playback_external_forward_subtitles">外部プレーヤーに字幕を転送</string>
     <string name="playback_external_forward_subtitles_sub">アドオンから優先言語の字幕を取得し、外部プレーヤーに渡します。</string>
     <string name="playback_external_send_skip_segments">イントロとアウトロのタイムスタンプを送信</string>
@@ -804,8 +804,8 @@
     <string name="playback_player_ask_desc">毎回プレーヤーを選択する</string>
     <string name="playback_player_auto">自動(コンテンツに最適化)</string>
     <string name="playback_player_auto_desc">映画やドラマにはExoPlayer・アニメにはMPV</string>
-    <string name="playback_engine_exoplayer_desc">現在のNuvio機能との互換性が最も高い。</string>
-    <string name="playback_engine_mvplayer_desc">Nuvio OSDコントロール付きのlibmpvを使用。実験的。</string>
+    <string name="playback_engine_exoplayer_desc">現在のTVXO機能との互換性が最も高い。</string>
+    <string name="playback_engine_mvplayer_desc">TVXO OSDコントロール付きのlibmpvを使用。実験的。</string>
 
     <string name="video_section">映像</string>
     <string name="playback_true_black_letterbox">完全な黒いバー</string>
@@ -1330,7 +1330,7 @@
     <string name="debrid_disconnect">切断</string>
     <string name="debrid_device_auth_connected">%1$sがこのデバイスに接続されています。</string>
     <string name="debrid_device_auth_starting">セキュアサインインを開始中...</string>
-    <string name="debrid_device_auth_instructions">QRをスキャンし、このコードを入力してNuvioを承認してください。</string>
+    <string name="debrid_device_auth_instructions">QRをスキャンし、このコードを入力してTVXOを承認してください。</string>
     <string name="debrid_device_auth_code_copied">コードをコピーしました。</string>
     <string name="debrid_device_auth_waiting">承認待ち...</string>
     <string name="debrid_device_auth_failed">サインインを開始できませんでした。</string>
@@ -1525,21 +1525,21 @@
     <string name="trakt_watch_progress_title">視聴進行状況</string>
     <string name="trakt_watch_progress_subtitle">再開と「視聴を続ける」を管理する進行状況ソースを選択</string>
     <string name="trakt_watch_progress_dialog_title">視聴進行状況</string>
-    <string name="trakt_watch_progress_dialog_subtitle">Traktのスクロブルが有効な間、再開と視聴を続けるにTraktとNuvio Syncのどちらを使用するか選択してください</string>
+    <string name="trakt_watch_progress_dialog_subtitle">Traktのスクロブルが有効な間、再開と視聴を続けるにTraktとTVXO Syncのどちらを使用するか選択してください</string>
     <string name="trakt_watch_progress_source_trakt">Trakt</string>
-    <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+    <string name="trakt_watch_progress_source_nuvio">TVXO Sync</string>
     <string name="trakt_library_source_title">ライブラリソース</string>
     <string name="trakt_library_source_subtitle">コレクションの保存と表示に使用するライブラリを選択</string>
     <string name="trakt_library_source_dialog_title">ライブラリソース</string>
     <string name="trakt_library_source_dialog_subtitle">ライブラリアイテムの保存・管理先を選択</string>
     <string name="trakt_library_source_trakt">Trakt</string>
-    <string name="trakt_library_source_nuvio">Nuvioライブラリ</string>
+    <string name="trakt_library_source_nuvio">TVXOライブラリ</string>
     <string name="trakt_library_source_trakt_selected">Traktライブラリを選択しました</string>
-    <string name="trakt_library_source_nuvio_selected">Nuvioライブラリを選択しました</string>
+    <string name="trakt_library_source_nuvio_selected">TVXOライブラリを選択しました</string>
     <string name="trakt_setting_on">オン</string>
     <string name="trakt_setting_off">オフ</string>
     <string name="trakt_watch_progress_trakt_selected">視聴進行状況ソースをTraktに設定しました</string>
-    <string name="trakt_watch_progress_nuvio_selected">視聴進行状況ソースをNuvio Syncに設定しました</string>
+    <string name="trakt_watch_progress_nuvio_selected">視聴進行状況ソースをTVXO Syncに設定しました</string>
     <string name="trakt_continue_watching_window">視聴継続ウィンドウ</string>
     <string name="trakt_continue_watching_subtitle">「視聴を続ける」に表示するTraktの履歴期間</string>
     <string name="trakt_unaired_next_up">未放送の次のエピソード</string>
@@ -1568,7 +1568,7 @@
     <string name="trakt_stat_watched_hours">視聴時間</string>
     <string name="trakt_disconnect">切断</string>
     <string name="trakt_disconnect_title">Traktを切断しますか？</string>
-    <string name="trakt_disconnect_subtitle">NuvioからTraktアカウントが切断されます</string>
+    <string name="trakt_disconnect_subtitle">TVXOからTraktアカウントが切断されます</string>
     <string name="trakt_login">ログイン</string>
     <string name="trakt_retry">再試行</string>
     <string name="trakt_back">戻る</string>
@@ -1645,11 +1645,11 @@
     <string name="profile_addons">アドオン</string>
     <string name="profile_plugins">プラグイン</string>
     <string name="profile_choose_avatar">アバターを選択</string>
-    <string name="profile_custom_avatar_web_panel_note">カスタムアバターURLはNuvioウェブパネルから設定できます。</string>
+    <string name="profile_custom_avatar_web_panel_note">カスタムアバターURLはTVXOウェブパネルから設定できます。</string>
     <string name="profile_editor_tab_avatar">アバター</string>
     <string name="profile_editor_tab_background">背景</string>
     <string name="profile_choose_background">プロフィール背景を選択</string>
-    <string name="profile_background_member_note">カスタム背景URLはNuvioウェブパネルから設定できます。</string>
+    <string name="profile_background_member_note">カスタム背景URLはTVXOウェブパネルから設定できます。</string>
     <string name="profile_background_normal">通常</string>
     <string name="profile_background_custom">カスタム</string>
     <string name="profile_avatar_none_selected">アバターが選択されていません</string>
@@ -1717,7 +1717,7 @@
     <string name="profile_pin_overlay_set_support">このプロフィールを開く前にPINの入力が必要になります</string>
     <string name="profile_pin_overlay_confirm_support">設定を完了するには同じ4桁を再入力してください</string>
     <string name="profile_pin_overlay_mismatch">PINが一致しませんでした。もう一度新しいPINを入力してください</string>
-    <string name="profile_pin_overlay_forgot_hint">PINを忘れた場合はNuvioウェブサイトのアカウントページからリセットできます</string>
+    <string name="profile_pin_overlay_forgot_hint">PINを忘れた場合はTVXOウェブサイトのアカウントページからリセットできます</string>
     <string name="profile_pin_overlay_back_hint">戻るボタンでキャンセル</string>
 
     
@@ -1800,7 +1800,7 @@
     <string name="stream_type_torrent">トレント</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">P2Pストリーミング</string>
-    <string name="p2p_consent_body">このストリームはピアツーピア(P2P)技術を使用します。P2Pを有効にすると、以下を了承したものとみなされます:\n\n\u2022 あなたのIPアドレスはネットワーク上の他のピアに公開されます\n\u2022 アクセスするコンテンツに対する責任はすべてあなた自身にあります\n\u2022 あなたの管轄区域でこのコンテンツをストリーミングする法的権利を有することを確認します\n\u2022 NuvioはP2Pコンテンツをホスト、配布、または制御しません\n\u2022 NuvioはP2Pストリーミングの使用に起因する法的結果に対して一切の責任を負いません\n\nこの機能は完全に自己責任で使用してください。P2Pはいつでも設定で無効にできます。</string>
+    <string name="p2p_consent_body">このストリームはピアツーピア(P2P)技術を使用します。P2Pを有効にすると、以下を了承したものとみなされます:\n\n\u2022 あなたのIPアドレスはネットワーク上の他のピアに公開されます\n\u2022 アクセスするコンテンツに対する責任はすべてあなた自身にあります\n\u2022 あなたの管轄区域でこのコンテンツをストリーミングする法的権利を有することを確認します\n\u2022 TVXOはP2Pコンテンツをホスト、配布、または制御しません\n\u2022 TVXOはP2Pストリーミングの使用に起因する法的結果に対して一切の責任を負いません\n\nこの機能は完全に自己責任で使用してください。P2Pはいつでも設定で無効にできます。</string>
     <string name="p2p_consent_enable">P2Pを有効にする</string>
     <string name="p2p_consent_cancel">キャンセル</string>
     <string name="settings_p2p_title">P2Pストリーミング</string>
@@ -2154,7 +2154,7 @@
     <string name="library_delete_subtitle">Traktからリストとすべてのリストアイテムが削除されます</string>
     <string name="library_delete_confirm">削除</string>
     <string name="library_source_local">ローカル</string>
-    <string name="library_source_nuvio">NUVIO</string>
+    <string name="library_source_nuvio">TVXO</string>
     <string name="library_source_trakt">TRAKT</string>
     <string name="library_source_saved">保存済み</string>
     <string name="library_source_cloud">クラウド</string>
@@ -2397,7 +2397,7 @@
     <string name="catalog_see_all_empty_title">利用可能なアイテムがありません</string>
     <string name="catalog_see_all_empty_subtitle">別のカタログを試すか、後でもう一度ご確認ください</string>
 
-    <string name="layout_selection_welcome">Nuvioへようこそ</string>
+    <string name="layout_selection_welcome">TVXOへようこそ</string>
     <string name="layout_selection_subtitle">ホーム画面のレイアウトを選択</string>
     <string name="layout_selection_continue">続ける</string>
 
@@ -2414,7 +2414,7 @@
     <string name="update_unknown_sources">続けるには不明なソースからのインストールを許可してください</string>
     <!-- AccountScreen -->
     <string name="account_title">アカウント</string>
-    <string name="account_sign_in_description">サインインしてデバイス間でライブラリ、視聴進行状況、アドオン、プラグインを同期。ライブラリ同期はTraktが接続されていない場合はNuvio Syncを使用し、視聴進行状況はTraktまたはNuvio Syncのどちらかを使用できます</string>
+    <string name="account_sign_in_description">サインインしてデバイス間でライブラリ、視聴進行状況、アドオン、プラグインを同期。ライブラリ同期はTraktが接続されていない場合はTVXO Syncを使用し、視聴進行状況はTraktまたはTVXO Syncのどちらかを使用できます</string>
     <string name="account_sync_code_title">同期コード</string>
     <string name="account_sync_code_description">アカウントを作成せずにデバイス間で同期</string>
     <string name="account_linked_devices">リンク済みデバイス (%1$d)</string>
@@ -2592,7 +2592,7 @@
     <string name="cd_trailer_controls">予告編コントロール</string>
     <string name="cd_seek_bar">シークバー</string>
     <string name="cd_unlink">リンク解除</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">TVXO</string>
     <string name="cd_trakt_logo">Traktロゴ</string>
     <string name="cd_trakt_qr">Trakt認証QR</string>
     <string name="cd_imdb">IMDb</string>
@@ -2604,7 +2604,7 @@
     <string name="cd_expand">%1$sを展開</string>
     <string name="cd_collapse">%1$sを折りたたむ</string>
     <string name="cd_qr_login">QRログインコード</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">TVXO</string>
 
     <string name="debug_signin_success">サインイン成功</string>
     <string name="debug_generate_description">デバッグ生成 %1$s アイテム #%2$d</string>
@@ -2747,7 +2747,7 @@
     <string name="collections_editor_tmdb_list_helper">例: https://www.themoviedb.org/list/8504994 または 8504994。</string>
     <string name="collections_editor_tmdb_person_id">人物ID</string>
     <string name="collections_editor_tmdb_person_helper">例: https://www.themoviedb.org/person/31-tom-hanks または 31。</string>
-    <string name="collections_editor_tmdb_title_helper">行/タブ名として表示されます。空の場合はNuvioがソースから生成します。</string>
+    <string name="collections_editor_tmdb_title_helper">行/タブ名として表示されます。空の場合はTVXOがソースから生成します。</string>
     <string name="collections_editor_tmdb_quick_genres">クイックジャンル</string>
     <string name="collections_editor_tmdb_quick_languages">クイック言語</string>
     <string name="collections_editor_tmdb_quick_countries">クイック国</string>
@@ -2929,7 +2929,7 @@
     <string name="autoplay_regex_preset_no_remux_hdr">REMUX/HDRなし</string>
 
     <!-- Playback settings sections -->
-    <string name="playback_player_internal_desc">NuvioTVの内蔵プレーヤーを使用</string>
+    <string name="playback_player_internal_desc">TVXOの内蔵プレーヤーを使用</string>
 
     <!-- Player runtime: torrent overlay + tracks -->
     <string name="player_torrent_peer_info">%1$dシード · %2$dピア</string>
@@ -3034,9 +3034,9 @@
     <string name="simkl_visit">Simklにアクセス</string>
     <string name="simkl_sync_info_action">同期の仕組み</string>
     <string name="simkl_sync_info_title">Simkl同期の仕組み</string>
-    <string name="simkl_sync_info_description">Nuvioは最大でも%1$d分に1回、Simklを確認します。他のアプリやSimklウェブサイト経由の変更は反映にその時間がかかる場合があります。</string>
+    <string name="simkl_sync_info_description">TVXOは最大でも%1$d分に1回、Simklを確認します。他のアプリやSimklウェブサイト経由の変更は反映にその時間がかかる場合があります。</string>
     <string name="simkl_sync_info_activity">各更新ではまずSimklに変更があるかを確認し、更新のみをダウンロードします。これはSimklのAPIルールに従い、不要なデータ使用を減らし、サービスの安定性維持に役立ちます。</string>
-    <string name="simkl_sync_info_manual">Nuvioでの変更はすぐにSimklに送信されます。リモートの変更をより早く確認したい場合は「今すぐ同期」を使用してください。</string>
+    <string name="simkl_sync_info_manual">TVXOでの変更はすぐにSimklに送信されます。リモートの変更をより早く確認したい場合は「今すぐ同期」を使用してください。</string>
     <string name="simkl_sync_info_library_statuses">Simklの「保留」または「中断」リストにある作品は「視聴を続ける」から非表示になります。いずれかのリストにある間は非表示が続きます。</string>
     <string name="simkl_sync_info_docs">Simkl同期ガイドを読む</string>
     <string name="error_open_browser_failed">ブラウザを開けませんでした</string>

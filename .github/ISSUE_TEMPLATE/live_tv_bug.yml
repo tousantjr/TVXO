@@ -14,7 +14,7 @@ body:
         This form is for bugs specifically related to Live TV functionality.
 
         Please do not use this form for problems with the original
-        Nuvio movie, TV show, or unrelated functionality.
+        TVXO movie, TV show, or unrelated functionality.
 
   - type: textarea
     id: problem
@@ -32,7 +32,7 @@ body:
       label: Steps to reproduce
       description: Tell us exactly how to reproduce the problem.
       placeholder: |
-        1. Open Nuvio With Live TV
+        1. Open TVXO With Live TV
         2. Open Live TV
         3. Select...
         4. The problem occurs...
@@ -71,7 +71,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Nuvio With Live TV version
+      label: TVXO With Live TV version
       placeholder: "Example: 2.9"
 
   - type: input

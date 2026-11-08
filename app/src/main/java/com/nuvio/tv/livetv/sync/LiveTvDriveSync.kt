@@ -711,7 +711,7 @@ class LiveTvDriveSync @Inject constructor(
             "https://www.googleapis.com/auth/drive.appdata" to MODE_APPDATA,
             "https://www.googleapis.com/auth/drive.file" to MODE_FILE
         )
-        const val FILE_NAME = "Nuvio Live TV backup.json"
+        const val FILE_NAME = "TVXO Live TV backup.json"
         val JSON = "application/json; charset=UTF-8".toMediaType()
         const val KEY_REFRESH = "refresh_token"
         const val KEY_EMAIL = "email"

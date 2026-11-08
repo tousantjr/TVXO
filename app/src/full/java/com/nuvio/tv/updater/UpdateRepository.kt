@@ -98,7 +98,7 @@ class UpdateRepository @Inject constructor(
                 title = versionName,
                 notes = json.optString("notes"),
                 releaseUrl = null,
-                assetName = apk.optString("name").ifBlank { "NuvioIPTV-Test.apk" },
+                assetName = apk.optString("name").ifBlank { "TVXO-Test.apk" },
                 // The download needs the key too; it is sent in the address because the downloader
                 // makes a plain request.
                 assetUrl = url + (if ('?' in url) "&" else "?") + "key=" + URLEncoder.encode(key, "UTF-8"),
