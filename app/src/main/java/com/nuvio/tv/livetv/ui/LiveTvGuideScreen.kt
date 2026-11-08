@@ -1513,7 +1513,7 @@ private fun LiveTvGuideScreenBody(
                         when {
                             !ui.hasSources -> EmptyGuideMessage(
                                 title = "No playlists yet",
-                                body = "Add an M3U playlist, Xtream login or XMLTV guide in Settings › Live TV.",
+                                body = "Add your Xtream Codes login in Settings › Live TV.",
                                 action = "Press OK to open Live TV settings"
                             )
                             channels.isEmpty() && status.loading -> EmptyGuideMessage(
@@ -3489,7 +3489,7 @@ private fun ChannelContextMenu(
                 if (program != null) item { MenuItem("Program info", onClick = onProgramInfo) }
                 if (bell != null) item { MenuItem(bell.label, onClick = { bell.toggle(); onDismiss() }) }
                 if (streamProgram != null) {
-                    item { MenuItem("Find & stream \"${streamProgram.title}\" in Nuvio", onClick = { onFindInNuvio(streamProgram) }) }
+                    item { MenuItem("Find & stream \"${streamProgram.title}\" in TVXO", onClick = { onFindInNuvio(streamProgram) }) }
                 }
                 // Upcoming show: Remind me (or Cancel reminder), right in the long-press menu.
                 if (program != null && program.startMs > now) item {
@@ -4214,7 +4214,7 @@ private fun ProgramInfoDialog(
             // For a show that hasn't started, streaming it through Nuvio is the main action.
             if (upcoming) {
                 LiveFocusRow(modifier = Modifier.focusRequester(first), onClick = { onFind(p!!) }) { f ->
-                    LiveText("Find & stream in Nuvio", color = focusedTextColor(f))
+                    LiveText("Find & stream in TVXO", color = focusedTextColor(f))
                 }
             }
             when {
@@ -4224,7 +4224,7 @@ private fun ProgramInfoDialog(
                 else -> LiveFocusRow(modifier = Modifier.focusRequester(first), onClick = onWatch) { f -> LiveText("Watch channel now", color = focusedTextColor(f)) }
             }
             if (p != null && !upcoming) {
-                LiveFocusRow(onClick = { onFind(p) }) { f -> LiveText("Find & stream in Nuvio", color = focusedTextColor(f)) }
+                LiveFocusRow(onClick = { onFind(p) }) { f -> LiveText("Find & stream in TVXO", color = focusedTextColor(f)) }
             }
             // On now, on a catch-up channel: start it over.
             if (p != null && now >= p.startMs && now < p.stopMs && canRestart) {

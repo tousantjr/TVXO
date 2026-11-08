@@ -187,7 +187,7 @@ fun SportsSettingsContent(
                     )
                     SettingsToggleRow(
                         "Switch to the Game Automatically",
-                        "When a reminder goes off, Nuvio switches to the game a minute before it starts (with 10 seconds to cancel). Only while Nuvio is open. Each game's own choice on its page comes first",
+                        "When a reminder goes off, TVXO switches to the game a minute before it starts (with 10 seconds to cancel). Only while TVXO is open. Each game's own choice on its page comes first",
                         s.autoSwitch,
                         { update { it.copy(autoSwitch = !it.autoSwitch) } }
                     )

@@ -63,3 +63,8 @@ AGENTS.md
 /PR.md
 docs/
 status-page/
+# TVXO: never commit signing material
+keystore.properties
+*.jks
+*.keystore
+!keystore.properties.example

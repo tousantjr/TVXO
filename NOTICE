@@ -1,0 +1,22 @@
+TVXO
+====
+
+TVXO is a modified version of NuvioPlusIPTV (and Nuvio), modified by TVXO, 2026-11-08.
+
+Upstream projects:
+  - NuvioPlusIPTV: https://github.com/homelessbrian/NuvioPlusIPTV
+  - Nuvio (NuvioTV): https://github.com/NuvioMedia/NuvioTV
+
+TVXO, like the projects it is based on, is free software licensed under the
+GNU General Public License, version 3 (GPL-3.0). See the LICENSE file for the
+full license text. There is NO WARRANTY, to the extent permitted by law.
+
+Source code: the complete corresponding source code of TVXO is available at
+https://github.com/tousantjr/TVXO (or on request from the distributor of the
+APK you received). Copyright and authorship notices of the original authors
+are retained in the source files.
+
+Third-party components bundled by the upstream projects keep their own licenses
+(see app/libs, libmpv-android, ffmpeg-decoder-downmix, DV7/libdovi,
+org/libtorrent4j, vpn-android, vpn-core and the in-app
+Settings > About > Licenses & attributions screen).

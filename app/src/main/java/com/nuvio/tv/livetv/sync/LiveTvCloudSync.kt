@@ -97,9 +97,13 @@ class LiveTvCloudSync @Inject constructor(
         .build()
     private val json = "application/json; charset=utf-8".toMediaType()
 
-    private val available: Boolean =
+    // TVXO: Setup Sync depended on homelessbrian's livetv-cloud Worker plus a Nuvio (api.nuvio.tv)
+    // account, so it is turned off in TVXO builds. CLOUD_URL is blank; nothing is contacted.
+    @Suppress("unused")
+    private val upstreamAvailable: Boolean =
         !serverConfiguration.isCustom &&
             serverConfiguration.backendUrl.toHttpUrlOrNull()?.host.equals("api.nuvio.tv", ignoreCase = true)
+    private val available: Boolean = false
 
     private val _state = MutableStateFlow(
         CloudSyncState(available = available, lastSyncMs = store.getLong(KEY_LAST_SYNC, 0L))
@@ -623,7 +627,7 @@ class LiveTvCloudSync @Inject constructor(
     }
 
     private fun failText(code: Int) = when (code) {
-        401 -> "Sign in to Nuvio again to sync."
+        401 -> "Sign in to TVXO again to sync."
         else -> NETWORK_TEXT
     }
 
@@ -640,7 +644,7 @@ class LiveTvCloudSync @Inject constructor(
 
     companion object {
         /** Our own small service (the livetv-cloud Worker). */
-        const val CLOUD_URL = "https://livetv-cloud.nuvioplusiptv.workers.dev"
+        const val CLOUD_URL = "" // TVXO: upstream Worker removed; Setup Sync is disabled
         private const val UPDATED_TEXT = "Updated from your other TV."
         private const val NETWORK_TEXT = "Couldn't reach sync. Will try again."
         private const val KEY_ENABLED = "enabled_"

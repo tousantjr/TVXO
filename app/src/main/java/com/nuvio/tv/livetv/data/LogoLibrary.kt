@@ -83,7 +83,7 @@ object LogoLibrary {
         c.connectTimeout = 10_000
         c.readTimeout = 30_000
         c.setRequestProperty("Accept", accept)
-        c.setRequestProperty("User-Agent", "NuvioPlusIPTV")
+        c.setRequestProperty("User-Agent", "TVXO")
         return try {
             if (c.responseCode != 200) return false
             val tmp = File(to.parentFile, to.name + ".tmp")

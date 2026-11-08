@@ -1,6 +1,6 @@
-# Nuvio With Live TV Issue Guidelines
+# TVXO With Live TV Issue Guidelines
 
-Nuvio With Live TV is a fork of Nuvio focused on adding and improving
+TVXO With Live TV is a fork of TVXO focused on adding and improving
 Live TV functionality.
 
 ## What belongs here?
@@ -20,12 +20,12 @@ Issues should be specifically related to:
 - Live TV playback
 - Live TV search
 - Live TV UI / UX
-- Live TV integration with the Nuvio experience
+- Live TV integration with the TVXO experience
 
 ## What does NOT belong here?
 
 Please do not submit requests or bugs for functionality unrelated
-to Live TV, including the original Nuvio movie and TV experience.
+to Live TV, including the original TVXO movie and TV experience.
 
 ## Before submitting
 

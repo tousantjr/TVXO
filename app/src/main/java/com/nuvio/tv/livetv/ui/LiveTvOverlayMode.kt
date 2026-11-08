@@ -464,7 +464,7 @@ private fun OverlayModeContent(
             )
             Spacer(Modifier.height(14.dp))
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                MenuItem("Find & stream in Nuvio", Modifier.focusRequester(first)) {
+                MenuItem("Find & stream in TVXO", Modifier.focusRequester(first)) {
                     futurePrompt = null
                     onFindInNuvio(com.nuvio.tv.livetv.data.LiveTvPosterResolver.searchTitleFor(p, ch))
                 }

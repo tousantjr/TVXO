@@ -93,7 +93,7 @@ internal enum class LiveTvPage(val title: String, val subtitle: String, val tab:
     GUIDE("Live TV", "How the guide looks and behaves while you're browsing", "Guide"),
     PLAYBACK("Live TV", "Picture, sound, pausing and recording", "Playback"),
     ON_DEMAND("On Demand", "Movies and shows from your provider", "On Demand"),
-    INTEGRATION("Live TV", "How Live TV shows up in the rest of Nuvio", "Integration")
+    INTEGRATION("Live TV", "How Live TV shows up in the rest of TVXO", "Integration")
 }
 
 private val LIVE_TABS = listOf(LiveTvPage.MAIN, LiveTvPage.GUIDE, LiveTvPage.PLAYBACK, LiveTvPage.INTEGRATION)
@@ -422,7 +422,8 @@ internal fun LiveTvSettingsContent(
             }
 
             // ------------------------------------------------------------ Backup & Sync
-            if (show(LiveTvPage.MAIN)) item(key = "drive") {
+            // TVXO: only shown when the build has its own Google Drive OAuth client configured.
+            if (show(LiveTvPage.MAIN) && drive.available) item(key = "drive") {
                 DriveSyncCard(
                     modifier = if (firstRequester != null && !cloud.available) Modifier.focusRequester(firstRequester) else Modifier,
                     state = drive,
@@ -451,6 +452,8 @@ internal fun LiveTvSettingsContent(
             // ------------------------------------------------------------ Playlists & Guides
             if (show(LiveTvPage.MAIN)) item(key = "sources") {
                 LiveSection(
+                    // TVXO: when both sync cards are hidden, this section takes the initial focus.
+                    modifier = if (firstRequester != null && !cloud.available && !drive.available) Modifier.focusRequester(firstRequester) else Modifier,
                     title = "Playlists & Guides",
                     summary = if (status.loading) (status.message ?: "Updating…")
                     else "${playlists.size} ${if (playlists.size == 1) "playlist" else "playlists"} · ${epgs.size} ${if (epgs.size == 1) "guide" else "guides"}",
@@ -482,12 +485,8 @@ internal fun LiveTvSettingsContent(
                             onClick = { dialog = LiveDialog.PlaylistActions(pl) }
                         )
                     }
-                    SettingsActionRow(
-                        title = "Add M3U Playlist",
-                        subtitle = "A channel list from the M3U link your provider gave you",
-                        leadingIcon = Icons.Default.Add,
-                        onClick = { dialog = LiveDialog.AddM3u }
-                    )
+                    // TVXO: Xtream Codes is the only source type offered. The M3U add row was
+                    // removed; existing M3U entries (e.g. from a restored backup) still show and can be edited/removed.
                     SettingsActionRow(
                         title = "Add Xtream Codes Login",
                         subtitle = "Sign in with the server, username and password from your provider. Its TV guide comes with it.",
@@ -1288,8 +1287,8 @@ internal fun LiveTvSettingsContent(
             // ------------------------------------------------------------ Home Screen & Nuvio
             if (show(LiveTvPage.INTEGRATION)) item(key = "nuvio") {
                 LiveSection(
-                    title = "Home Screen & Nuvio",
-                    summary = "The Live TV row inside Nuvio's home page, and the menu",
+                    title = "Home Screen & TVXO",
+                    summary = "The Live TV row inside TVXO's home page, and the menu",
                     icon = Icons.Default.Home,
                     open = "nuvio" in open,
                     onToggle = { toggle("nuvio") },
@@ -1314,7 +1313,7 @@ internal fun LiveTvSettingsContent(
                             com.nuvio.tv.livetv.home.LiveTvLauncherRows.refresh(homeProfileContext, afterMs = 1_500)
                         }
                     )
-                    SubHeading("Row Inside Nuvio's Home Page")
+                    SubHeading("Row Inside TVXO's Home Page")
                     SettingsToggleRow(
                         "Live TV Row on the Home Screen",
                         "For this profile. Tucked above your top row: press Up to show it.",
@@ -1421,7 +1420,7 @@ internal fun LiveTvSettingsContent(
                     )
                     SettingsToggleRow(
                         "Movies & Series",
-                        "Titles from your Nuvio addons",
+                        "Titles from your TVXO addons",
                         s.guideSearchCatalog,
                         { update { it.copy(guideSearchCatalog = !it.guideSearchCatalog) } }
                     )
@@ -1440,7 +1439,7 @@ internal fun LiveTvSettingsContent(
                     )
                     SettingsToggleRow(
                         "Movies & Series",
-                        "Titles from your Nuvio addons",
+                        "Titles from your TVXO addons",
                         s.onDemandSearchCatalog,
                         { update { it.copy(onDemandSearchCatalog = !it.onDemandSearchCatalog) } }
                     )
@@ -2235,7 +2234,7 @@ private fun CloudSyncCard(
     onDelete: () -> Unit
 ) {
     val status = when {
-        !state.signedIn -> "Sign in to Nuvio to use it"
+        !state.signedIn -> "Sign in to TVXO to use it"
         !state.enabled -> "Off"
         state.busy -> "Syncing…"
         state.lastSyncMs > 0 -> "On · last synced " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(state.lastSyncMs))
@@ -2252,7 +2251,7 @@ private fun CloudSyncCard(
         run {
             when {
                 !state.signedIn -> Text(
-                    text = "Sign in to your Nuvio account (Settings → Account) and your Live TV setup follows you to every TV you sign in on. Nothing else to set up.",
+                    text = "Sign in to your TVXO account (Settings → Account) and your Live TV setup follows you to every TV you sign in on. Nothing else to set up.",
                     style = MaterialTheme.typography.bodySmall,
                     color = NuvioTheme.colors.TextSecondary
                 )
@@ -2271,7 +2270,7 @@ private fun CloudSyncCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = NuvioTheme.colors.TextSecondary
                     )
-                    SettingsActionRow("Account", "The Nuvio sign-in this setup follows", state.email ?: "Signed in", onClick = {})
+                    SettingsActionRow("Account", "The TVXO sign-in this setup follows", state.email ?: "Signed in", onClick = {})
                     SubHeading("What to sync")
                     com.nuvio.tv.livetv.sync.SyncPart.values().forEach { part ->
                         SettingsToggleRow(part.label, part.description, part in enabledParts, { onTogglePart(part) })
@@ -2422,7 +2421,7 @@ private fun SourceFormDialog(
         if (toggle2 != null) {
             SettingsToggleRow(
                 title = toggle2.first,
-                subtitle = "Adds the provider's movies and series to On Demand and to Nuvio's stream list",
+                subtitle = "Adds the provider's movies and series to On Demand and to TVXO's stream list",
                 checked = toggle2Value,
                 onToggle = { toggle2Value = !toggle2Value }
             )
@@ -2662,7 +2661,7 @@ private fun streamsPositionLabel(v: String): String = when (v) {
 private fun searchSectionLabel(kind: String): String = when (kind) {
     "live" -> "Live TV channels"
     "ondemand" -> "On Demand (your provider)"
-    else -> "Nuvio catalogs (addons)"
+    else -> "TVXO catalogs (addons)"
 }
 
 /**

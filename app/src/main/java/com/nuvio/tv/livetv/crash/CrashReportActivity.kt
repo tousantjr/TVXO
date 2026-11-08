@@ -37,7 +37,7 @@ class CrashReportActivity : Activity() {
         fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
         val title = TextView(this).apply {
-            text = "Nuvio + IPTV stopped"
+            text = "TVXO stopped"
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
             typeface = Typeface.DEFAULT_BOLD
@@ -54,7 +54,7 @@ class CrashReportActivity : Activity() {
         // 2,000 characters comfortably, so the full trace stays on screen only.
         // The whole report is a web page on the home network (opened from a phone on the same
         // Wi-Fi); the code holds its address. Without a network, the start of the report instead.
-        server = ReportServer.start("Nuvio + IPTV crash report", short = { shortCrash(report) }) { report }
+        server = ReportServer.start("TVXO crash report", short = { shortCrash(report) }) { report }
         val summary = report.substringBefore("FULL TRACE:").trim().take(1_800)
         val qr = runCatching {
             com.nuvio.tv.core.qr.QrCodeGenerator.generate(server?.url ?: summary, dp(200))

@@ -67,10 +67,10 @@ fun IptvIconToggle(enabled: Boolean, busy: Boolean, onToggle: (Boolean) -> Unit)
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Show \"+ IPTV\" on the icon", color = NuvioTheme.colors.TextPrimary)
+                Text("Use the TVXO Live TV icon", color = NuvioTheme.colors.TextPrimary)
                 Text(
-                    if (enabled) "On: the Nuvio + IPTV icon and banner in your chosen color"
-                    else "Off: Nuvio's original icons, in your chosen color",
+                    if (enabled) "On: the TVXO icon and banner in your chosen color"
+                    else "Off: the plain TVXO icon, in your chosen color",
                     color = NuvioTheme.colors.TextSecondary,
                     style = androidx.tv.material3.MaterialTheme.typography.bodySmall
                 )
