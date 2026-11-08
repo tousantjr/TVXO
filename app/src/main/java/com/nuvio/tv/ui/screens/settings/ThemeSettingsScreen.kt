@@ -594,6 +594,7 @@ private fun SettingsUiStyle.localizedDescription(): String = when (this) {
 
 @Composable
 private fun AppTheme.localizedName(): String = when (this) {
+    AppTheme.TVXO_PINK -> stringResource(R.string.theme_color_tvxo_pink)
     AppTheme.CUSTOM -> stringResource(R.string.theme_color_custom)
     AppTheme.GOLD -> stringResource(R.string.theme_color_gold)
     AppTheme.JADE -> stringResource(R.string.theme_color_jade)

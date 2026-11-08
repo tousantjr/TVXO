@@ -91,11 +91,31 @@ object ThemeColors {
         backgroundCard = NuvioPrimitives.neutral850
     )
 
+    /**
+     * TVXO: sampled from the TVXO logo (branding/tvxo_logo_source.jpg): pink #FF0D7D, lime #BBF615.
+     * Pink is the main accent; lime the second colour (variant/containers, end of gradients).
+     * Near-black text on both: white on this pink is only ~3.7:1, near-black is ~5.6:1.
+     */
+    val TvxoPink = ThemeColorPalette(
+        secondary = NuvioPrimitives.tvxoPink,
+        secondaryVariant = NuvioPrimitives.tvxoLime,
+        onSecondary = NuvioPrimitives.neutral950,
+        onSecondaryVariant = NuvioPrimitives.neutral950,
+        accentGradient = listOf(NuvioPrimitives.tvxoPink, NuvioPrimitives.tvxoLime),
+        focusRing = NuvioPrimitives.tvxoPink,
+        focusRingGradient = listOf(NuvioPrimitives.tvxoPink),
+        focusBackground = Color(0xFF3D0B22),
+        background = NuvioPrimitives.black,
+        backgroundElevated = Color(0xFF141014),
+        backgroundCard = Color(0xFF1C1418)
+    )
+
     fun getColorPalette(
         theme: AppTheme,
         customColors: CustomThemeColors = CustomThemeColors.Default
     ): ThemeColorPalette {
         return when (theme) {
+            AppTheme.TVXO_PINK -> TvxoPink
             AppTheme.CUSTOM -> customColors.toColorPalette()
             AppTheme.GOLD -> SupporterThemeColors.Gold
             AppTheme.JADE -> SupporterThemeColors.Jade

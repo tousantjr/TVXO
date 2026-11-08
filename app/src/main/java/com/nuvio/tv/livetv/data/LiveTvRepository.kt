@@ -1879,11 +1879,16 @@ class LiveTvRepository @Inject constructor(
 
         // Every guide is read; each channel keeps its best candidate:
         //   1. real listings beat placeholder listings ("Programming", "No information", …)
-        //   2. a tvg-id match beats a name match
-        //   3. then the earlier guide in the list
+        //   2. TVXO: the provider's own guide beats an extra (user-added XMLTV) guide
+        //   3. a tvg-id match beats a name match
+        //   4. then the earlier guide in the list
         // so a guide full of placeholders can't hide real listings from another guide.
-        data class Candidate(val score: Long, val sourceId: String, val xmltvId: String)
+        // TVXO: the best guide of the *other* kind (provider vs extra) is kept too, and fills the
+        // time slots the chosen guide leaves empty (see EpgDatabase.replaceAllFromStage's fill).
+        data class Candidate(val score: Long, val sourceId: String, val xmltvId: String, val real: Boolean, val provider: Boolean)
         val best = HashMap<String, Candidate>()
+        val bestProvider = HashMap<String, Candidate>()
+        val bestExtra = HashMap<String, Candidate>()
         val pinned = HashMap<String, List<EpgProgram>>()
         val sourceLists = ArrayList<EpgSourceChannels>()
         val sourceMeta = ArrayList<Triple<EpgTarget, String, List<EpgChannelEntry>>>()
@@ -2073,11 +2078,16 @@ class LiveTvRepository @Inject constructor(
                 if (m.count <= 0) return
                 count += m.count
                 val real = m.placeholders * 10 < m.count * 8
+                val provider = target.playlistId != null
                 // Higher is better; then more days ahead, then the guide's position.
-                val score = guideRank(real, idMatch, m.lastStop, order)
+                val score = guideRank(real, idMatch, m.lastStop, order, provider)
+                val cand = Candidate(score, target.fileId, xmlId, real, provider)
+                val byKind = if (provider) bestProvider else bestExtra
                 chans.forEach { c ->
                     val cur = best[c.key]
-                    if (cur == null || score > cur.score) best[c.key] = Candidate(score, target.fileId, xmlId)
+                    if (cur == null || score > cur.score) best[c.key] = cand
+                    val k = byKind[c.key]
+                    if (k == null || score > k.score) byKind[c.key] = cand
                 }
             }
             idHits.forEach { (xmlId, chans) -> offer(xmlId, chans, idMatch = true) }
@@ -2144,6 +2154,15 @@ class LiveTvRepository @Inject constructor(
         // The guide shown: from the staged guides, the chosen one for each channel (hand-picked
         // ones as given), all in one step.
         val choice = auto.filterKeys { it !in pinned }
+        // TVXO gap filling: a channel's guide of the other kind (provider <-> extra XMLTV), when it
+        // has real listings, fills the time slots the chosen guide leaves empty.
+        val fill = HashMap<String, EpgAssignment>()
+        choice.keys.forEach { key ->
+            val primary = best[key] ?: return@forEach
+            val other = (if (primary.provider) bestExtra else bestProvider)[key] ?: return@forEach
+            if (other.real && other.sourceId != primary.sourceId) fill[key] = EpgAssignment(other.sourceId, other.xmltvId)
+        }
+        if (fill.isNotEmpty()) LIVE_REPORT.add("Guide: ${fill.size} channels get empty time slots filled from a second guide")
         // Channels with a tvg-shift in the playlist: their listings moved by that too.
         val tvgShifts = channels.filter { it.tvgShiftMinutes != 0 }.associate { it.key to it.tvgShiftMinutes * 60_000L }
         if (tvgShifts.isNotEmpty()) {
@@ -2153,7 +2172,7 @@ class LiveTvRepository @Inject constructor(
         val storeStart = System.currentTimeMillis()
         val stored = runCatching {
             val fp = guideFingerprint(settings, targets)
-            guideDb.replaceAllFromStage(fp, choice, pinned, auto, guideParts(settings, targets, fp), windowStart, windowEnd, tvgShifts)
+            guideDb.replaceAllFromStage(fp, choice, pinned, auto, guideParts(settings, targets, fp), windowStart, windowEnd, tvgShifts, fill)
         }.onFailure { Log.w(TAG, "Couldn't store the guide", it) }.isSuccess
         LIVE_REPORT.add("Guide: best guide per channel stored in ${(System.currentTimeMillis() - storeStart) / 1000} s")
         // The guides' working copies aren't kept once the guide is built (they'd double the storage).
@@ -2167,7 +2186,11 @@ class LiveTvRepository @Inject constructor(
             val list = orderedWindows.getOrPut(id) {
                 windowCopies[id]?.sortedBy { it.startMs } ?: emptyList()
             }
-            if (list.isNotEmpty()) window[key] = tvgShifts[key]?.let { list.shiftedBy(it) } ?: list
+            val filled = fill[key]?.let { f ->
+                val extra = windowCopies["${f.sourceId}\u0000${f.xmltvId}"]?.sortedBy { it.startMs }
+                if (extra.isNullOrEmpty()) list else fillGaps(list, extra)
+            } ?: list
+            if (filled.isNotEmpty()) window[key] = tvgShifts[key]?.let { filled.shiftedBy(it) } ?: filled
         }
         pinned.forEach { (key, list) ->
             val w = list.filter { it.stopMs > winFrom && it.startMs < winTo }
@@ -2201,13 +2224,20 @@ class LiveTvRepository @Inject constructor(
      * another guide's week, so the same provider showed "until Saturday" on one TV and "until
      * Monday" on another depending on the order of their guides.
      */
-    private fun guideRank(real: Boolean, idMatch: Boolean, listings: List<EpgProgram>, order: Int): Long =
-        guideRank(real, idMatch, listings.maxOfOrNull { it.stopMs } ?: 0L, order)
+    private fun guideRank(real: Boolean, idMatch: Boolean, listings: List<EpgProgram>, order: Int, provider: Boolean): Long =
+        guideRank(real, idMatch, listings.maxOfOrNull { it.stopMs } ?: 0L, order, provider)
 
-    private fun guideRank(real: Boolean, idMatch: Boolean, lastStop: Long, order: Int): Long {
+    /**
+     * TVXO: [provider] (the Xtream login's own guide) ranks above an extra XMLTV guide, so extra
+     * guides only take over channels the provider has no real listings for; for the rest they
+     * just fill empty time slots (see fillGaps).
+     */
+    private fun guideRank(real: Boolean, idMatch: Boolean, lastStop: Long, order: Int, provider: Boolean): Long {
         val halfDaysAhead = ((lastStop - System.currentTimeMillis()).coerceAtLeast(0L) / (12 * HOUR)).coerceAtMost(999L)
-        return (if (real) 4_000_000L else 0L) + (if (idMatch) 2_000_000L else 0L) + halfDaysAhead * 1_000L - order
+        return (if (real) 8_000_000L else 0L) + (if (provider) 4_000_000L else 0L) +
+            (if (idMatch) 2_000_000L else 0L) + halfDaysAhead * 1_000L - order
     }
+
 
     /**
      * Some guides add a long placeholder ("Programming", "No information") that overlaps the real
@@ -2363,14 +2393,24 @@ class LiveTvRepository @Inject constructor(
         cands.forEach { (key, list) ->
             var bestScore = Long.MIN_VALUE
             var best: Pair<Cand, List<EpgProgram>>? = null
+            var bestProv: Pair<Long, List<EpgProgram>> = Long.MIN_VALUE to emptyList()
+            var bestExt: Pair<Long, List<EpgProgram>> = Long.MIN_VALUE to emptyList()
             list.forEach { c ->
                 val listings = cleanListings(programsBySource[c.sourceId]?.get(c.xmltvId).orEmpty())
                 if (listings.isEmpty()) return@forEach
-                val score = guideRank(!isPlaceholderListing(listings), c.idMatch, listings, c.order)
+                val provider = targets.getOrNull(c.order)?.playlistId != null
+                val real = !isPlaceholderListing(listings)
+                val score = guideRank(real, c.idMatch, listings, c.order, provider)
                 if (score > bestScore) { bestScore = score; best = c to listings }
+                val k = if (provider) bestProv else bestExt
+                if (real && score > k.first) { if (provider) bestProv = score to listings else bestExt = score to listings }
             }
             best?.let { (c, listings) ->
-                newPrograms[key] = listings.shiftedBy(tvgShiftOf[key] ?: 0L)
+                // TVXO: the best real guide of the other kind fills the empty time slots.
+                val chosenProvider = targets.getOrNull(c.order)?.playlistId != null
+                val other = (if (chosenProvider) bestExt else bestProv).second
+                val merged = if (other.isEmpty() || other === listings) listings else fillGaps(listings, other)
+                newPrograms[key] = merged.shiftedBy(tvgShiftOf[key] ?: 0L)
                 newAuto[key] = EpgAssignment(c.sourceId, c.xmltvId)
                 iconsBySource[c.sourceId]?.get(c.xmltvId)?.let { newIcons[key] = it }
             }
@@ -3020,7 +3060,8 @@ class LiveTvRepository @Inject constructor(
         const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 12; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
         private val qualityTokens = Regex("""\b(fhd|uhd|hd|sd|4k|8k|hevc|h265|h264|1080p|720p|backup|raw)\b""")
-        private val prefixToken = Regex("""^[a-z]{2,3}\s*[:|]\s*""")
+        // "UK: ", "US| ", and the "|UK| " form some providers use.
+        private val prefixToken = Regex("""^\|?[a-z]{2,3}\s*[:|]\s*""")
         private val bracketed = Regex("""\[.*?]|\(.*?\)""")
 
         private const val SOURCE_LISTS_VERSION = 1
@@ -3029,6 +3070,33 @@ class LiveTvRepository @Inject constructor(
 
         /** A guide or tvg-id as a name: "GloboSP.br" -> "globosp". */
         internal fun idName(id: String): String = normalize(id.trim().replace(countryEnd, ""))
+
+        /**
+         * [primary]'s listings plus those of [extra] that fall entirely in a gap of [primary] (no
+         * overlap with any of its shows), in time order. [primary] must be sorted by start.
+         */
+        internal fun fillGaps(primary: List<EpgProgram>, extra: List<EpgProgram>): List<EpgProgram> {
+            if (extra.isEmpty()) return primary
+            if (primary.isEmpty()) return extra
+            // The primary guide's covered time, merged into separate stretches.
+            val spans = ArrayList<LongArray>()
+            for (p in primary) {
+                val last = spans.lastOrNull()
+                if (last != null && p.startMs <= last[1]) { if (p.stopMs > last[1]) last[1] = p.stopMs }
+                else spans += longArrayOf(p.startMs, p.stopMs)
+            }
+            fun overlaps(e: EpgProgram): Boolean {
+                var lo = 0; var hi = spans.size - 1; var idx = -1
+                while (lo <= hi) {
+                    val mid = (lo + hi) ushr 1
+                    if (spans[mid][0] < e.stopMs) { idx = mid; lo = mid + 1 } else hi = mid - 1
+                }
+                return idx >= 0 && spans[idx][1] > e.startMs
+            }
+            val added = extra.filter { it.stopMs > it.startMs && !overlaps(it) }
+            if (added.isEmpty()) return primary
+            return (primary + added).sortedBy { it.startMs }
+        }
 
         internal fun normalize(name: String): String {
             var n = name.lowercase().trim()

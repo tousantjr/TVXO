@@ -111,6 +111,8 @@ class LiveTvSettingsViewModel @Inject constructor(
     fun setEpgEnabled(id: String, enabled: Boolean) = viewModelScope.launch { repository.setEpgEnabled(id, enabled) }
 
     fun refreshAll() = repository.refreshAll(force = true)
+    /** Downloads every guide again (the provider's and the extra XMLTV sources), in the background. */
+    fun refreshGuide() = repository.refreshEpgOnly()
 
     fun unhideChannel(key: String) = viewModelScope.launch { prefs.setChannelHidden(key, false) }
     fun unhideAllChannels() = viewModelScope.launch { prefs.clearHiddenChannels() }

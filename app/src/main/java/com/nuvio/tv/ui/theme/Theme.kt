@@ -41,20 +41,20 @@ val LocalNuvioExtendedColors = staticCompositionLocalOf {
 
 val LocalNuvioTextStyles = staticCompositionLocalOf { NuvioTextStyles }
 
-val LocalAppTheme = staticCompositionLocalOf { AppTheme.WHITE }
+val LocalAppTheme = staticCompositionLocalOf { AppTheme.TVXO_PINK }
 
-val LocalThemePalette = staticCompositionLocalOf { ThemeColors.White }
+val LocalThemePalette = staticCompositionLocalOf { ThemeColors.TvxoPink }
 
 val LocalSettingsUiStyle = staticCompositionLocalOf { SettingsUiStyle.CLASSIC }
 
 val LocalNuvioFocusRingStyle = staticCompositionLocalOf {
-    createFocusRingStyle(ThemeColors.Ocean)
+    createFocusRingStyle(ThemeColors.TvxoPink)
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun NuvioTheme(
-    appTheme: AppTheme = AppTheme.WHITE,
+    appTheme: AppTheme = AppTheme.TVXO_PINK,
     appFont: AppFont = AppFont.INTER,
     amoledMode: Boolean = false,
     amoledSurfacesMode: Boolean = false,

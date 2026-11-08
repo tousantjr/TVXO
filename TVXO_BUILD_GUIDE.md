@@ -8,6 +8,13 @@ The upstream remote is named `upstream`, and its push URL is set to `DISABLED` s
 
 ---
 
+## What's new (after 1.1.0-beta.13.1)
+
+- **TVXO Pink theme.** New theme preset **TVXO Pink**, now the default. Colours are sampled from the logo: pink `#FF0D7D` is the main accent (focus rings, selected items, buttons, progress, toggles, loaders) and lime `#BBF615` is the second colour (variant/containers, end of accent gradients). It uses near-black text on pink and lime, with black backgrounds. If someone had explicitly chosen another theme, they keep it. Change it under Settings > Appearance (theme colour).
+- **Extra guide sources (XMLTV).** Go to Settings > Live TV > Extra Guide Sources (XMLTV). Here you can add, edit or remove extra `.xml` / `.xml.gz` guide links, and there is a **Refresh Guide Now** action. Your Xtream provider's guide stays the main source. An extra guide takes over a channel only when the provider has no real listings for it. Otherwise it only fills empty time slots, with no overlapping shows. Channels are matched by tvg-id / epg_channel_id first, then by a normalised name (case-insensitive; `UK:`/`US:`/`|UK|` prefixes, HD/FHD/4K and punctuation are ignored). Guides are stream-parsed and cached in the background, and they refresh with the normal guide refresh (every 12 h by default). A broken link shows its error on its own row and doesn't stop the other guides.
+
+---
+
 ## 1. Create the GitHub repo and push
 
 1. On GitHub, signed in as **tousantjr**, create a new **empty** repository named `TVXO`: no README, no license, no .gitignore. Make it **public**. The in-app updater calls the public GitHub API without a token, so a private repo's releases are invisible to it.

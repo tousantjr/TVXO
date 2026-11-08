@@ -493,7 +493,7 @@ internal fun LiveTvSettingsContent(
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddXtream }
                     )
-                    SubHeading("TV Guides (EPG)")
+                    SubHeading("Extra Guide Sources (XMLTV)")
                     epgs.forEach { e ->
                         SettingsActionRow(
                             title = e.name,
@@ -504,10 +504,16 @@ internal fun LiveTvSettingsContent(
                         )
                     }
                     SettingsActionRow(
-                        title = "Add EPG Source",
-                        subtitle = "Extra TV listings from an XMLTV link (ending in .xml or .xml.gz). Guides linked in your playlists load by themselves.",
+                        title = "Add Extra Guide Source (XMLTV)",
+                        subtitle = "An XMLTV link (.xml or .xml.gz). Your provider's own guide stays the main one: extra guides only fill channels it has no listings for, and empty time slots.",
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddEpg }
+                    )
+                    SettingsActionRow(
+                        title = "Refresh Guide Now",
+                        subtitle = "Downloads your provider's guide and every extra guide source again, in the background",
+                        leadingIcon = Icons.Default.Refresh,
+                        onClick = { viewModel.refreshGuide() }
                     )
                     SubHeading("Updates")
                     SettingsActionRow(
@@ -1693,10 +1699,14 @@ internal fun LiveTvSettingsContent(
             }
         )
         LiveDialog.AddEpg -> SourceFormDialog(
-            title = "Add EPG source",
-            fields = listOf(FormField("Name", "Guide"), FormField("XMLTV URL", "http://…/epg.xml.gz")),
+            title = "Add extra guide source (XMLTV)",
+            fields = listOf(FormField("Name", "Extra guide"), FormField("XMLTV URL", "https://…/epg.xml.gz")),
             onDismiss = close,
-            onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addEpg(v[0], v[1]); close() }
+            onSave = { v, _ ->
+                val url = v[1].trim()
+                if (url.isNotBlank()) viewModel.addEpg(v[0].trim().ifBlank { guideNameFromUrl(url) }, url)
+                close()
+            }
         )
         is LiveDialog.PlaylistActions -> ActionListDialog(
             title = d.source.name,
@@ -1814,7 +1824,7 @@ internal fun LiveTvSettingsContent(
                 "Update now" to { viewModel.saveEpg(d.source); close() },
                 ("Time shift: " + offsetLabel(d.source.shiftMinutes)) to { dialog = LiveDialog.EpgSourceShift(d.source) },
                 (if (d.source.enabled) "Disable" else "Enable") to { viewModel.setEpgEnabled(d.source.id, !d.source.enabled); close() },
-                "Delete EPG source" to { dialog = LiveDialog.ConfirmDeleteEpg(d.source) }
+                "Remove this guide source" to { dialog = LiveDialog.ConfirmDeleteEpg(d.source) }
             ),
             onDismiss = close
         )
@@ -1959,10 +1969,14 @@ internal fun LiveTvSettingsContent(
             onConfirm = { viewModel.removeEpg(d.source.id); close() }
         )
         is LiveDialog.EditEpg -> SourceFormDialog(
-            title = "Edit EPG source",
+            title = "Edit extra guide source",
             fields = listOf(FormField("Name", "", d.source.name), FormField("XMLTV URL", "", d.source.url)),
             onDismiss = close,
-            onSave = { v, _ -> viewModel.saveEpg(d.source.copy(name = v[0], url = v[1])); close() }
+            onSave = { v, _ ->
+                val url = v[1].trim()
+                if (url.isNotBlank()) viewModel.saveEpg(d.source.copy(name = v[0].trim().ifBlank { guideNameFromUrl(url) }, url = url))
+                close()
+            }
         )
         LiveDialog.HiddenChannels -> UnhideDialog(
             title = "Hidden channels",
@@ -2702,3 +2716,7 @@ private fun SearchOrderList(order: List<String>, onChange: (List<String>) -> Uni
     }
 }
 
+
+/** A name for an extra guide added without one: the link's host ("epg.example.com"). */
+private fun guideNameFromUrl(url: String): String =
+    runCatching { java.net.URI(url).host?.removePrefix("www.") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Extra guide"

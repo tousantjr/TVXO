@@ -688,7 +688,12 @@ class EpgDatabase @Inject constructor(@ApplicationContext context: Context) :
         fromMs: Long,
         toMs: Long,
         /** Channels whose listings are moved (the playlist's tvg-shift), in ms. */
-        channelShifts: Map<String, Long> = emptyMap()
+        channelShifts: Map<String, Long> = emptyMap(),
+        /**
+         * TVXO: a second guide channel per channel whose listings fill the time slots the first
+         * one leaves empty. Only shows that overlap nothing already stored for the channel are added.
+         */
+        fill: Map<String, EpgAssignment> = emptyMap()
     ) {
         changes++
         try {
@@ -739,6 +744,28 @@ class EpgDatabase @Inject constructor(@ApplicationContext context: Context) :
                 db.execSQL("CREATE INDEX IF NOT EXISTS programs_ch_start ON programs(ch, start)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS programs_stop ON programs(stop)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS programs_start ON programs(start)")
+                if (fill.isNotEmpty()) {
+                    // After the index exists, so each "anything there already?" check is a quick lookup.
+                    db.execSQL("DROP TABLE IF EXISTS temp.fillc")
+                    db.execSQL("CREATE TEMP TABLE fillc (src TEXT NOT NULL, xid TEXT NOT NULL, ch TEXT NOT NULL, sh INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (src, xid, ch))")
+                    val fins = db.compileStatement("INSERT OR IGNORE INTO temp.fillc (src, xid, ch, sh) VALUES (?,?,?,?)")
+                    fill.forEach { (ch, a) ->
+                        fins.clearBindings(); fins.bindString(1, a.sourceId); fins.bindString(2, a.xmltvId); fins.bindString(3, ch)
+                        fins.bindLong(4, channelShifts[ch] ?: 0L)
+                        fins.executeInsert()
+                    }
+                    // SQLite works out the whole SELECT before inserting (it reads the table it
+                    // writes to), so only gaps in the first guide are filled.
+                    db.execSQL(
+                        "INSERT INTO programs (ch, start, stop, title, descr, cat, ep, icon, year, people) " +
+                            "SELECT c.ch, s.start + c.sh, s.stop + c.sh, s.title, s.descr, s.cat, s.ep, s.icon, s.year, s.people " +
+                            "FROM stage s JOIN temp.fillc c ON c.src = s.src AND c.xid = s.xid " +
+                            "WHERE s.stop + c.sh > ? AND s.start + c.sh < ? AND s.stop > s.start " +
+                            "AND NOT EXISTS (SELECT 1 FROM programs p WHERE p.ch = c.ch AND p.start < s.stop + c.sh AND p.stop > s.start + c.sh)",
+                        arrayOf<Any>(fromMs, toMs)
+                    )
+                    db.execSQL("DROP TABLE IF EXISTS temp.fillc")
+                }
                 putFingerprint(db, fingerprint, parts)
                 db.setTransactionSuccessful()
             } finally {
