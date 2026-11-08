@@ -164,7 +164,33 @@ Settings > Live TV > Playlists & Guides now offers only **"Add Xtream Codes Logi
 - `.github/workflows`: 5 upstream workflows deleted, new `tvxo-release.yml`. `.github/ISSUE_TEMPLATE`: homelessbrian link removed, names rebranded.
 - `README.md` replaced: the upstream README with its Discord/Ko-fi badges and Downloader code was removed and is still in git history. New `NOTICE` and this guide.
 
-## 12. Known limitations (be aware)
+## 12. Local build result (2026-11-08, Linux build machine)
+
+Environment: JDK 17, Android SDK platform 36, build-tools 36.0.0, NDK 29.0.14206865, CMake 3.22.1, Go 1.27.3.
+`local.properties` contained only `sdk.dir=...`, so no API keys were set.
+
+- `./gradlew :app:assembleFullDebug` returned **BUILD SUCCESSFUL in 16m 43s** with exit code 0. Outputs:
+  - `app-full-arm64-v8a-debug.apk` (85 MB)
+  - `app-full-armeabi-v7a-debug.apk` (83 MB)
+  - `app-full-universal-debug.apk` (187 MB)
+- `aapt2 dump badging` on the arm64 APK:
+  - package `com.tvxo.tv.debug`, versionCode 107600, label "TVXO Debug" in every locale
+  - leanback launcher entries carry icons and banners whose pixels match the TVXO placeholder art
+  - signed with the standard Android debug key
+- The arm64 APK contains `libffmpegJNI.so`, `libgav1JNI.so`, `libiamf*.so`, `libmpeghJNI.so`, `libmpv.so`, and the WireGuard/OpenVPN libs.
+
+- Signed release test, using a throwaway key passed through the `TVXO_KEYSTORE_*` / `TVXO_KEY_*` env vars (the same path CI uses), deleted afterwards:
+  - command: `./gradlew :app:assembleFullRelease -PlivetvBuildNumber=1 -PlivetvVersionName=1.1.0-beta.13.1`
+  - result: **BUILD SUCCESSFUL in 16m 40s**
+  - outputs: `app-full-arm64-v8a-release.apk` (64 MB), `app-full-armeabi-v7a-release.apk` (63 MB), `app-full-universal-release.apk` (166 MB)
+  - arm64 APK: package `com.tvxo.tv`, versionCode 107601, versionName `1.1.0-beta.13.1`, label "TVXO"
+  - `apksigner` shows the signer is the throwaway key, so the env-var signing works
+  - generated BuildConfig: `GITHUB_OWNER="tousantjr"`, `GITHUB_REPO="TVXO"`; `SUPABASE_URL`, `SUPPORT_URL`, `TEST_UPDATES_URL` and `TV_LOGIN_WEB_BASE_URL` are all `""`
+- The GitHub Actions workflow itself has **not** been run (the repo doesn't exist yet). Its YAML parses, and it uses the same Gradle command and signing env vars as the local release test.
+
+To build locally yourself: install the same tools, put `sdk.dir=/path/to/sdk` in `local.properties`, and run the command above.
+
+## 13. Known limitations (be aware)
 
 - **Not tested on a TV.** None of these changes have been run on a device yet. Check: launcher icon and banner, Live TV add flow, playback, and the updater (install build N, publish N+1, check for update).
 - **Codecs / players are upstream's current set, unchanged.**
