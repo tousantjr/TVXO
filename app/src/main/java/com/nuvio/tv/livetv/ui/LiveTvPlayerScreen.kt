@@ -70,7 +70,7 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private enum class PlayerDialog { NONE, OPTIONS, AUDIO, SUBTITLES, SCREEN_SIZE, STREAM_INFO, SLEEP, BACKUPS, BACKUP_FLYOUT }
+private enum class PlayerDialog { NONE, OPTIONS, AUDIO, SUBTITLES, SCREEN_SIZE, STREAM_INFO, SLEEP, BACKUPS, BACKUP_FLYOUT, MULTIVIEW }
 
 /** Right twice within this long, in full screen: the backup channels flyout. */
 private const val DOUBLE_RIGHT_MS = 400L
@@ -593,6 +593,7 @@ fun LiveTvPlayerScreen(
                                     com.nuvio.tv.livetv.record.LiveTvNotice.show(if (pinned) "Score pinned to the corner" else "Score unpinned")
                                 }
                                 PanelControl.BACKUPS -> dialog = PlayerDialog.BACKUPS
+                                PanelControl.MULTIVIEW -> dialog = PlayerDialog.MULTIVIEW
                                 PanelControl.MORE -> openGear()
                                 PanelControl.TIMELINE, null -> Unit
                             }
@@ -1331,6 +1332,25 @@ fun LiveTvPlayerScreen(
             onDismiss = { dialog = PlayerDialog.NONE }
         )
         PlayerDialog.BACKUP_FLYOUT -> if (backups.isEmpty()) dialog = PlayerDialog.NONE
+        // Multiview: up to four channels at once, each on its own player (the main one waits).
+        PlayerDialog.MULTIVIEW -> com.nuvio.tv.livetv.multiview.LiveTvMultiviewScreen(
+            initial = current,
+            channels = ui.allVisibleChannels.ifEmpty { displayList },
+            playback = viewModel.playback,
+            onFullScreen = { ch ->
+                dialog = PlayerDialog.NONE
+                closeFull()
+                viewModel.preview(ch)
+                showBanner()
+                scope.launch { delay(60); runCatching { rootFocus.requestFocus() } }
+            },
+            onExit = {
+                dialog = PlayerDialog.NONE
+                closeFull()
+                showBanner()
+                scope.launch { delay(60); runCatching { rootFocus.requestFocus() } }
+            }
+        )
         PlayerDialog.NONE -> Unit
     }
     // Holding OK on a copy in either backups list: its options (record, favorites, rename…).

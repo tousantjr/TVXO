@@ -1158,6 +1158,46 @@ class LiveTvPlaybackController @Inject constructor(
     }
 
     /** Back in the app: carry on, jumping to the live edge for live channels. */
+    // ---------------------------------------------------------------- multiview
+
+    /**
+     * Multiview: a stream for one of its tiles, built exactly like the main player's (same user
+     * agent, headers, redirects, HLS / TS handling, DRM). The tile plays it on its own player.
+     * Stalker portal links are asked for from the portal first.
+     */
+    suspend fun multiviewMediaSource(channel: LiveChannel): androidx.media3.exoplayer.source.MediaSource {
+        var ch = channel
+        var url = channel.url
+        if (url.startsWith(STALKER_SCHEME)) {
+            val source = preferences.playlists.first()
+                .singleOrNull { it.id == channel.sourceId && it.isStalker && it.liveEnabled }
+                ?: error("This portal is no longer set up.")
+            val link = kotlinx.coroutines.withContext(Dispatchers.IO) { stalker.resolve(source, channel.url) }
+            ch = channel.copy(headers = channel.headers + link.headers)
+            url = link.url
+        }
+        val mime = if (ch.key in plainTs) MimeTypes.VIDEO_MP2T else null
+        return buildMediaSource(url, ch.headers, isLive = true, drmInfo = ch.drm, mime = mime)
+    }
+
+    /**
+     * Multiview opening: the main player lets go of its stream (and its video decoder) right away,
+     * so the tiles have the decoders and the provider's connections. [resumeAfterMultiview]
+     * brings it back the way coming back from the background does.
+     */
+    fun suspendForMultiview() {
+        val p = _player ?: return
+        if (p.playWhenReady) {
+            pausedForBackground = true
+            p.pause()
+        }
+        backgroundJob?.cancel()
+        backgroundJob = null
+        disconnectForBackground()
+    }
+
+    fun resumeAfterMultiview() = onAppForeground()
+
     fun onAppForeground() {
         backgroundJob?.cancel()
         backgroundJob = null
@@ -2092,16 +2132,22 @@ class LiveTvPlaybackController @Inject constructor(
         }
     }
 
-    private fun buildMediaSource(url: String, headers: Map<String, String>, isLive: Boolean): androidx.media3.exoplayer.source.MediaSource {
+    private fun buildMediaSource(
+        url: String,
+        headers: Map<String, String>,
+        isLive: Boolean,
+        drmInfo: com.nuvio.tv.livetv.model.DrmInfo? = currentChannel?.drm,
+        mime: String? = forcedMime
+    ): androidx.media3.exoplayer.source.MediaSource {
         // Protected (DRM) streams, e.g. MPEG-DASH with a ClearKey or Widevine license.
-        currentChannel?.drm?.let { drm -> buildDrmMediaSource(url, headers, isLive, drm)?.let { return it } }
+        drmInfo?.let { drm -> buildDrmMediaSource(url, headers, isLive, drm, mime)?.let { return it } }
         val http = com.nuvio.tv.core.vpn.protectHttpFactory(DefaultHttpDataSource.Factory()
             .setUserAgent(headers["User-Agent"] ?: LiveTvRepository.DEFAULT_UA)
             .setDefaultRequestProperties(headers.filterKeys { it != "User-Agent" })
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000), headers, headers["User-Agent"] ?: LiveTvRepository.DEFAULT_UA)
-        val item = buildMediaItem(url, isLive)
+        val item = buildMediaItem(url, isLive, mime)
         // Closed captions: TV channels usually carry them inside the video (CEA-608/708) without
         // announcing them, so the player never offered them and Subtitles only showed "Off".
         // Look for them anyway, the way TV apps do.
@@ -2137,7 +2183,8 @@ class LiveTvPlaybackController @Inject constructor(
         url: String,
         headers: Map<String, String>,
         isLive: Boolean,
-        drm: com.nuvio.tv.livetv.model.DrmInfo
+        drm: com.nuvio.tv.livetv.model.DrmInfo,
+        mime: String? = forcedMime
     ): androidx.media3.exoplayer.source.MediaSource? = runCatching {
         val http = com.nuvio.tv.core.vpn.protectHttpFactory(DefaultHttpDataSource.Factory()
             .setUserAgent(headers["User-Agent"] ?: LiveTvRepository.DEFAULT_UA)
@@ -2145,7 +2192,7 @@ class LiveTvPlaybackController @Inject constructor(
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000), headers, headers["User-Agent"] ?: LiveTvRepository.DEFAULT_UA)
-        val itemBuilder = buildMediaItem(url, isLive).buildUpon()
+        val itemBuilder = buildMediaItem(url, isLive, mime).buildUpon()
         if (drm.manifestType == "mpd" || url.lowercase().contains(".mpd")) itemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
         if (drm.manifestType == "hls") itemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
         val uuid = when (drm.scheme) {
@@ -2213,11 +2260,11 @@ class LiveTvPlaybackController @Inject constructor(
         return org.json.JSONObject().put("keys", org.json.JSONArray(keys)).put("type", "temporary").toString()
     }
 
-    private fun buildMediaItem(url: String, isLive: Boolean): MediaItem {
+    private fun buildMediaItem(url: String, isLive: Boolean, mime: String? = forcedMime): MediaItem {
         val builder = MediaItem.Builder().setUri(Uri.parse(url))
         val lower = url.lowercase().substringBefore('?')
         when {
-            forcedMime != null -> builder.setMimeType(forcedMime)
+            mime != null -> builder.setMimeType(mime)
             lower.endsWith(".m3u8") || lower.contains("/hls/") || lower.contains("m3u8") ||
                 com.nuvio.tv.livetv.model.PlaylistSource.asksForHls(url) -> builder.setMimeType(MimeTypes.APPLICATION_M3U8)
             lower.endsWith(".mpd") -> builder.setMimeType(MimeTypes.APPLICATION_MPD)

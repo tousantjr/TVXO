@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Star
@@ -72,7 +73,7 @@ internal enum class PanelMode { LIVE, CATCHUP, SHIFT }
  * the timeline, back 30, play/pause, forward 30 and the gear; the rest are kept for the keys
  * that still name them, and live in the gear panel.
  */
-internal enum class PanelControl { TIMELINE, BACK, PLAY, FORWARD, LIVE, CC, AUDIO, SIZE, SLEEP, PIN, BELL, BACKUPS, MORE }
+internal enum class PanelControl { TIMELINE, BACK, PLAY, FORWARD, LIVE, CC, AUDIO, SIZE, SLEEP, PIN, BELL, BACKUPS, MULTIVIEW, MORE }
 
 /** Timeline: everything in wall-clock milliseconds. */
 internal data class PanelTimeline(
@@ -119,7 +120,7 @@ internal object BarPart {
 }
 
 /** Which controls the bar offers: back 30 / forward 30 only where you can skip, and the gear. */
-internal fun panelControls(mode: PanelMode, paused: Boolean, canSkip: Boolean, bell: Boolean = false, pin: Boolean = false, backups: Boolean = false): List<PanelControl> = buildList {
+internal fun panelControls(mode: PanelMode, paused: Boolean, canSkip: Boolean, bell: Boolean = false, pin: Boolean = false, backups: Boolean = false, multiview: Boolean = true): List<PanelControl> = buildList {
     val transport = mode != PanelMode.LIVE || paused
     // The timeline itself can be grabbed (Up from the buttons) and moved with ◀ / ▶.
     if (transport && canSkip) add(PanelControl.TIMELINE)
@@ -132,6 +133,8 @@ internal fun panelControls(mode: PanelMode, paused: Boolean, canSkip: Boolean, b
     if (bell) add(PanelControl.BELL)
     // Other copies of this channel (same name, any quality or playlist), right before the gear.
     if (backups) add(PanelControl.BACKUPS)
+    // Multiview: watch up to four channels at once.
+    if (multiview) add(PanelControl.MULTIVIEW)
     add(PanelControl.MORE)
 }
 
@@ -367,6 +370,18 @@ internal fun LiveTvPlayerPanel(
                                     Box(Modifier.onGloballyPositioned { onBackupsBounds(it.boundsInWindow()) }) {
                                         RoundButton(Icons.Default.FilterNone, focused = focused == PanelControl.BACKUPS && !inRow, big = false)
                                     }
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (PanelControl.MULTIVIEW in controls) {
+                                    val mvFocused = focused == PanelControl.MULTIVIEW && !inRow
+                                    if (mvFocused) {
+                                        LiveText(
+                                            androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.live_multiview),
+                                            size = 11.sp, weight = FontWeight.SemiBold, color = colors.TextPrimary
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+                                    RoundButton(Icons.AutoMirrored.Filled.ViewQuilt, focused = mvFocused, big = false)
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 RoundButton(Icons.Default.Settings, focused = focused == PanelControl.MORE && !inRow, big = false)
