@@ -24,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,7 +73,9 @@ data class LiveTrackOption(
 @OptIn(UnstableApi::class)
 @Singleton
 class LiveTvPlaybackController @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val preferences: com.nuvio.tv.livetv.data.LiveTvPreferences,
+    private val stalker: com.nuvio.tv.livetv.data.StalkerPortalClient
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -552,6 +555,8 @@ class LiveTvPlaybackController @Inject constructor(
     /** The channel the player is on (as it was when playback started). */
     val playingChannel: LiveChannel? get() = currentChannel
     private var currentUrl: String? = null
+    /** A Stalker channel's playback link being asked for (see [play]). */
+    private var portalJob: Job? = null
     private var attachCount = 0
     private var releaseJob: Job? = null
     private var reconnectJob: Job? = null
@@ -646,6 +651,36 @@ class LiveTvPlaybackController @Inject constructor(
         /** Catch-up: the real time the link asks for, to check against the stream's own clock (null: don't check). */
         catchupExpectWallMs: Long? = null
     ) {
+        // A Stalker portal channel: its playback link is asked for from the portal first (links
+        // are short-lived), then played like any other link.
+        if (overrideUrl == null && catchupTitle == null && channel.url.startsWith(STALKER_SCHEME)) {
+            portalJob?.cancel()
+            _player?.stop()
+            currentChannel = channel
+            currentUrl = null
+            _state.value = LivePlaybackState(channelKey = channel.key, isBuffering = true)
+            portalJob = scope.launch {
+                try {
+                    val source = preferences.playlists.first()
+                        .singleOrNull { it.id == channel.sourceId && it.isStalker && it.liveEnabled }
+                        ?: error("This portal is no longer set up.")
+                    val link = kotlinx.coroutines.withContext(Dispatchers.IO) { stalker.resolve(source, channel.url) }
+                    portalJob = null
+                    play(channel.copy(headers = channel.headers + link.headers), overrideUrl = link.url)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    com.nuvio.tv.livetv.model.LiveTvLoadReport.add("Stalker: ${channel.name} failed: ${e.message}")
+                    _state.value = LivePlaybackState(
+                        channelKey = channel.key,
+                        error = "Couldn't open this portal channel. ${e.message ?: "Check the portal account."}"
+                    )
+                }
+            }
+            return
+        }
+        portalJob?.cancel()
+        portalJob = null
         // Something chosen to play (back from the background through a launcher row, say):
         // that wins over picking up what was on before.
         resumeAfterBackground = null
@@ -915,6 +950,8 @@ class LiveTvPlaybackController @Inject constructor(
 
     fun stop() {
         clearStarting()
+        portalJob?.cancel()
+        portalJob = null
         reconnectJob?.cancel()
         stopReplayCache()
         // A pause buffer lets go of its provider connection too (a recording you're watching
@@ -2259,6 +2296,8 @@ class LiveTvPlaybackController @Inject constructor(
     }
 
     companion object {
+        /** Channel links from a Stalker portal (see StalkerPortalClient.writePlaylist). */
+        const val STALKER_SCHEME = "tvxo-stalker://"
         /** A sports addon stream needs at least this much timeline to pause and skip in it by itself. */
         private const val OWN_MIN_MS = 60_000L
         /** A live sports addon stream with at least this much rewind window is paused and skipped in by itself. */

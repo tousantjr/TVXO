@@ -1539,7 +1539,7 @@ private fun LiveTvGuideScreenBody(
                         when {
                             !ui.hasSources -> EmptyGuideMessage(
                                 title = "No playlists yet",
-                                body = "Add your Xtream Codes login in Settings › Live TV.",
+                                body = "Add an Xtream Codes login, M3U playlist or Stalker portal in Settings › Live TV.",
                                 action = "Press OK to open Live TV settings"
                             )
                             channels.isEmpty() && status.loading -> EmptyGuideMessage(

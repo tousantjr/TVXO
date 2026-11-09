@@ -322,6 +322,9 @@ fun HeroContentSection(
                             )
                         }
 
+                        // Rate on every signed-in tracker (Trakt / Simkl / MDBList); hidden when none is connected.
+                        PersonalRatingButton(meta)
+
                         if (trailerAvailable) {
                             ActionIconButtonPainter(
                                 painter = trailerPainter,
