@@ -9,7 +9,9 @@ Upstream projects:
 
 Some features are adapted from:
 - Nuvio ReSeq by abbaskip (GPL-3.0): https://github.com/abbaskip/Nuvio-ReSeq
-  (Stalker/MAG portals, personal ratings)
+  (Stalker/MAG portals, personal ratings, TVDB episode order)
+- TheTVDB (https://thetvdb.com) supplies episode-order metadata. TVXO is not
+  endorsed by TheTVDB; users and builds need their own TVDB API key.
 - IPTVnator by 4gray and contributors (MIT), referenced by ReSeq's Stalker
   client: https://github.com/4gray/iptvnator (see NOTICE-IPTVNATOR.md)
 

@@ -106,6 +106,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import java.text.SimpleDateFormat
 import java.util.Locale
+import com.nuvio.tv.domain.model.shownEpisode
 import java.util.TimeZone
 import com.nuvio.tv.ui.util.contentTextDirection
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
@@ -816,9 +817,9 @@ private fun EpisodeCard(
     }
     val strEpisode = stringResource(R.string.episodes_episode)
     val strUnavailable = stringResource(R.string.episodes_unavailable)
-    val episodeCode = remember(episode.episode, strEpisode) {
+    val episodeCode = remember(episode.displayEpisode, episode.episode, strEpisode) {
         val prefix = strEpisode.uppercase(Locale.getDefault())
-        episode.episode?.let { number -> "$prefix $number" } ?: prefix
+        episode.shownEpisode?.let { number -> "$prefix $number" } ?: prefix
     }
 
     val primaryColor = NuvioTheme.colors.Secondary

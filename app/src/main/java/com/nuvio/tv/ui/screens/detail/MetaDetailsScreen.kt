@@ -875,6 +875,7 @@ fun MetaDetailsScreen(
                     episodeShuffle = uiState.episodeShuffle,
                     shufflePoolEmpty = uiState.shufflePoolEmpty,
                     onEpisodeShuffleChange = viewModel::setEpisodeShuffle,
+                    onEpisodeOrderChanged = viewModel::reloadEpisodeOrder,
                     episodeOptionsOverlayStyle = uiState.episodeOptionsOverlayStyle,
                     showFullReleaseDate = uiState.showFullReleaseDate,
                     overallRatingsVisibility = uiState.overallRatingsVisibility,
@@ -1218,6 +1219,7 @@ private fun MetaDetailsContent(
     episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffleSettings,
     shufflePoolEmpty: Boolean,
     onEpisodeShuffleChange: suspend (com.nuvio.tv.domain.model.EpisodeShuffleSettings) -> Boolean,
+    onEpisodeOrderChanged: () -> Unit = {},
     episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle,
     showFullReleaseDate: Boolean,
     overallRatingsVisibility: HomeImdbRatingsVisibility,
@@ -2478,6 +2480,7 @@ private fun MetaDetailsContent(
                 Box(modifier = Modifier.bringIntoViewResponder(heroNoScrollResponder)) {
                     HeroContentSection(
                         meta = meta,
+                        onEpisodeOrderChanged = onEpisodeOrderChanged,
                         nextEpisode = nextEpisode,
                         nextToWatch = nextToWatch,
                         onPlayClick = { if (shufflePoolEmpty) showRandomEpisodeOverlay = true else heroPlayClick() },
