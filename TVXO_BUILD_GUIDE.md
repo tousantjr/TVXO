@@ -8,7 +8,17 @@ The upstream remote is named `upstream`, and its push URL is set to `DISABLED` s
 
 ---
 
-## What's new (after 1.1.0-beta.13.1)
+## What's new (after the TVXO Pink / XMLTV release)
+
+Features adapted from [Nuvio ReSeq](https://github.com/abbaskip/Nuvio-ReSeq) by abbaskip (GPLv3); the Stalker part also follows [IPTVnator](https://github.com/4gray/iptvnator) (MIT, notice in `NOTICE-IPTVNATOR.md`).
+
+- **M3U playlists are back.** Settings > Live TV > Playlists & Guides has **Add M3U Playlist** again, next to **Add Xtream Codes Login**. The Live TV empty-state screen still opens the Xtream login first and mentions that M3U and Stalker can be added in settings.
+- **Stalker / MAG portals.** Settings > Live TV > Playlists & Guides > **Add Stalker / MAG Portal**: name, portal URL, MAC address, and optional username, password and serial for portals that need them. It imports live channels and the portal's own guide. Playback links are asked from the portal when a channel starts (they are short-lived), so the player never sees the portal's login. Code: `livetv/data/StalkerPortalClient.kt`, wired into `LiveTvRepository` (channels and guide) and `LiveTvPlaybackController` (links). **Only tested against fake portals in unit tests (27 tests), never against a real provider.**
+- **Rate button.** Movie and show pages have a **Rate** button that saves a 1-10 rating (shown as half stars) to Trakt, Simkl and MDBList at once, and can remove it. It appears only when at least one of those is signed in, and only shows services that can identify the title. Code: `core/tracking/PersonalRating.kt`, `data/repository/PersonalRatingsService.kt`, `ui/screens/detail/PersonalRatingsControl.kt`. ReSeq's "ask to rate after a movie" prompt was not added.
+- **Provider movies and shows in normal search**: already in TVXO before this change (the On Demand row in Search, `livetv/ondemand/OnDemandSearch.kt`), so nothing was added.
+- **Not added: TVDB episode order.** In ReSeq it changes over 100 files, including watch progress and Trakt/Simkl/MDBList progress sync, and every user needs their own TVDB API key. It was left out to avoid breaking Continue Watching.
+
+### Earlier (after 1.1.0-beta.13.1)
 
 - **TVXO Pink theme.** New theme preset **TVXO Pink**, now the default. Colours are sampled from the logo: pink `#FF0D7D` is the main accent (focus rings, selected items, buttons, progress, toggles, loaders) and lime `#BBF615` is the second colour (variant/containers, end of accent gradients). It uses near-black text on pink and lime, with black backgrounds. If someone had explicitly chosen another theme, they keep it. Change it under Settings > Appearance (theme colour).
 - **Extra guide sources (XMLTV).** Go to Settings > Live TV > Extra Guide Sources (XMLTV). Here you can add, edit or remove extra `.xml` / `.xml.gz` guide links, and there is a **Refresh Guide Now** action. Your Xtream provider's guide stays the main source. An extra guide takes over a channel only when the provider has no real listings for it. Otherwise it only fills empty time slots, with no overlapping shows. Channels are matched by tvg-id / epg_channel_id first, then by a normalised name (case-insensitive; `UK:`/`US:`/`|UK|` prefixes, HD/FHD/4K and punctuation are ignored). Guides are stream-parsed and cached in the background, and they refresh with the normal guide refresh (every 12 h by default). A broken link shows its error on its own row and doesn't stop the other guides.
@@ -199,9 +209,9 @@ Transparent images are extracted from the black background by brightness (alpha 
 | **Google Drive Backup & Sync** (`livetv/sync/LiveTvDriveSync.kt`) | the user's own Google Drive; needs **your** Google OAuth client | Kept. The card is shown **only** when `GOOGLE_DRIVE_CLIENT_ID` is set. To enable it, create a Google Cloud project, enable the Google Drive API, create an OAuth client of type **"TVs and Limited Input devices"** (the app uses Google's device-code flow, `oauth2.googleapis.com/device/code`, scope `drive.appdata`), and set both secrets. The backup file name is now "TVXO Live TV backup.json". |
 | Supporters / Ko-fi screen | nuvio.tv supporters API, Ko-fi links | **Disabled** (`AppFeaturePolicy.supportNuvioEnabled = false` in the `full` flavor). The About row and the navigation route are gone. |
 
-## 10. Live TV source: Xtream only
+## 10. Live TV sources
 
-Settings > Live TV > Playlists & Guides now offers only **"Add Xtream Codes Login"**: name, server, username, password, plus two include toggles. The "Add M3U Playlist" row was removed. The M3U dialog code remains, unreachable, so the diff stays small. Existing M3U entries, e.g. from a restored backup, still appear and can be edited or removed. The Live TV empty-state text now says "Add your Xtream Codes login in Settings › Live TV." The "TV Guides (EPG)" rows were kept: they add extra guide data, not channel sources, and an Xtream login brings its own guide.
+Settings > Live TV > Playlists & Guides offers **Add Xtream Codes Login**, **Add M3U Playlist** and **Add Stalker / MAG Portal**. (Between 1.1.0-beta.13.1 and the ReSeq features update it was Xtream only.) The Live TV empty state opens the Xtream login first. The "TV Guides (EPG)" and "Extra Guide Sources (XMLTV)" rows add guide data, not channel sources.
 
 ## 11. Full change list (branch `tvxo-rebrand`)
 

@@ -7,6 +7,12 @@ Upstream projects:
   - NuvioPlusIPTV: https://github.com/homelessbrian/NuvioPlusIPTV
   - Nuvio (NuvioTV): https://github.com/NuvioMedia/NuvioTV
 
+Some features are adapted from:
+- Nuvio ReSeq by abbaskip (GPL-3.0): https://github.com/abbaskip/Nuvio-ReSeq
+  (Stalker/MAG portals, personal ratings)
+- IPTVnator by 4gray and contributors (MIT), referenced by ReSeq's Stalker
+  client: https://github.com/4gray/iptvnator (see NOTICE-IPTVNATOR.md)
+
 TVXO, like the projects it is based on, is free software licensed under the
 GNU General Public License, version 3 (GPL-3.0). See the LICENSE file for the
 full license text. There is NO WARRANTY, to the extent permitted by law.
