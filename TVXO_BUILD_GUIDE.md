@@ -110,6 +110,10 @@ Published on 2026-11-08 from commit `59d674eb` (https://github.com/tousantjr/TVX
 
 History note: to publish without the `workflows` permission, the branch history was rewritten with `git filter-repo --path .github/workflows --invert-paths`. All other history is kept; 54 commits that only touched workflow files dropped out. The original history is kept only in the local backup branches `tvxo-rebrand-backup-original` / `tvxo-rebrand-backup-with-ci` on the build machine, not on GitHub.
 
+### 1.1.0-beta.13.5 (published from the build machine)
+
+Built locally from `main` commit `0bf81fa0` with the release keystore (`-PlivetvBuildNumber=5 -PlivetvVersionName=1.1.0-beta.13.5`) and published through the REST API, because the publishing GitHub App can't start Actions runs. versionCode `107605`, same signing cert SHA-256 `85:D5:6A:EC:...:FB:63` as earlier releases. `downloader/TVXO.apk` is the arm64-v8a APK (sha256 `b2aaeeea...7dbc64`). The next CI run continues at `.6`.
+
 ### What the workflow does
 
 1. Open Actions > **TVXO Release** > Run workflow, choose the branch (`main`), and optionally type release notes.
