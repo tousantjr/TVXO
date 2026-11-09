@@ -163,7 +163,10 @@ internal data class CwVideoSummary(
     val episode: Int?,
     val overview: String?,
     val available: Boolean? = null,
-    val rating: Double? = null
+    val rating: Double? = null,
+    /** TVDB order numbers when the profile picked one for the show (Up Next follows them). */
+    val displaySeason: Int? = null,
+    val displayEpisode: Int? = null
 )
 
 private fun Meta.toCwSummary(): CwMetaSummary = CwMetaSummary(
@@ -188,7 +191,9 @@ private fun Meta.toCwSummary(): CwMetaSummary = CwMetaSummary(
             episode = v.episode,
             overview = v.overview,
             available = v.available,
-            rating = v.rating
+            rating = v.rating,
+            displaySeason = v.displaySeason,
+            displayEpisode = v.displayEpisode
         )
     }
 )
@@ -2280,13 +2285,18 @@ internal fun resolveNextUpVideoFromMeta(
     meta: CwMetaSummary,
     showUnairedNextUp: Boolean
 ): CwVideoSummary? {
+    // With a TVDB order chosen, Up Next follows its numbers (Specials there are skipped like provider specials).
+    val tvdbOrdered = meta.videos.any { it.displaySeason != null && it.displayEpisode != null }
     val episodes = meta.videos
         .filter { video ->
             val season = video.season
             val episode = video.episode
-            season != null && episode != null && season != 0
+            season != null && episode != null && (if (tvdbOrdered) video.displaySeason != null && video.displaySeason != 0 else season != 0)
         }
-        .sortedWith(compareBy<CwVideoSummary>({ it.season ?: Int.MAX_VALUE }, { it.episode ?: Int.MAX_VALUE }))
+        .sortedWith(
+            if (tvdbOrdered) compareBy<CwVideoSummary>({ it.displaySeason }, { it.displayEpisode })
+            else compareBy<CwVideoSummary>({ it.season ?: Int.MAX_VALUE }, { it.episode ?: Int.MAX_VALUE })
+        )
 
     if (episodes.isEmpty()) return null
 
@@ -2295,6 +2305,15 @@ internal fun resolveNextUpVideoFromMeta(
     if (seedSeason == null || seedEpisode == null) return null
 
     var watchedIndex = episodes.indexOfFirst { it.season == seedSeason && it.episode == seedEpisode }
+
+    // The seed isn't a regular episode in the TVDB order (e.g. TVDB moved it to Specials): use provider order.
+    if (tvdbOrdered && watchedIndex < 0 && episodes.none { it.id == progress.videoId }) {
+        return resolveNextUpVideoFromMeta(
+            progress,
+            meta.copy(videos = meta.videos.map { it.copy(displaySeason = null, displayEpisode = null) }),
+            showUnairedNextUp
+        )
+    }
 
     // Fallback: if the seed wasn't found by season+episode
     if (watchedIndex < 0) {
@@ -2326,11 +2345,12 @@ internal fun resolveNextUpVideoFromMeta(
     }
 
     val todayLocal = LocalDate.now(ZoneId.systemDefault())
-    val watchedEpisodeSeason = episodes[watchedIndex].season
+    fun CwVideoSummary.orderSeason() = if (tvdbOrdered) displaySeason else season
+    val watchedEpisodeSeason = episodes[watchedIndex].orderSeason()
     val nextVideo = episodes.drop(watchedIndex + 1).firstOrNull { video ->
         if (video.season in progress.excludedNextUpSeasons) return@firstOrNull false
         val releaseDate = parseEpisodeReleaseDate(video.released)
-        val isSeasonRollover = video.season != watchedEpisodeSeason
+        val isSeasonRollover = video.orderSeason() != watchedEpisodeSeason
         if (isSeasonRollover) {
             if (releaseDate == null) {
                 logNextUpDecision(
@@ -2372,6 +2392,13 @@ internal fun resolveNextUpVideoFromMeta(
 }
 
 private const val CW_META_NEGATIVE_CACHE_TTL_MS = 5 * 60_000L
+
+/** Adds TVDB display numbers when this profile picked a TVDB order for the show. */
+private suspend fun HomeViewModel.withTvdbOrder(meta: Meta): Meta {
+    val service = tvdbEpisodeOrder ?: return meta
+    val ordered = service.orderVideos(profileManager.activeProfileId.value, listOf(meta.id, meta.imdbId), meta.videos)
+    return if (ordered === meta.videos) meta else meta.copy(videos = ordered)
+}
 
 internal suspend fun HomeViewModel.resolveCwMeta(progress: WatchProgress) =
     resolveMetaForProgress(progress, cwMetaCache)
@@ -2463,7 +2490,7 @@ private suspend fun HomeViewModel.resolveMetaForProgress(
                     }
                     NetworkResult.Loading -> Unit
                 }
-                summary = ((result as? NetworkResult.Success<*>)?.data as? Meta)?.toCwSummary()
+                summary = ((result as? NetworkResult.Success<*>)?.data as? Meta)?.let { withTvdbOrder(it) }?.toCwSummary()
                 if (summary != null) break
             }
             if (summary != null) break
@@ -2479,7 +2506,7 @@ private suspend fun HomeViewModel.resolveMetaForProgress(
                             id = candidateId
                         ).first { it !is NetworkResult.Loading }
                     }
-                    summary = ((fallbackResult as? NetworkResult.Success<*>)?.data as? Meta)?.toCwSummary()
+                    summary = ((fallbackResult as? NetworkResult.Success<*>)?.data as? Meta)?.let { withTvdbOrder(it) }?.toCwSummary()
                     if (summary != null) break
                 }
                 if (summary != null) break

@@ -306,7 +306,10 @@ data class NextEpisodeInfo(
     val hasAired: Boolean,
     val available: Boolean? = null,
     val unairedMessage: String?,
-    val isOtherType: Boolean = false
+    val isOtherType: Boolean = false,
+    /** Numbers shown on screen when a TVDB order is chosen; season/episode stay the provider's. */
+    val displaySeason: Int? = null,
+    val displayEpisode: Int? = null
 )
 
 data class SubtitleSyncCue(

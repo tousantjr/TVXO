@@ -30,9 +30,30 @@ internal fun applyTvdbOrder(
     label: String,
     aired: List<TvdbEpisode>,
     selected: List<TvdbEpisode>
-): TvdbOrderingResult {
-    val episodes = meta.videos.filter { it.season != null && it.episode != null }
-    if (episodes.isEmpty()) return TvdbOrderingResult.Rejected("This show has no numbered episodes.")
+): TvdbOrderingResult = when (val result = numberTvdbVideos(meta.videos, label, aired, selected)) {
+    is TvdbNumbering.Rejected -> TvdbOrderingResult.Rejected(result.reason)
+    is TvdbNumbering.Numbered -> TvdbOrderingResult.Applied(
+        meta.copy(
+            videos = result.videos,
+            episodeOrder = EpisodeOrderInfo(seriesId, type, label, unmatched = result.unmatched)
+        )
+    )
+}
+
+internal sealed interface TvdbNumbering {
+    data class Numbered(val videos: List<Video>, val unmatched: Int) : TvdbNumbering
+    data class Rejected(val reason: String) : TvdbNumbering
+}
+
+/** Gives [videos] display numbers in the [selected] TVDB order (see the note at the top). */
+internal fun numberTvdbVideos(
+    videos: List<Video>,
+    label: String,
+    aired: List<TvdbEpisode>,
+    selected: List<TvdbEpisode>
+): TvdbNumbering {
+    val episodes = videos.filter { it.season != null && it.episode != null }
+    if (episodes.isEmpty()) return TvdbNumbering.Rejected("This show has no numbered episodes.")
     val matches = matchProviderEpisodes(episodes, aired)
     val regular = episodes.filter { (it.season ?: 0) > 0 }
     val selectedById = selected.associateBy { it.id }
@@ -45,7 +66,7 @@ internal fun applyTvdbOrder(
     }
     val placedRegular = regular.count { it in placed }
     if (regular.isNotEmpty() && placedRegular < regular.size * TVDB_MIN_MATCH_SHARE) {
-        return TvdbOrderingResult.Rejected(
+        return TvdbNumbering.Rejected(
             "Only $placedRegular of ${regular.size} episodes could be matched to TVDB's $label, so provider order is shown."
         )
     }
@@ -53,7 +74,7 @@ internal fun applyTvdbOrder(
     var nextSpecial = placed.values.filter { it.season == 0 }.maxOfOrNull { it.number } ?: 0
     val unmatched = episodes.filter { it !in placed }.sortedWith(compareBy({ it.season }, { it.episode }))
     val unmatchedNumbers = unmatched.associateWith { ++nextSpecial }
-    val videos = meta.videos.map { video ->
+    val numbered = videos.map { video ->
         val slot = placed[video]
         when {
             slot != null -> video.copy(displaySeason = slot.season, displayEpisode = slot.number)
@@ -61,12 +82,7 @@ internal fun applyTvdbOrder(
             else -> video
         }
     }
-    return TvdbOrderingResult.Applied(
-        meta.copy(
-            videos = videos,
-            episodeOrder = EpisodeOrderInfo(seriesId, type, label, unmatched = unmatched.count { (it.season ?: 0) > 0 })
-        )
-    )
+    return TvdbNumbering.Numbered(numbered, unmatched = unmatched.count { (it.season ?: 0) > 0 })
 }
 
 /**
