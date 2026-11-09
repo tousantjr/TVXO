@@ -1,5 +1,8 @@
 package com.nuvio.tv.ui.screens.player.autosync
 
+import com.nuvio.tv.core.network.PlaybackCallFactory
+import org.junit.After
+import org.junit.Before
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -17,6 +20,11 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class EmbeddedSubtitleTimelineLoaderTest {
+    private val realWrap = PlaybackCallFactory.wrap
+    // The VPN layer needs a running Android app; test against the plain client.
+    @Before fun plainClient() { PlaybackCallFactory.wrap = { it } }
+    @After fun restoreClient() { PlaybackCallFactory.wrap = realWrap }
+
     @Test
     fun concurrentIndexLoadsShareOneDownload(): Unit = runBlocking {
         MockWebServer().use { server ->
