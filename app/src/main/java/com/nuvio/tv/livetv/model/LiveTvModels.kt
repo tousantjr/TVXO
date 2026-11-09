@@ -58,9 +58,16 @@ data class PlaylistSource(
      * Minutes to move the time asked for in this playlist's catch-up (and catch-up saves): for
      * providers whose archive runs on a different clock than their guide.
      */
-    val catchupShiftMinutes: Int = 0
+    val catchupShiftMinutes: Int = 0,
+    /** Stalker / Ministra (MAG) portal: its URL and the MAC address the provider authorised. */
+    val stalkerPortal: String = "",
+    val stalkerMac: String = "",
+    val stalkerUsername: String = "",
+    val stalkerPassword: String = "",
+    val stalkerSerial: String = ""
 ) {
     val isXtream: Boolean get() = xtreamServer.isNotBlank()
+    val isStalker: Boolean get() = stalkerPortal.isNotBlank()
 
     /** The time zone catch-up links are written in: the one picked in settings, else the server's. */
     val catchupZone: String get() = catchupTimezone.ifBlank { serverTimezone }

@@ -61,6 +61,11 @@ class LiveTvSettingsViewModel @Inject constructor(
     fun addPlaylist(name: String, url: String, userAgent: String) =
         viewModelScope.launch { repository.addPlaylist(name, url, userAgent) }
 
+    fun addStalker(name: String, portal: String, mac: String, user: String, pass: String, serial: String, guide: Boolean = true) =
+        viewModelScope.launch {
+            repository.addStalker(name, portal, mac, user, pass, serial, guide)
+        }
+
     fun addXtream(name: String, server: String, user: String, pass: String, importVod: Boolean = true, importLive: Boolean = true) =
         viewModelScope.launch {
             repository.addXtream(name, server, user, pass, importVod, importLive)

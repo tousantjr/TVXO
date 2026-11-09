@@ -178,6 +178,7 @@ private val CLOCK_SIZES = listOf("small" to "Small", "medium" to "Medium", "larg
 private sealed interface LiveDialog {
     data object AddM3u : LiveDialog
     data object AddXtream : LiveDialog
+    data object AddStalker : LiveDialog
     data object AddEpg : LiveDialog
     data class PlaylistActions(val source: PlaylistSource) : LiveDialog
     data class CatchupZone(val source: PlaylistSource) : LiveDialog
@@ -467,7 +468,7 @@ internal fun LiveTvSettingsContent(
                         val account = accounts[pl.id]
                         val expiring = pl.enabled && account?.expiringSoon() == true
                         SettingsActionRow(
-                            title = pl.name + if (pl.isXtream) " (Xtream)" else "",
+                            title = pl.name + if (pl.isStalker) " (Stalker)" else if (pl.isXtream) " (Xtream)" else "",
                             subtitle = when {
                                 pl.isXtream && pl.enabled && !pl.importLive && pl.importVod -> "Movies & series only (TV channels off)"
                                 pl.isXtream && pl.enabled && !pl.importLive && !pl.importVod -> "Nothing included: turn on TV channels or movies & series under Edit"
@@ -485,13 +486,23 @@ internal fun LiveTvSettingsContent(
                             onClick = { dialog = LiveDialog.PlaylistActions(pl) }
                         )
                     }
-                    // TVXO: Xtream Codes is the only source type offered. The M3U add row was
-                    // removed; existing M3U entries (e.g. from a restored backup) still show and can be edited/removed.
                     SettingsActionRow(
                         title = "Add Xtream Codes Login",
                         subtitle = "Sign in with the server, username and password from your provider. Its TV guide comes with it.",
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddXtream }
+                    )
+                    SettingsActionRow(
+                        title = "Add M3U Playlist",
+                        subtitle = "A playlist link (.m3u / .m3u8). Add its XMLTV guide below if the playlist doesn't link one.",
+                        leadingIcon = Icons.Default.Add,
+                        onClick = { dialog = LiveDialog.AddM3u }
+                    )
+                    SettingsActionRow(
+                        title = "Add Stalker / MAG Portal",
+                        subtitle = "A portal URL and the MAC address your provider authorised. Live channels and the portal's guide.",
+                        leadingIcon = Icons.Default.Add,
+                        onClick = { dialog = LiveDialog.AddStalker }
                     )
                     SubHeading("Extra Guide Sources (XMLTV)")
                     epgs.forEach { e ->
@@ -1682,6 +1693,7 @@ internal fun LiveTvSettingsContent(
             onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addPlaylist(v[0], v[1], v[2]); close() }
         )
         LiveDialog.AddXtream -> AddXtreamSourceDialog(viewModel, onDone = close)
+        LiveDialog.AddStalker -> StalkerSourceDialog(viewModel, source = null, onDone = close)
         LiveDialog.AddEpg -> SourceFormDialog(
             title = "Add extra guide source (XMLTV)",
             fields = listOf(FormField("Name", "Extra guide"), FormField("XMLTV URL", "https://…/epg.xml.gz")),
@@ -1756,7 +1768,9 @@ internal fun LiveTvSettingsContent(
         )
         is LiveDialog.EditPlaylist -> {
             val src = d.source
-            if (src.isXtream) {
+            if (src.isStalker) {
+                StalkerSourceDialog(viewModel, source = src, onDone = close)
+            } else if (src.isXtream) {
                 SourceFormDialog(
                     title = "Edit Xtream login",
                     fields = listOf(
@@ -2387,9 +2401,12 @@ private fun SourceFormDialog(
     onSaveBoth: ((List<String>, Boolean, Boolean) -> Unit)? = null,
     /** Xtream: "Include TV channels", shown first. Its value goes to [onSaveAll]. */
     toggleLive: Pair<String, Boolean>? = null,
-    onSaveAll: ((values: List<String>, guide: Boolean, vod: Boolean, live: Boolean) -> Unit)? = null
+    onSaveAll: ((values: List<String>, guide: Boolean, vod: Boolean, live: Boolean) -> Unit)? = null,
+    /** Checks the values before saving: a message to show instead of saving, or null when fine. */
+    validate: ((List<String>) -> String?)? = null
 ) {
     val values = remember { fields.map { mutableStateOf(it.initial) } }
+    var problem by remember { mutableStateOf<String?>(null) }
     var toggleValue by remember { mutableStateOf(toggle?.second ?: true) }
     var toggle2Value by remember { mutableStateOf(toggle2?.second ?: true) }
     var toggleLiveValue by remember { mutableStateOf(toggleLive?.second ?: true) }
@@ -2450,13 +2467,17 @@ private fun SourceFormDialog(
             )
         }
         }
+        problem?.let {
+            Text(text = it, style = MaterialTheme.typography.bodySmall, color = NuvioTheme.colors.Error)
+        }
         SettingsDialogActionRow {
             SettingsDialogActionButton(text = "Cancel", onClick = onDismiss)
             SettingsDialogActionButton(
                 text = "Save",
                 onClick = {
                     val v = values.map { it.value.trim() }
-                    when {
+                    problem = validate?.invoke(v)
+                    if (problem == null) when {
                         onSaveAll != null -> onSaveAll(v, toggleValue, toggle2Value, toggleLiveValue)
                         onSaveBoth != null -> onSaveBoth(v, toggleValue, toggle2Value)
                         else -> onSave(v, toggleValue)
@@ -2466,6 +2487,38 @@ private fun SourceFormDialog(
             )
         }
     }
+}
+
+/** Add or edit a Stalker / Ministra (MAG) portal (adapted from Nuvio ReSeq). */
+@Composable
+internal fun StalkerSourceDialog(viewModel: LiveTvSettingsViewModel, source: PlaylistSource?, onDone: () -> Unit) {
+    SourceFormDialog(
+        title = if (source == null) "Add Stalker / MAG portal" else "Edit Stalker portal",
+        fields = listOf(
+            FormField("Name", "My portal", source?.name.orEmpty()),
+            FormField("Portal URL", "http://portal.example.com/c/", source?.stalkerPortal.orEmpty()),
+            FormField("MAC address", "00:1A:79:00:00:00", source?.stalkerMac.orEmpty()),
+            FormField("Username (only if the portal asks)", "Optional", source?.stalkerUsername.orEmpty()),
+            FormField("Password (only if the portal asks)", "Optional", source?.stalkerPassword.orEmpty()),
+            FormField("Serial number (only if the portal asks)", "Optional", source?.stalkerSerial.orEmpty())
+        ),
+        toggle = "Load the portal's guide" to (source?.useEmbeddedEpg ?: true),
+        validate = { com.nuvio.tv.livetv.data.StalkerPortalClient.validate(it[1], it[2]) },
+        onDismiss = onDone,
+        onSave = { v, guide ->
+            if (source == null) {
+                viewModel.addStalker(v[0], v[1], v[2], v[3], v[4], v[5], guide)
+            } else {
+                viewModel.savePlaylist(
+                    source.copy(
+                        name = v[0].ifBlank { source.name }, stalkerPortal = v[1], stalkerMac = v[2].uppercase(),
+                        stalkerUsername = v[3], stalkerPassword = v[4], stalkerSerial = v[5], useEmbeddedEpg = guide
+                    )
+                )
+            }
+            onDone()
+        }
+    )
 }
 
 @Composable

@@ -405,9 +405,9 @@ internal fun executeSubtitleRequest(
     permissive: OkHttpClient = subtitleUnvalidatedTlsHttpClient
 ): okhttp3.Response =
     try {
-        com.nuvio.vpn.android.VpnHttpClient.wrap(validated).newCall(request).execute()
+        com.nuvio.tv.core.network.PlaybackCallFactory.wrap(validated).newCall(request).execute()
     } catch (e: SSLException) {
-        com.nuvio.vpn.android.VpnHttpClient.wrap(permissive).newCall(request.withoutCredentialHeaders()).execute()
+        com.nuvio.tv.core.network.PlaybackCallFactory.wrap(permissive).newCall(request.withoutCredentialHeaders()).execute()
     }
 
 private fun PlayerRuntimeController.executeSubtitleDownload(
