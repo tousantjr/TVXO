@@ -131,7 +131,8 @@ fun HeroContentSection(
     onHeroActionFocused: () -> Unit = {},
     onPlayFocusRestored: () -> Unit = {},
     onShowFullDescription: () -> Unit = {},
-    onTruncationChanged: (Boolean) -> Unit = {}
+    onTruncationChanged: (Boolean) -> Unit = {},
+    onEpisodeOrderChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isSeriesApi = remember(meta.apiType) {
@@ -324,6 +325,9 @@ fun HeroContentSection(
 
                         // Rate on every signed-in tracker (Trakt / Simkl / MDBList); hidden when none is connected.
                         PersonalRatingButton(meta)
+
+                        // TVDB episode order (aired / DVD / absolute ...), series only.
+                        TvdbOrderButton(meta, onEpisodeOrderChanged)
 
                         if (trailerAvailable) {
                             ActionIconButtonPainter(
