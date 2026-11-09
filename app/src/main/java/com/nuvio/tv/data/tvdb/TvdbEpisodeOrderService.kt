@@ -4,6 +4,7 @@ import android.util.Log
 import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.domain.model.EpisodeOrderInfo
 import com.nuvio.tv.domain.model.Meta
+import com.nuvio.tv.domain.model.Video
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -100,6 +101,40 @@ class TvdbEpisodeOrderService @Inject constructor(
         }
     }
 
+    /**
+     * [videos] numbered in the TVDB order this profile picked for the show saved under [aliases],
+     * so Next episode and Up Next follow it. Returns [videos] unchanged when there's no choice,
+     * they're already numbered, or TVDB can't be used right now (playback never waits on errors).
+     */
+    suspend fun orderVideos(
+        profileId: Int,
+        aliases: Collection<String?>,
+        videos: List<Video>,
+        timeoutMs: Long = PLAYBACK_TIMEOUT_MS
+    ): List<Video> {
+        if (videos.isEmpty() || videos.any { it.displaySeason != null }) return videos
+        val ids = aliases.filterNotNull().filter(String::isNotBlank).distinct()
+        if (ids.isEmpty()) return videos
+        val choice = runCatching { choices.choice(profileId, ids) }.getOrNull() ?: return videos
+        return try {
+            withTimeout(timeoutMs) {
+                val aired = episodes(choice.seriesId, AIRED)
+                val selected = if (choice.type == AIRED) aired else episodes(choice.seriesId, choice.type)
+                if (selected.isEmpty()) return@withTimeout videos
+                when (val result = numberTvdbVideos(videos, choice.type, aired, selected)) {
+                    is TvdbNumbering.Numbered -> result.videos
+                    is TvdbNumbering.Rejected -> videos
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            videos
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            Log.w(TAG, "TVDB order for playback failed", e)
+            videos
+        }
+    }
+
     private suspend fun episodes(seriesId: Long, type: String): List<TvdbEpisode> {
         val key = "$seriesId|$type"
         episodeCache[key]?.takeIf { fresh(it) }?.let { return it.value }
@@ -115,6 +150,8 @@ class TvdbEpisodeOrderService @Inject constructor(
         private const val TAG = "TvdbEpisodeOrder"
         const val AIRED = "official"
         private const val TIMEOUT_MS = 15_000L
+        /** Playback only waits briefly; results are usually cached from the detail page. */
+        private const val PLAYBACK_TIMEOUT_MS = 5_000L
         private const val CACHE_MS = 24 * 60 * 60 * 1000L
 
         fun labelFor(order: TvdbOrder): String = when (order.type) {

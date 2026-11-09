@@ -1,8 +1,7 @@
 name: TVXO Release
 
-# NOTE: this file lives in ci/ and is NOT active. To enable it, copy it to
-# .github/workflows/tvxo-release.yml (e.g. via the GitHub website) and add the 4 Actions
-# secrets described in TVXO_BUILD_GUIDE.md, section "Enable automatic CI later".
+# Active copy: .github/workflows/tvxo-release.yml (ci/tvxo-release.yml is kept identical).
+# Needs the Actions secrets listed below; see TVXO_BUILD_GUIDE.md.
 
 # Builds a signed TVXO release APK and publishes it to this repository's GitHub Releases,
 # where the in-app updater looks for it (owner/repo is set by `tvxo.updateRepo` in

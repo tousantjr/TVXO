@@ -68,6 +68,7 @@ class PlayerViewModel @Inject constructor(
     private val bingeGroupCacheDataStore: com.nuvio.tv.data.local.BingeGroupCacheDataStore,
     private val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
     private val episodeShufflePlayback: com.nuvio.tv.core.player.EpisodeShufflePlayback,
+    private val tvdbEpisodeOrder: com.nuvio.tv.data.tvdb.TvdbEpisodeOrderService,
     private val watchedItemsPreferences: com.nuvio.tv.data.local.WatchedItemsPreferences,
     private val watchedSeriesStateHolder: WatchedSeriesStateHolder,
     private val trackPreferenceDataStore: com.nuvio.tv.data.local.TrackPreferenceDataStore,
@@ -150,6 +151,7 @@ class PlayerViewModel @Inject constructor(
         serverPlayback = serverPlayback,
         serverStreams = serverStreams,
         party = partyRepository,
+        tvdbEpisodeOrder = tvdbEpisodeOrder,
         profileId = savedStateHandle.get<String>("profileId")?.toIntOrNull()
             ?: profileManager.activeProfileId.value,
         savedStateHandle = savedStateHandle,
