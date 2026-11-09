@@ -191,6 +191,10 @@ class LiveTvViewModel @Inject constructor(
     private val hasSources: StateFlow<Boolean> = prefs.playlists.map { it.isNotEmpty() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    /** TVXO: whether any Live TV source is set up; null until the saved sources are read. */
+    val sourcesSetUp: StateFlow<Boolean?> = prefs.playlists.map { val set: Boolean? = it.isNotEmpty(); set }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     /**
      * Channels with the user's renames and renumbering applied. Worked out once for the whole
      * app (guide, full screen and search share it) instead of once per screen.

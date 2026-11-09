@@ -383,9 +383,9 @@ private fun AuthQrLoginPane(
                     modifier = if (focusMainAction) Modifier.focusRequester(initialFocusRequester) else Modifier,
                     colors = ButtonDefaults.colors(
                         containerColor = AuthSecondaryButtonBackground,
-                        focusedContainerColor = Color.White,
+                        focusedContainerColor = NuvioTheme.colors.Secondary,
                         contentColor = AuthTextPrimary,
-                        focusedContentColor = Color.Black,
+                        focusedContentColor = NuvioTheme.colors.OnSecondary,
                         disabledContainerColor = AuthSecondaryButtonBackground.copy(alpha = 0.45f)
                     ),
                     border = ButtonDefaults.border(
@@ -413,9 +413,9 @@ private fun AuthQrLoginPane(
                 },
                 colors = ButtonDefaults.colors(
                     containerColor = AuthSecondaryButtonBackground,
-                    focusedContainerColor = Color.White,
+                    focusedContainerColor = NuvioTheme.colors.Secondary,
                     contentColor = AuthTextPrimary,
-                    focusedContentColor = Color.Black
+                    focusedContentColor = NuvioTheme.colors.OnSecondary
                 ),
                 border = ButtonDefaults.border(
                     border = androidx.tv.material3.Border(
@@ -478,9 +478,9 @@ private fun AuthEmailLoginForm(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.colors(
                 containerColor = Color.White,
-                focusedContainerColor = Color.White,
+                focusedContainerColor = NuvioTheme.colors.Secondary,
                 contentColor = Color.Black,
-                focusedContentColor = Color.Black,
+                focusedContentColor = NuvioTheme.colors.OnSecondary,
                 disabledContainerColor = Color.White.copy(alpha = 0.12f),
                 disabledContentColor = AuthTextPrimary.copy(alpha = 0.58f)
             ),

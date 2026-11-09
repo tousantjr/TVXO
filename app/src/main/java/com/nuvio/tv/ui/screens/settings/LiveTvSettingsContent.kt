@@ -1698,23 +1698,7 @@ internal fun LiveTvSettingsContent(
             onDismiss = close,
             onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addPlaylist(v[0], v[1], v[2]); close() }
         )
-        LiveDialog.AddXtream -> SourceFormDialog(
-            title = "Add Xtream Codes login",
-            fields = listOf(
-                FormField("Name", "My provider"),
-                FormField("Server", "http://host:port"),
-                FormField("Username", ""),
-                FormField("Password", "")
-            ),
-            onDismiss = close,
-            onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3]); close() },
-            toggleLive = "Include TV channels" to true,
-            toggle2 = "Include movies & series (On Demand)" to true,
-            onSaveAll = { v, _, vod, live ->
-                if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3], importVod = vod, importLive = live)
-                close()
-            }
-        )
+        LiveDialog.AddXtream -> AddXtreamSourceDialog(viewModel, onDone = close)
         LiveDialog.AddStalker -> StalkerSourceDialog(
             onDismiss = close,
             onSave = { name, config, guide, vod, live ->
@@ -2538,6 +2522,31 @@ private fun StalkerSourceDialog(
         onSaveAll = { values, guide, vod, live ->
             onSave(values[0], com.nuvio.stalker.StalkerConfig(values[1], values[2], values[3], values[4], values[5],
                 values[6], values[7], values[8], values[9].ifBlank { "UTC" }, values[10].ifBlank { "en" }), guide, vod, live)
+        }
+    )
+}
+
+/**
+ * The Xtream Codes login form (Settings > Live TV > Add Xtream Codes login). Also opened straight
+ * from the Live TV page when no source is set up yet. [onDone] runs after Save or Cancel.
+ */
+@Composable
+internal fun AddXtreamSourceDialog(viewModel: LiveTvSettingsViewModel, onDone: () -> Unit) {
+    SourceFormDialog(
+        title = "Add Xtream Codes login",
+        fields = listOf(
+            FormField("Name", "My provider"),
+            FormField("Server", "http://host:port"),
+            FormField("Username", ""),
+            FormField("Password", "")
+        ),
+        onDismiss = onDone,
+        onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3]); onDone() },
+        toggleLive = "Include TV channels" to true,
+        toggle2 = "Include movies & series (On Demand)" to true,
+        onSaveAll = { v, _, vod, live ->
+            if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3], importVod = vod, importLive = live)
+            onDone()
         }
     )
 }
