@@ -18,6 +18,8 @@ Features adapted from [Nuvio ReSeq](https://github.com/abbaskip/Nuvio-ReSeq) by 
 - **Provider movies and shows in normal search**: already in TVXO before this change (the On Demand row in Search, `livetv/ondemand/OnDemandSearch.kt`), so nothing was added.
 - **Not added: TVDB episode order.** In ReSeq it changes over 100 files, including watch progress and Trakt/Simkl/MDBList progress sync, and every user needs their own TVDB API key. It was left out to avoid breaking Continue Watching.
 
+- **Unit tests all pass** (`./gradlew :app:testFullDebugUnitTest`: 2746 tests, 0 failures, 1 skipped). Four older tests had always failed on this fork: three subtitle tests, because the fork's VPN layer refuses network calls outside a running app, and one Trakt test, because builds without Trakt app keys skip token refresh. Playback-side HTTP now goes through `core/network/PlaybackCallFactory.kt`, which tests can swap for a plain client (the app always uses the VPN layer), and the Trakt test no longer depends on build keys.
+
 ### Earlier (after 1.1.0-beta.13.1)
 
 - **TVXO Pink theme.** New theme preset **TVXO Pink**, now the default. Colours are sampled from the logo: pink `#FF0D7D` is the main accent (focus rings, selected items, buttons, progress, toggles, loaders) and lime `#BBF615` is the second colour (variant/containers, end of accent gradients). It uses near-black text on pink and lime, with black backgrounds. If someone had explicitly chosen another theme, they keep it. Change it under Settings > Appearance (theme colour).
