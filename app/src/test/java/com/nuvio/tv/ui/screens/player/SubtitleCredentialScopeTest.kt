@@ -1,5 +1,8 @@
 package com.nuvio.tv.ui.screens.player
 
+import com.nuvio.tv.core.network.PlaybackCallFactory
+import org.junit.After
+import org.junit.Before
 import okhttp3.Dns
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.assertEquals
@@ -18,6 +21,11 @@ import javax.net.ssl.X509TrustManager
 import kotlin.concurrent.thread
 
 class SubtitleCredentialScopeTest {
+    private val realWrap = PlaybackCallFactory.wrap
+    // The VPN layer needs a running Android app; test against the plain client.
+    @Before fun plainClient() { PlaybackCallFactory.wrap = { it } }
+    @After fun restoreClient() { PlaybackCallFactory.wrap = realWrap }
+
 
     private val streamHeaders = mapOf(
         "Authorization" to "Bearer token",

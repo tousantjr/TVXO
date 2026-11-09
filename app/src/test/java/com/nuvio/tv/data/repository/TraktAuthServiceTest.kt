@@ -7,6 +7,8 @@ import com.nuvio.tv.data.local.TraktAuthState
 import com.nuvio.tv.data.remote.api.TraktApi
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.spyk
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -27,12 +29,14 @@ class TraktAuthServiceTest {
         coEvery { authSessionNoticeDataStore.markTraktReconnectRequired() } returns Unit
         coEvery { traktApi.refreshToken(any()) } returns Response.error(400, "invalid_grant".toResponseBody())
 
-        val service = TraktAuthService(
+        val service = spyk(TraktAuthService(
             context = mockk<Context>(relaxed = true),
             traktApi = traktApi,
             traktAuthDataStore = traktAuthDataStore,
             authSessionNoticeDataStore = authSessionNoticeDataStore
-        )
+        ))
+        // Builds without Trakt app keys (local/CI) would skip the refresh entirely.
+        every { service.hasRequiredCredentials() } returns true
 
         assertFalse(service.refreshTokenIfNeeded(force = true))
         assertFalse(service.refreshTokenIfNeeded(force = true))
