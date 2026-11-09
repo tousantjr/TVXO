@@ -170,8 +170,26 @@ fun LiveTvGuideScreen(
     // only has the built-in defaults, and it drew one frame of the old look, then redrew.
     val loadedSettings by viewModel.settings.collectAsStateWithLifecycle()
     val menuLoaded by viewModel.menuStyleLoaded.collectAsStateWithLifecycle()
-    if (!viewModel.isSettingsLoaded(loadedSettings) || !menuLoaded) {
-        Box(Modifier.fillMaxSize().background(NuvioTheme.colors.Background))
+    // TVXO: no Xtream source set up: the login form right away, no loading wait.
+    val sourcesSetUp by viewModel.sourcesSetUp.collectAsStateWithLifecycle()
+    if (sourcesSetUp == false) {
+        LiveTvNoSourceScreen(onOpenSettings = onOpenSettings)
+        return
+    }
+    if (!viewModel.isSettingsLoaded(loadedSettings) || !menuLoaded || sourcesSetUp == null) {
+        // Usually a split second; visible text (and Back / Left to the menu) in case it isn't.
+        val openSidebar = com.nuvio.tv.LocalOpenSidebar.current
+        val sidebarExpanded = com.nuvio.tv.LocalSidebarExpanded.current
+        BackHandler(enabled = !sidebarExpanded) { openSidebar() }
+        Box(
+            Modifier.fillMaxSize().background(NuvioTheme.colors.Background)
+                .onPreviewKeyEvent { e ->
+                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) { openSidebar(); true } else false
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            LiveText("Loading Live TV...", color = NuvioTheme.colors.TextSecondary)
+        }
         return
     }
     LiveTvGuideScreenBody(
@@ -666,6 +684,8 @@ private fun LiveTvGuideScreenBody(
     }
     BackHandler(enabled = !sidebarExpanded) {
         when {
+            // TVXO: nothing loaded (yet): Back goes to the menu, never out of the app.
+            ui.allVisibleChannels.isEmpty() -> openSidebar()
             column == GuideColumn.PROGRAM -> {
                 column = GuideColumn.CHANNEL
                 windowStart = floorSlot(now)
@@ -1456,6 +1476,12 @@ private fun LiveTvGuideScreenBody(
                                 }
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                                 val code = event.nativeKeyEvent.keyCode
+                                // TVXO: no channels at all (still loading, or the source failed):
+                                // Left goes to the menu, so the highlight is never stuck here.
+                                if (ui.allVisibleChannels.isEmpty() && event.key == Key.DirectionLeft) {
+                                    openSidebar()
+                                    return@onPreviewKeyEvent true
+                                }
                                 when {
                                     event.key == Key.DirectionUp -> {
                                         // Up from the first channel reaches the ⚙ in the top bar.
@@ -1520,6 +1546,16 @@ private fun LiveTvGuideScreenBody(
                                 title = status.message ?: "Loading…",
                                 body = "Large playlists and guides can take several minutes the first time. It keeps going if you leave this screen, and next time it opens straight away.",
                                 action = null
+                            )
+                            channels.isEmpty() && ui.allVisibleChannels.isEmpty() && status.error != null -> EmptyGuideMessage(
+                                title = "Couldn't load your channels",
+                                body = status.error + "\nCheck your Xtream login in Settings › Live TV.",
+                                action = "Press Left or Back for the menu"
+                            )
+                            channels.isEmpty() && ui.allVisibleChannels.isEmpty() && ui.selectedGroupId != ChannelGroup.SEARCH -> EmptyGuideMessage(
+                                title = "No channels loaded yet",
+                                body = "Your Xtream source hasn't returned any channels. Check it in Settings › Live TV, or try Update Everything Now.",
+                                action = "Press Left or Back for the menu"
                             )
                             channels.isEmpty() && ui.selectedGroupId == ChannelGroup.SEARCH -> EmptyGuideMessage(
                                 title = if (ui.searchQuery.isBlank()) "Search channels" else "No channels match \"${ui.searchQuery}\"",

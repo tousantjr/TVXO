@@ -246,6 +246,9 @@ val LocalSplashBackground = compositionLocalOf { SplashBackground() }
 
 private const val SIDEBAR_AUTO_COLLAPSE_DELAY_MS = 3_000L
 
+/** TVXO: no account server, so the first-run account (QR) sign-in screen is skipped. */
+private const val TVXO_FIRST_RUN_ACCOUNT_SCREEN = false
+
 private const val MAX_SUPPORTED_FONT_SCALE = 1.15f
 
 data class DrawerItem(
@@ -509,7 +512,9 @@ open class MainActivity : ComponentActivity() {
             PartyEffects(partyRepository)
 
             LaunchedEffect(hasSeenAuthQrOnFirstLaunch, authState) {
-                if (hasSeenAuthQrOnFirstLaunch == false && authState is AuthState.FullAccount) {
+                // TVXO has no account server, so the first-run account sign-in screen is never
+                // shown: first launch behaves as if "Continue without account" was chosen.
+                if (hasSeenAuthQrOnFirstLaunch == false && (!TVXO_FIRST_RUN_ACCOUNT_SCREEN || authState is AuthState.FullAccount)) {
                     appOnboardingDataStore.setHasSeenAuthQrOnFirstLaunch(true)
                     onboardingCompletedThisSession = true
                 }
@@ -821,6 +826,7 @@ open class MainActivity : ComponentActivity() {
                     if (!surfaceContentReady) {
                         // Still loading auth state; nothing to show yet.
                     } else if (
+                        TVXO_FIRST_RUN_ACCOUNT_SCREEN &&
                         hasSeenAuthQrOnFirstLaunch == false &&
                         authState !is AuthState.FullAccount &&
                         !onboardingCompletedThisSession
