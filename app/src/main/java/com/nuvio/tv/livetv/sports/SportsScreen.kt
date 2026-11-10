@@ -428,7 +428,8 @@ fun SportsScreen(
                 onQuickWatch = ::quickWatch,
                 onPick = { picker = true },
                 onWatchChannel = { ch -> viewModel.watchChannel(ch); onOpenLive() },
-                onMultiview = { mine -> openMultiview(mine) }
+                onMultiview = { mine -> openMultiview(mine) },
+                onMultiviewFrom = { ev -> openMultiview(mineOnly = false, first = ev) }
             )
         }
         // The picture, on top of the page where its slot is (one view for every page, so it
@@ -548,7 +549,9 @@ private fun SportsHub(
     onPick: () -> Unit,
     onWatchChannel: (LiveChannel) -> Unit,
     /** Multiview with every live game ([mineOnly]: My Teams' live games only). */
-    onMultiview: (mineOnly: Boolean) -> Unit = {}
+    onMultiview: (mineOnly: Boolean) -> Unit = {},
+    /** Multiview from one live game's card, that game first. */
+    onMultiviewFrom: (SportsEvent) -> Unit = {}
 ) {
     // Back opens the side menu first, like the guide and On Demand (it used to go straight to
     // Home). With the menu open, Back is left to the app. A game page, Pick Your Teams and the
@@ -785,6 +788,7 @@ private fun SportsHub(
             onPick = onPick,
             onOpen = onOpen,
             onQuickWatch = onQuickWatch,
+            onMultiviewFrom = onMultiviewFrom,
             leaguesLine = if (effectiveChip == CHIP_ALL && leagueView == null) leaguesLine else null,
             leaguesBarReq = leaguesBarReq,
             onChooseLeagues = { leaguesOpen = true }
@@ -992,6 +996,7 @@ private fun GameList(
     onPick: () -> Unit,
     onOpen: (SportsEvent) -> Unit,
     onQuickWatch: (SportsEvent) -> Unit,
+    onMultiviewFrom: (SportsEvent) -> Unit = {},
     /** All Events only: the "Choose Leagues" bar above the games (null: no bar). */
     leaguesLine: String? = null,
     leaguesBarReq: FocusRequester? = null,
@@ -1029,17 +1034,25 @@ private fun GameList(
                 item(key = prefix + row.first().id) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         row.forEachIndexed { i, ev ->
-                            GameCard(
-                                ev = ev,
-                                follows = follows,
-                                now = now,
-                                use24h = use24h,
-                                hideScores = settings.hideScores,
-                                playing = playing(ev),
-                                modifier = Modifier.weight(1f).then(if (i == 0) rowFirst else Modifier).focusRequester(requesterFor(ev.id)),
-                                onClick = { onOpen(ev) },
-                                onLongClick = { onQuickWatch(ev) }
-                            )
+                            // Live games with a channel: a Multiview button under the card (Down from it).
+                            val mv = ev.state == GameState.LIVE && matches[ev.id].orEmpty().isNotEmpty()
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                GameCard(
+                                    ev = ev,
+                                    follows = follows,
+                                    now = now,
+                                    use24h = use24h,
+                                    hideScores = settings.hideScores,
+                                    playing = playing(ev),
+                                    modifier = Modifier.fillMaxWidth().then(if (i == 0) rowFirst else Modifier).focusRequester(requesterFor(ev.id)),
+                                    onClick = { onOpen(ev) },
+                                    onLongClick = { onQuickWatch(ev) }
+                                )
+                                if (mv) SportsAction(
+                                    "▦  " + androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_multiview_button),
+                                    onClick = { onMultiviewFrom(ev) }
+                                )
+                            }
                         }
                         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
