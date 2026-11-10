@@ -82,6 +82,26 @@ class PlaybackAvailabilityTest {
         assertFalse(available.canStream("other", video.id, "uncached-parent"))
     }
 
+    @Test
+    fun `provider on demand enables movies and series only`() {
+        val onDemand = PlaybackAvailability(isLoaded = true, onDemand = true)
+        assertTrue(onDemand.canStream("movie", "tt123"))
+        assertTrue(onDemand.canStream("series", "tt123:1:1"))
+        assertFalse(onDemand.canStream("channel", "channel:1"))
+        assertFalse(onDemand.copy(onDemand = false).canStream("movie", "tt123"))
+    }
+
+    @Test
+    fun `on demand is offered while the first import is still running`() {
+        val s = com.nuvio.tv.livetv.ondemand.OnDemandStreams
+        // Fresh install: Xtream login with movies & series saved, catalog not imported yet.
+        assertTrue(s.shouldOffer(hasContent = false, hasVodLogin = true, inStreams = true, enabled = true))
+        assertTrue(s.shouldOffer(hasContent = true, hasVodLogin = false, inStreams = true, enabled = true))
+        assertFalse(s.shouldOffer(hasContent = false, hasVodLogin = false, inStreams = true, enabled = true))
+        assertFalse(s.shouldOffer(hasContent = true, hasVodLogin = true, inStreams = false, enabled = true))
+        assertFalse(s.shouldOffer(hasContent = true, hasVodLogin = true, inStreams = true, enabled = false))
+    }
+
     private fun addon() = Addon(
         id = "addon", name = "Addon", version = "1", description = null, logo = null,
         baseUrl = "https://example.com", catalogs = emptyList(), types = emptyList(),

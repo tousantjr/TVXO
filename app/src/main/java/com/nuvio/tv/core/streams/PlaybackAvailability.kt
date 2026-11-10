@@ -24,7 +24,9 @@ internal data class PlaybackAvailability(
     val scrapers: List<ScraperInfo> = emptyList(),
     val isLoaded: Boolean = false,
     private val cachedMeta: (String, String) -> Meta? = { _, _ -> null },
-    private val serverStreams: (String, String) -> Boolean = { _, _ -> false }
+    private val serverStreams: (String, String) -> Boolean = { _, _ -> false },
+    /** Live TV fork: your IPTV provider's On Demand may have movies/series (offered as "📡 On Demand"). */
+    val onDemand: Boolean = com.nuvio.tv.livetv.ondemand.OnDemandStreams.offeredInStreams
 ) {
     fun canStream(
         type: String,
@@ -36,6 +38,5 @@ internal data class PlaybackAvailability(
         addons.any { it.enabled && it.supportsStreamResource(type, videoId) } ||
         scrapers.any { it.enabled && it.supportsType(type) } ||
         serverStreams(type, videoId) ||
-        // Live TV fork: your IPTV provider's On Demand may have it (offered as "📡 On Demand").
-        ((type == "movie" || type == "series") && com.nuvio.tv.livetv.ondemand.OnDemandStreams.offeredInStreams)
+        ((type == "movie" || type == "series") && onDemand)
 }
