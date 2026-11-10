@@ -189,9 +189,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK=$(ls out/*arm64-v8a*.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls out/*universal*.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls out/*.apk | head -1)
+          # Universal first: Sony Bravia and many Google TVs run 32-bit (armeabi-v7a) userspace,
+          # so an arm64-only APK shows "This app isn't compatible with your TV."
+          APK=$(ls out/*universal*.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls out/*armeabi-v7a*.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls out/*arm64-v8a*.apk 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then echo "::error::No universal, armeabi-v7a or arm64-v8a APK found in out/ for the Downloader link"; exit 1; fi
+          echo "Downloader link will serve: $APK"
           mkdir -p dl
           cp "$APK" dl/TVXO.apk
           if ! gh release view downloader -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
