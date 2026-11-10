@@ -141,6 +141,8 @@ private const val CHIP_SPORT = "sp:"
 /** Tables: your leagues' tables (see SportsTables). */
 private const val CHIP_TABLES = "tables"
 private const val CHIP_NETWORKS = "networks"
+/** My Teams This Week: the weekly calendar (see SportsWeekPage). */
+private const val CHIP_WEEK = "week"
 
 /** Width of the game list next to the video window. */
 private val LIST_WIDTH = 470.dp
@@ -289,7 +291,15 @@ fun SportsScreen(
         events.firstOrNull { ev -> matches[ev.id]?.any { it.channel.key == key } == true }?.let { SportsLaunch.openedFromSports(it.id) }
         onOpenLive()
     }
+    // Multiview from Sports: the live games' channels (null: closed).
+    var multiview by remember { mutableStateOf<List<LiveChannel>?>(null) }
+    fun openMultiview(mineOnly: Boolean, first: SportsEvent? = null) {
+        val chans = viewModel.multiviewChannels(mineOnly, first)
+        if (chans.isEmpty()) LiveTvNotice.show(if (mineOnly) "None of your teams' live games has a channel yet" else "No live games with a channel right now")
+        else multiview = chans
+    }
     com.nuvio.tv.livetv.ui.FrameMeter("Sports")
+    androidx.compose.runtime.CompositionLocalProvider(LocalSportsAnim provides SportsAnimLevel.from(settings.animations)) {
     Box(
         Modifier
             .fillMaxSize()
@@ -369,6 +379,7 @@ fun SportsScreen(
                 onTable = { tableReq = TableRequest(opened.leagueId, opened.sides.map { it.team.id }.toSet()) },
                 onOpenGame = { ev -> openId = ev.id },
                 onQuickWatch = ::quickWatch,
+                onMultiview = { openMultiview(mineOnly = false, first = opened) },
                 backLabel = fromLabel ?: "Sports",
                 onClose = {
                     val back = fromRoute
@@ -416,7 +427,9 @@ fun SportsScreen(
                 onOpen = { ev -> fromRoute = null; fromLabel = null; openId = ev.id },
                 onQuickWatch = ::quickWatch,
                 onPick = { picker = true },
-                onWatchChannel = { ch -> viewModel.watchChannel(ch); onOpenLive() }
+                onWatchChannel = { ch -> viewModel.watchChannel(ch); onOpenLive() },
+                onMultiview = { mine -> openMultiview(mine) },
+                onMultiviewFrom = { ev -> openMultiview(mineOnly = false, first = ev) }
             )
         }
         // The picture, on top of the page where its slot is (one view for every page, so it
@@ -424,6 +437,17 @@ fun SportsScreen(
         if (videoOn) VideoLayer(slot, root, playerRef ?: viewModel.player, playing = playingKey != null, backdrop = backdrop, onAttached = { viewModel.onSurfaceAttached() })
     }
     fixFor?.let { ev -> FixChannelDialog(ev, matches[ev.id].orEmpty(), settings.hideScores, viewModel) { fixFor = null } }
+    multiview?.let { chans ->
+        com.nuvio.tv.livetv.multiview.LiveTvMultiviewScreen(
+            initial = chans.firstOrNull(),
+            initialChannels = chans.drop(1),
+            channels = remember { viewModel.repo.channelsForPicker() },
+            playback = viewModel.playbackController,
+            onFullScreen = { ch -> multiview = null; viewModel.watchChannel(ch); onOpenLive() },
+            onExit = { multiview = null }
+        )
+    }
+    }
 }
 
 /** How far down the theme glow reaches (as in the guide). */
@@ -523,7 +547,11 @@ private fun SportsHub(
     onOpen: (SportsEvent) -> Unit,
     onQuickWatch: (SportsEvent) -> Unit,
     onPick: () -> Unit,
-    onWatchChannel: (LiveChannel) -> Unit
+    onWatchChannel: (LiveChannel) -> Unit,
+    /** Multiview with every live game ([mineOnly]: My Teams' live games only). */
+    onMultiview: (mineOnly: Boolean) -> Unit = {},
+    /** Multiview from one live game's card, that game first. */
+    onMultiviewFrom: (SportsEvent) -> Unit = {}
 ) {
     // Back opens the side menu first, like the guide and On Demand (it used to go straight to
     // Home). With the menu open, Back is left to the app. A game page, Pick Your Teams and the
@@ -701,10 +729,19 @@ private fun SportsHub(
             }
         }
     }
+    val weekLabel = androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_week_chip)
+    val mvMineLabel = androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_multiview_mine)
+    val mvAll = remember(events, matches, follows) { SportsMultiview.liveGames(events, matches, follows, mineOnly = false).size }
+    val mvMine = remember(events, matches, follows) { SportsMultiview.liveGames(events, matches, follows, mineOnly = true).size }
     val filters: @Composable (Modifier) -> Unit = { m ->
         LazyRow(m.keepFocusWhileHeld(vertical = false), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
             val upTo: Modifier = Modifier
             item(key = CHIP_MINE) { FilterIcon("★", "My Sports", effectiveChip == CHIP_MINE, Modifier.focusRequester(firstChip).then(upTo), withLabel = true) { pickChip(CHIP_MINE) } }
+            // My Teams This Week: a calendar of your teams' games.
+            if (follows.teams.isNotEmpty()) item(key = CHIP_WEEK) { FilterIcon("📅", weekLabel, effectiveChip == CHIP_WEEK, upTo, withLabel = true) { pickChip(CHIP_WEEK) } }
+            // Multiview: every live game with a channel, or just your teams'.
+            if (mvAll > 1) item(key = "mv_all") { FilterIcon("▦", androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_multiview_all, mvAll), false, upTo, iconColor = SportsColors.Lime, withLabel = true) { onMultiview(false) } }
+            if (mvMine > 0 && mvMine != mvAll) item(key = "mv_mine") { FilterIcon("▦", mvMineLabel, false, upTo, iconColor = SportsColors.Pink, withLabel = true) { onMultiview(true) } }
             // Everything on, day by day (live games first), with how many are on now.
             item(key = CHIP_ALL) {
                 FilterIcon(
@@ -723,9 +760,13 @@ private fun SportsHub(
             }
         }
     }
+    // Slide in from the side the day came from; fade on a new filter, sport or when games load.
+    val prevDay = remember { intArrayOf(day) }
+    val dayDir = Integer.signum(day - prevDay[0])
+    androidx.compose.runtime.SideEffect { prevDay[0] = day }
     val list: @Composable (Modifier) -> Unit = { m ->
         GameList(
-            modifier = m,
+            modifier = m.sportsEnter(listOf(day, effectiveChip, allSport, pageReady), dayDir),
             sections = sections,
             columns = columns,
             day = day,
@@ -747,6 +788,7 @@ private fun SportsHub(
             onPick = onPick,
             onOpen = onOpen,
             onQuickWatch = onQuickWatch,
+            onMultiviewFrom = onMultiviewFrom,
             leaguesLine = if (effectiveChip == CHIP_ALL && leagueView == null) leaguesLine else null,
             leaguesBarReq = leaguesBarReq,
             onChooseLeagues = { leaguesOpen = true }
@@ -783,6 +825,31 @@ private fun SportsHub(
             onOpen = onOpen,
             onQuickWatch = onQuickWatch
         )
+        return
+    }
+
+    // ---- My Teams This Week: the weekly calendar
+    if (effectiveChip == CHIP_WEEK) {
+        Box(Modifier.fillMaxSize().sportsEnter(CHIP_WEEK)) {
+            SportsWeekPage(
+                known = known,
+                follows = follows,
+                settings = settings,
+                now = now,
+                use24h = use24h,
+                playingKey = playingKey,
+                matches = matches,
+                header = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LiveText("Sports", size = 26.sp, weight = FontWeight.Black)
+                        Spacer(Modifier.width(14.dp))
+                        filters(Modifier.weight(1f))
+                    }
+                },
+                onOpen = onOpen,
+                onQuickWatch = onQuickWatch
+            )
+        }
         return
     }
 
@@ -929,6 +996,7 @@ private fun GameList(
     onPick: () -> Unit,
     onOpen: (SportsEvent) -> Unit,
     onQuickWatch: (SportsEvent) -> Unit,
+    onMultiviewFrom: (SportsEvent) -> Unit = {},
     /** All Events only: the "Choose Leagues" bar above the games (null: no bar). */
     leaguesLine: String? = null,
     leaguesBarReq: FocusRequester? = null,
@@ -966,17 +1034,25 @@ private fun GameList(
                 item(key = prefix + row.first().id) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         row.forEachIndexed { i, ev ->
-                            GameCard(
-                                ev = ev,
-                                follows = follows,
-                                now = now,
-                                use24h = use24h,
-                                hideScores = settings.hideScores,
-                                playing = playing(ev),
-                                modifier = Modifier.weight(1f).then(if (i == 0) rowFirst else Modifier).focusRequester(requesterFor(ev.id)),
-                                onClick = { onOpen(ev) },
-                                onLongClick = { onQuickWatch(ev) }
-                            )
+                            // Live games with a channel: a Multiview button under the card (Down from it).
+                            val mv = ev.state == GameState.LIVE && matches[ev.id].orEmpty().isNotEmpty()
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                GameCard(
+                                    ev = ev,
+                                    follows = follows,
+                                    now = now,
+                                    use24h = use24h,
+                                    hideScores = settings.hideScores,
+                                    playing = playing(ev),
+                                    modifier = Modifier.fillMaxWidth().then(if (i == 0) rowFirst else Modifier).focusRequester(requesterFor(ev.id)),
+                                    onClick = { onOpen(ev) },
+                                    onLongClick = { onQuickWatch(ev) }
+                                )
+                                if (mv) SportsAction(
+                                    "▦  " + androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_multiview_button),
+                                    onClick = { onMultiviewFrom(ev) }
+                                )
+                            }
                         }
                         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
@@ -1265,6 +1341,8 @@ private fun GamePage(
     /** A game picked on a team's card. */
     onOpenGame: (SportsEvent) -> Unit,
     onQuickWatch: (SportsEvent) -> Unit,
+    /** Multiview with every live game (this one first). */
+    onMultiview: (() -> Unit)? = null,
     /** Where Back goes, shown at the top ("‹  Calendar"). */
     backLabel: String = "Sports",
     onClose: () -> Unit
@@ -1530,6 +1608,11 @@ private fun GamePage(
                         onClick = { viewModel.repo.toggleTeam(side.team) }
                     )
                 }
+            }
+            // Multiview: this game and the other live games, each on its own channel.
+            if (ev.state == GameState.LIVE && matches.isNotEmpty() && onMultiview != null) {
+                val mm = f()
+                item { SportsAction("▦  " + androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_multiview_button), modifier = mm, onClick = onMultiview) }
             }
             val m = f()
             item { SportsAction(if (matches.isEmpty()) "Pick a channel" else "Fix channel", modifier = m, onClick = onFix) }

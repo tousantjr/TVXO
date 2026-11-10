@@ -50,7 +50,13 @@ data class GameExtras(
     val draw: Double? = null,
     /** The home team's chance through the game (0–1), oldest first. */
     val winHistory: List<Float> = emptyList(),
-    val lineups: List<Lineup> = emptyList()
+    val lineups: List<Lineup> = emptyList(),
+    /** A betting line (spread, total, money lines), when ESPN has one. */
+    val betting: BettingLine? = null,
+    /** Live play-by-play, newest first. */
+    val plays: List<LivePlay> = emptyList(),
+    /** Live box score: each team's main stat group. */
+    val box: List<BoxTeam> = emptyList()
 ) {
     val hasMatchInfo: Boolean get() = venue != null || tempF != null || referee != null || attendance != null
     val hasOdds: Boolean get() = homeWin != null && awayWin != null
@@ -92,6 +98,20 @@ internal object SportsExtras {
         ).let { e -> runCatching { table(root, e, setOfNotNull(homeId, awayId), names.values.toSet()) }.getOrDefault(e) }
             .let { e -> runCatching { info(root, e) }.getOrDefault(e) }
             .let { e -> runCatching { odds(root, e) }.getOrDefault(e) }
+            .let { e -> runCatching { live(root, e) }.getOrDefault(e) }
+    }
+
+    // ---- betting line, play-by-play and box score (pure parsers on the raw parts)
+    private fun live(root: JSONObject, e: GameExtras): GameExtras {
+        val betting = runCatching {
+            SportsOdds.parse(root.optJSONArray("pickcenter")?.toString()) ?: SportsOdds.parse(root.optJSONArray("odds")?.toString())
+        }.getOrNull()
+        val playsJson = root.optJSONArray("plays")?.toString()
+            ?: root.optJSONObject("drives")?.optJSONObject("current")?.optJSONArray("plays")?.toString()
+        val commentary = (root.optJSONArray("commentary") ?: root.optJSONArray("keyEvents"))?.toString()
+        val plays = runCatching { SportsLiveDetail.plays(playsJson, commentary) }.getOrDefault(emptyList())
+        val box = runCatching { SportsLiveDetail.boxscore(root.optJSONObject("boxscore")?.optJSONArray("players")?.toString()) }.getOrDefault(emptyList())
+        return e.copy(betting = betting, plays = plays, box = box)
     }
 
     // ---- team stats (boxscore)

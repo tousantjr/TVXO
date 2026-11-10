@@ -54,6 +54,8 @@ interface SportsEntryPoint {
     fun sportsRepository(): SportsRepository
     fun sportsPlayback(): com.nuvio.tv.livetv.player.LiveTvPlaybackController
     fun sportsLivePrefs(): com.nuvio.tv.livetv.data.LiveTvPreferences
+    /** Loads the last dead channel scan, so Sports can leave dead channels out. */
+    fun sportsDeadScanner(): com.nuvio.tv.livetv.extras.DeadChannelScanner
 }
 
 /** Opens Live TV full screen on whatever it's now playing (or about to replay). */
@@ -80,7 +82,11 @@ fun SportsHost(navController: NavController) {
         runCatching { EntryPointAccessors.fromApplication(context.applicationContext, SportsEntryPoint::class.java) }.getOrNull()
     } ?: return
     val repo = remember { entry.sportsRepository() }
-    LaunchedEffect(Unit) { repo.start() }
+    LaunchedEffect(Unit) {
+        repo.start()
+        // Makes sure the saved dead channel results are loaded (DeadChannels.dead) for matching.
+        runCatching { entry.sportsDeadScanner() }
+    }
     // Only update while the app is in front (TV boxes keep apps alive in the background for days).
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
@@ -211,6 +217,7 @@ fun SportsHost(navController: NavController) {
         delay(7_000)
         if (SportsLive.alerts.value == a) SportsLive.alerts.value = null
     }
+    androidx.compose.runtime.CompositionLocalProvider(LocalSportsAnim provides SportsAnimLevel.from(settings.animations)) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
         AnimatedVisibility(
             visible = alert != null && !settings.hideScores,
@@ -219,6 +226,70 @@ fun SportsHost(navController: NavController) {
         ) {
             alert?.let { ScoringAlertCard(it) }
         }
+    }
+
+    // ---- "Game started": a followed team's game has just gone live. A card in the corner that
+    // never takes the highlight; Play/Pause switches to the game's channel. Gone after 15 s.
+    var started by remember { mutableStateOf<Pair<SportsEvent, ChannelMatch?>?>(null) }
+    // Your team scored or won: its logo in the middle for a moment (not with scores hidden or animations off).
+    var splash by remember { mutableStateOf<Pair<TeamInfo, Boolean>?>(null) }
+    val animOn = SportsAnimLevel.from(settings.animations) != SportsAnimLevel.OFF
+    LaunchedEffect(alert) {
+        val a = alert ?: return@LaunchedEffect
+        val s = repo.settings.value
+        if (!s.hideScores && SportsAnimLevel.from(s.animations) != SportsAnimLevel.OFF && repo.follows.value.followedTeam(a.team) != null) splash = a.team to false
+    }
+    LaunchedEffect(Unit) {
+        val previous = HashMap<String, GameState>()
+        val fired = HashSet<String>()
+        var firstRound = true
+        while (true) {
+            val f = repo.follows.value
+            val s = repo.settings.value
+            val now = System.currentTimeMillis()
+            val events = repo.events.value
+            if (!firstRound) {
+                val playing = entry.sportsPlayback().playingChannel?.key
+                SportsGameStarted.detect(previous, events, f, fired, now).firstOrNull()?.let { ev ->
+                    fired += ev.id
+                    val best = repo.bestChannel(ev.id)
+                    // Not when it's already on, or the reminder is switching to it by itself.
+                    val switching = armed?.first?.id == ev.id || countdown?.first?.id == ev.id
+                    if (!switching && (best == null || best.channel.key != playing) && due?.first?.id != ev.id) started = ev to best
+                }
+                if (!s.hideScores && SportsAnimLevel.from(s.animations) != SportsAnimLevel.OFF) {
+                    SportsGameStarted.wins(previous, events, f).firstOrNull()?.let { (_, team) -> splash = team to true }
+                }
+            } else {
+                // Games already live when the app opens count as seen (no pop-up for those).
+                events.filter { it.state == GameState.LIVE }.forEach { fired += it.id }
+                firstRound = false
+            }
+            previous.clear()
+            events.forEach { previous[it.id] = it.state }
+            delay(15_000)
+        }
+    }
+    LaunchedEffect(started) {
+        val (ev, m) = started ?: run { SportsStartedPrompt.onWatch = null; return@LaunchedEffect }
+        SportsStartedPrompt.onWatch = if (m == null) null else ({
+            started = null
+            entry.sportsPlayback().play(m.channel)
+            openLiveTvFullscreen(navController)
+        })
+        delay(15_000)
+        if (started?.first?.id == ev.id) started = null
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+        AnimatedVisibility(
+            visible = started != null,
+            enter = slideInHorizontally { it } + fadeIn(),
+            exit = slideOutHorizontally { it } + fadeOut()
+        ) {
+            started?.let { (ev, m) -> GameStartedCard(ev, m) }
+        }
+    }
+    if (animOn) splash?.let { (team, won) -> TeamLogoSplash(team, won) { splash = null } }
     }
 }
 

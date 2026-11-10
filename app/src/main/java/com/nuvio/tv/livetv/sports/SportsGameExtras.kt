@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.nuvio.tv.R
 import com.nuvio.tv.livetv.ui.LiveText
 import com.nuvio.tv.ui.theme.NuvioTheme
 import kotlinx.coroutines.delay
@@ -86,21 +88,121 @@ internal fun gameExtrasPanels(
     val us = SportsCatalog.regionOf(settings) == "US"
     val out = ArrayList<ExtrasPanel>()
     val form = if (x.form.isNotEmpty() || x.meetings.isNotEmpty()) ExtrasPanel("form") { FormPanel(x) } else null
-    val info = if (x.hasMatchInfo || (x.hasOdds && !settings.hideScores)) ExtrasPanel("info") { InfoPanel(ev, x, us, showOdds = !settings.hideScores, awayColor, homeColor) } else null
+    // Odds and win probability can be turned off in Sports settings; never shown with scores hidden.
+    val oddsOn = settings.showOdds && !settings.hideScores
+    val info = if (x.hasMatchInfo || (x.hasOdds && oddsOn)) ExtrasPanel("info") { InfoPanel(ev, x, us, showOdds = oddsOn, awayColor, homeColor) } else null
     val table = if (x.table.isNotEmpty()) ExtrasPanel("table", onTable) { TablePanel(x, opens = onTable != null) } else null
+    val odds = if (oddsOn && (x.betting != null || x.hasOdds || x.winHistory.size >= 2)) ExtrasPanel("odds") { OddsPanel(ev, x, awayColor, homeColor) } else null
     if (ev.state == GameState.PRE || settings.hideScores) {
         // Before it starts (or with scores hidden: nothing that gives the result away).
-        listOfNotNull(form, info, table).forEach { out += it }
+        val oddsPre = if (ev.state == GameState.PRE && x.betting != null) odds else null
+        listOfNotNull(form, oddsPre, info, table).forEach { if (out.size < 3) out += it }
+    } else if (ev.state == GameState.LIVE) {
+        // While it's on: play-by-play, team stats, box score (or leaders), odds. Up to four.
+        if (x.plays.isNotEmpty()) out += ExtrasPanel("plays") { PlaysPanel(ev, x.plays, awayColor, homeColor) }
+        if (x.stats.isNotEmpty()) out += ExtrasPanel("stats") { StatsPanel(x, sides, awayColor, homeColor) }
+        when {
+            x.box.isNotEmpty() -> out += ExtrasPanel("box") { BoxPanel(ev, x.box, awayColor, homeColor) }
+            x.performers.isNotEmpty() -> out += ExtrasPanel("leaders") { LeadersPanel(x, ev, awayColor, homeColor) }
+            x.lineups.isNotEmpty() -> out += ExtrasPanel("lineups") { LineupsPanel(x) }
+        }
+        odds?.let { out += it }
+        listOfNotNull(table, form).forEach { if (out.size < 3) out += it }
+        return out.take(4)
     } else {
         if (x.stats.isNotEmpty()) out += ExtrasPanel("stats") { StatsPanel(x, sides, awayColor, homeColor) }
         when {
             x.performers.isNotEmpty() -> out += ExtrasPanel("leaders") { LeadersPanel(x, ev, awayColor, homeColor) }
             x.lineups.isNotEmpty() -> out += ExtrasPanel("lineups") { LineupsPanel(x) }
         }
-        if (x.winHistory.size >= 2 || x.hasOdds) out += ExtrasPanel("chance") { ChancePanel(ev, x, awayColor, homeColor) }
+        if (oddsOn && (x.winHistory.size >= 2 || x.hasOdds)) out += ExtrasPanel("chance") { ChancePanel(ev, x, awayColor, homeColor) }
         listOfNotNull(table, info, form).forEach { if (out.size < 3) out += it }
     }
     return out.take(3)
+}
+
+// ------------------------------------------------------------------ live: plays, box score, odds
+
+@Composable
+private fun PlaysPanel(ev: SportsEvent, plays: List<LivePlay>, awayColor: Color, homeColor: Color) {
+    PanelTitle(stringResource(R.string.sports_play_by_play))
+    val sport = SportsCatalog.league(ev.leagueId)?.sport ?: Sport.OTHER
+    plays.take(7).forEach { p ->
+        val color = when (p.teamId) {
+            null -> SportsLook.Dim
+            ev.home?.team?.id -> homeColor
+            ev.away?.team?.id -> awayColor
+            else -> SportsLook.Dim
+        }
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+            Box(Modifier.padding(top = 4.dp).size(6.dp).clip(RoundedCornerShape(3.dp)).background(if (p.scoring) SportsColors.Lime else color))
+            Spacer(Modifier.width(6.dp))
+            val whenText = listOfNotNull(p.period?.let { periodLabel(sport, it) }, p.clock).joinToString(" ")
+            if (whenText.isNotBlank()) {
+                LiveText(whenText, color = SportsLook.Dim, size = 9.sp, weight = FontWeight.Bold, modifier = Modifier.width(52.dp), maxLines = 1)
+            }
+            LiveText(
+                p.text, color = if (p.scoring) SportsColors.Lime else Color.White, size = 10.sp,
+                weight = if (p.scoring) FontWeight.Bold else FontWeight.Normal, maxLines = 2, modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+private fun periodLabel(sport: Sport, n: Int): String = when (sport) {
+    Sport.AMERICAN_FOOTBALL, Sport.BASKETBALL -> if (n <= 4) "Q$n" else "OT"
+    Sport.HOCKEY -> if (n <= 3) "P$n" else "OT"
+    Sport.BASEBALL -> "Inn $n"
+    Sport.FOOTBALL -> if (n == 1) "1H" else if (n == 2) "2H" else "ET"
+    else -> "P$n"
+}
+
+@Composable
+private fun BoxPanel(ev: SportsEvent, box: List<BoxTeam>, awayColor: Color, homeColor: Color) {
+    PanelTitle(stringResource(R.string.sports_box_score))
+    box.take(2).forEachIndexed { i, t ->
+        if (i > 0) Spacer(Modifier.height(5.dp))
+        val color = if (t.teamId == ev.home?.team?.id) homeColor else if (t.teamId == ev.away?.team?.id) awayColor else SportsLook.Dim
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(color))
+            Spacer(Modifier.width(5.dp))
+            LiveText(listOfNotNull(t.team.ifBlank { null }, t.group?.uppercase(Locale.ROOT)).joinToString(" · "), color = Color.White, size = 10.sp, weight = FontWeight.Black, modifier = Modifier.weight(1f), maxLines = 1)
+            t.labels.take(3).forEach { LiveText(it, color = SportsLook.Dim, size = 8.sp, weight = FontWeight.Black, modifier = Modifier.width(34.dp), maxLines = 1) }
+        }
+        t.rows.take(3).forEach { r ->
+            Row(Modifier.fillMaxWidth().padding(top = 1.dp)) {
+                LiveText(r.name, color = Color(0xFFC9CCD6), size = 10.sp, modifier = Modifier.weight(1f).padding(start = 13.dp), maxLines = 1)
+                r.stats.take(3).forEach { LiveText(it, color = Color.White, size = 10.sp, weight = FontWeight.Bold, modifier = Modifier.width(34.dp), maxLines = 1) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OddsPanel(ev: SportsEvent, x: GameExtras, awayColor: Color, homeColor: Color) {
+    // No betting line: ESPN's own win probability panel, as before.
+    val b = x.betting ?: run { ChancePanel(ev, x, awayColor, homeColor); return }
+    PanelTitle(stringResource(R.string.sports_odds_title))
+    // ESPN's own probability first; else the chance the money lines imply.
+    val bar = when {
+        x.hasOdds -> x
+        b.impliedHome != null -> x.copy(homeWin = b.impliedHome, awayWin = b.impliedAway, draw = null)
+        else -> null
+    }
+    if (bar != null) { ChanceBar(ev, bar, awayColor, homeColor); Spacer(Modifier.height(6.dp)) }
+    run {
+        val away = ev.away?.team?.abbr ?: "AWAY"
+        val home = ev.home?.team?.abbr ?: "HOME"
+        val lines = listOfNotNull(
+            b.details?.let { stringResource(R.string.sports_odds_line, it) },
+            b.overUnder?.let { stringResource(R.string.sports_odds_total, SportsOdds.trim(it)) },
+            if (b.awayMoneyLine != null || b.homeMoneyLine != null)
+                stringResource(R.string.sports_odds_moneyline, "$away ${SportsOdds.formatMoneyLine(b.awayMoneyLine) ?: "–"} · $home ${SportsOdds.formatMoneyLine(b.homeMoneyLine) ?: "–"}")
+            else null
+        )
+        lines.forEach { LiveText(it, color = Color.White, size = 11.sp, weight = FontWeight.Bold, maxLines = 1); Spacer(Modifier.height(2.dp)) }
+        b.provider?.let { LiveText(stringResource(R.string.sports_odds_provider, it), color = SportsLook.Faint, size = 8.sp, maxLines = 1) }
+    }
 }
 
 private fun teamColor(side: Side?, fallback: Color): Color =

@@ -114,8 +114,21 @@ internal fun Modifier.sportsFrame(
 ): Modifier {
     val shape = RoundedCornerShape(radius)
     val ring = NuvioTheme.focusRing.brush()
+    val level = LocalSportsAnim.current
+    // Full: a smooth grow and a pink glow. Reduced: the glow, no grow animation. Off: as before.
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (focused) (if (level == SportsAnimLevel.FULL) 1.035f else 1.02f) else 1f,
+        if (level == SportsAnimLevel.FULL) androidx.compose.animation.core.tween(160) else androidx.compose.animation.core.snap(),
+        label = "cardScale"
+    )
+    val glow by androidx.compose.animation.core.animateFloatAsState(
+        if (focused && level != SportsAnimLevel.OFF) 1f else 0f,
+        if (level == SportsAnimLevel.FULL) androidx.compose.animation.core.tween(200) else androidx.compose.animation.core.snap(),
+        label = "cardGlow"
+    )
     return this
-        .graphicsLayer { val s = if (focused) 1.02f else 1f; scaleX = s; scaleY = s }
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .sportsGlow(SportsColors.Pink, { glow }, radius)
         .clip(shape)
         .background(background)
         // The border on top of everything inside (team bands reach the edges).
@@ -223,9 +236,10 @@ internal fun SportsBadge(text: String, background: Color, color: Color, modifier
     )
 }
 
-/** A score: fixed-width digits, dimmed when behind, and a short yellow flash when it changes. */
+/** A score: fixed-width digits, dimmed when behind; rolls to a new value with a short lime flash. */
 @Composable
 internal fun ScoreLabel(score: String, dim: Boolean, size: TextUnit) {
+    val level = LocalSportsAnim.current
     var last by remember { mutableStateOf(score) }
     var flash by remember { mutableStateOf(false) }
     LaunchedEffect(score) {
@@ -237,15 +251,21 @@ internal fun ScoreLabel(score: String, dim: Boolean, size: TextUnit) {
         }
     }
     val shape = RoundedCornerShape(6.dp)
-    androidx.compose.material3.Text(
-        text = score,
-        style = SportsLook.ScoreStyle,
-        fontSize = size,
-        color = if (dim && !flash) Color.White.copy(alpha = 0.5f) else Color.White,
-        maxLines = 1,
-        modifier = if (flash) Modifier.clip(shape).background(SportsLook.Flash.copy(alpha = 0.18f)).border(1.5.dp, SportsLook.Flash, shape).padding(horizontal = 5.dp)
+    val flashColor = if (level == SportsAnimLevel.OFF) SportsLook.Flash else SportsColors.Lime
+    Box(
+        if (flash) Modifier.clip(shape).background(flashColor.copy(alpha = 0.18f)).border(1.5.dp, flashColor, shape).padding(horizontal = 5.dp)
         else Modifier.padding(horizontal = 5.dp)
-    )
+    ) {
+        ScoreRoll(score) { shown ->
+            androidx.compose.material3.Text(
+                text = shown,
+                style = SportsLook.ScoreStyle,
+                fontSize = size,
+                color = if (dim && !flash) Color.White.copy(alpha = 0.5f) else Color.White,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 // ------------------------------------------------------------------ team bands and status
@@ -293,7 +313,7 @@ internal fun StateBadge(ev: SportsEvent, playing: Boolean, use24h: Boolean) {
     val colors = NuvioTheme.colors
     when {
         playing -> SportsBadge("▶ PLAYING", colors.Secondary, colors.OnSecondary)
-        ev.state == GameState.LIVE -> SportsBadge("● LIVE", SportsLook.Live, Color.White)
+        ev.state == GameState.LIVE -> LiveBadge(SportsAnimLogic.closeLate(ev, progressOf(ev, System.currentTimeMillis())))
         ev.state == GameState.POST -> SportsBadge("FINAL", Color.White.copy(alpha = 0.12f), Color.White)
         ev.state == GameState.OFF -> SportsBadge((ev.status ?: "POSTPONED").uppercase(), Color(0x33FF8A80), Color(0xFFFF8A80))
         // Set to record: the start time, and REC under it.
@@ -303,6 +323,20 @@ internal fun StateBadge(ev: SportsEvent, playing: Boolean, use24h: Boolean) {
             RecBadge()
         }
         else -> SportsBadge(startLabel(ev, use24h), Color.White.copy(alpha = 0.10f), Color.White)
+    }
+}
+
+/** LIVE with a pulsing dot (lime when the game is close late on). */
+@Composable
+internal fun LiveBadge(close: Boolean) {
+    Row(
+        Modifier.clip(RoundedCornerShape(5.dp)).background(SportsLook.Live.copy(alpha = 0.22f)).border(1.dp, SportsLook.Live, RoundedCornerShape(5.dp))
+            .padding(horizontal = 6.dp, vertical = 1.5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PulsingDot(close, 6.dp)
+        Spacer(Modifier.width(4.dp))
+        LiveText("LIVE", color = Color.White, size = 9.sp, weight = FontWeight.Black)
     }
 }
 
@@ -369,10 +403,26 @@ internal fun GameCard(
     val sport = league?.sport ?: Sport.OTHER
     val sides = ev.ordered(sport)
     val premium = sides.size != 2 && eventLook(ev, league).premium
+    // A brief lime glow round the card when its score changes (not while scores are hidden).
+    val level = LocalSportsAnim.current
+    val scoreKey = if (hideScores) "" else SportsAnimLogic.scoreKey(ev)
+    var lastScore by remember(ev.id) { mutableStateOf(scoreKey) }
+    val scoreGlow = remember(ev.id) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(scoreKey) {
+        if (scoreKey != lastScore) {
+            val changed = lastScore.isNotEmpty() && scoreKey.isNotEmpty()
+            lastScore = scoreKey
+            if (changed && level != SportsAnimLevel.OFF) {
+                scoreGlow.snapTo(1f)
+                scoreGlow.animateTo(0f, androidx.compose.animation.core.tween(if (level == SportsAnimLevel.FULL) 1_800 else 900))
+            }
+        }
+    }
     Box(
         modifier
             .fillMaxWidth()
             .height(86.dp)
+            .sportsGlow(SportsColors.Lime, { scoreGlow.value }, 14.dp)
             // Big events (WrestleMania…): a gold border, same size as every other card.
             .sportsFrame(focused, premium, Color(0xFFFFCE54))
             .onFocusChanged { focused = it.isFocused }
@@ -502,7 +552,8 @@ internal fun EventBand(ev: SportsEvent, league: League?, sport: Sport, modifier:
 internal fun PlaceholderCard(modifier: Modifier = Modifier, height: Dp = 86.dp) {
     Box(
         modifier.fillMaxWidth().height(height).clip(SportsLook.Shape)
-            .background(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.04f))))
+            .background(Color.White.copy(alpha = 0.04f))
+            .sportsShimmer()
     )
 }
 
@@ -651,7 +702,7 @@ internal fun FilterIcon(icon: String, label: String, selected: Boolean, modifier
 internal fun SectionHeader(title: String, live: Boolean = false, count: Int? = null, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (live) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(SportsLook.Live))
+            PulsingDot(close = false, size = 8.dp)
             Spacer(Modifier.width(7.dp))
         }
         LiveText(title, color = if (live) Color.White else Color(0xFFC9CCD6), size = 11.sp, weight = FontWeight.Black)
