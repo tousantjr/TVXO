@@ -44,14 +44,18 @@ internal class PlaybackAvailabilityViewModel @Inject constructor(
     val availability = combine(
         addonRepository.getInstalledAddons(),
         enabledScrapers,
-        serverRepository.uiState
-    ) { addons, scrapers, _ ->
+        serverRepository.uiState,
+        // Recompute when On Demand switches on (e.g. after the first provider import), so an
+        // already-open movie screen turns "Playback unavailable" back into Play.
+        com.nuvio.tv.livetv.ondemand.OnDemandStreams.offered
+    ) { addons, scrapers, _, onDemand ->
         PlaybackAvailability(
             addons,
             scrapers,
             isLoaded = true,
             cachedMeta = metaRepository::getCachedMeta,
-            serverStreams = serverStreams::canServe
+            serverStreams = serverStreams::canServe,
+            onDemand = onDemand
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackAvailability())
 }

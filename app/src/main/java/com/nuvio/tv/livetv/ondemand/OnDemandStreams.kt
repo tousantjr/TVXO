@@ -12,6 +12,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -43,8 +44,16 @@ object OnDemandStreams {
      * greys out Play ("Playback unavailable") when none of your addons can stream a title (for
      * example shows without an IMDb id); with On Demand on, your provider may still have it.
      */
-    @Volatile
-    var offeredInStreams: Boolean = false
+    val offered = MutableStateFlow(false)
+
+    /** Same as [offered]; observable so open movie screens re-enable Play when it turns on. */
+    var offeredInStreams: Boolean
+        get() = offered.value
+        set(value) { offered.value = value }
+
+    /** On Demand is offered when it's switched on and a provider has (or is importing) movies & series. */
+    fun shouldOffer(hasContent: Boolean, hasVodLogin: Boolean, inStreams: Boolean, enabled: Boolean): Boolean =
+        inStreams && enabled && (hasContent || hasVodLogin)
 
     /** Auto-play may pick your provider's copy (set on, and its tab is first). */
     @Volatile

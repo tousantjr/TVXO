@@ -94,6 +94,14 @@ class PlaybackAvailabilityViewModelTest {
             runCurrent()
             assertFalse(viewModel.availability.value.canStream("movie", "tt123"))
 
+            // Provider On Demand switching on (first import / login saved) re-enables Play live.
+            com.nuvio.tv.livetv.ondemand.OnDemandStreams.offeredInStreams = true
+            runCurrent()
+            assertTrue(viewModel.availability.value.canStream("movie", "tt123"))
+            com.nuvio.tv.livetv.ondemand.OnDemandStreams.offeredInStreams = false
+            runCurrent()
+            assertFalse(viewModel.availability.value.canStream("movie", "tt123"))
+
             coVerify(exactly = 0) { addonRepository.fetchAddon(any()) }
             verify(exactly = 0) { metaRepository.getMetaFromAllAddons(any(), any(), any()) }
             verify(exactly = 0) { metaRepository.getMeta(any(), any(), any()) }
