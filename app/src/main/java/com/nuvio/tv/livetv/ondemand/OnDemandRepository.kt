@@ -150,8 +150,17 @@ class OnDemandRepository @Inject constructor(
         if (started) return
         started = true
         scope.launch {
-            kotlinx.coroutines.flow.combine(hasContent, prefs.settings) { has, s -> has && s.onDemandInStreams && s.onDemandEnabled }
-                .collect { OnDemandStreams.offeredInStreams = it }
+            // Play stays enabled from the moment an Xtream login with movies & series exists, not
+            // only once its (possibly minutes-long) first import has finished: a fresh install
+            // used to show "Playback unavailable" on every movie until then.
+            kotlinx.coroutines.flow.combine(hasContent, prefs.settings, prefs.playlists) { has, s, playlists ->
+                OnDemandStreams.shouldOffer(
+                    hasContent = has,
+                    hasVodLogin = playlists.any { it.enabled && it.isXtream && it.importVod },
+                    inStreams = s.onDemandInStreams,
+                    enabled = s.onDemandEnabled
+                )
+            }.collect { OnDemandStreams.offeredInStreams = it }
         }
         scope.launch {
             // Auto-play may pick your provider's copy only when that's on and its tab is first.
