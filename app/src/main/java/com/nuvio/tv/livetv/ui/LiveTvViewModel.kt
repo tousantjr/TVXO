@@ -93,7 +93,8 @@ class LiveTvViewModel @Inject constructor(
     driveSync: com.nuvio.tv.livetv.sync.LiveTvDriveSync,
     val recorder: com.nuvio.tv.livetv.record.LiveTvRecorder,
     val scheduler: com.nuvio.tv.livetv.record.LiveTvRecordingScheduler,
-    private val hooks: com.nuvio.tv.livetv.player.LiveTvPlayerHooks
+    private val hooks: com.nuvio.tv.livetv.player.LiveTvPlayerHooks,
+    private val deadScanner: com.nuvio.tv.livetv.extras.DeadChannelScanner
 ) : ViewModel(), com.nuvio.tv.livetv.player.LiveTvPlayerHooks.Owner {
 
     init {
@@ -198,7 +199,14 @@ class LiveTvViewModel @Inject constructor(
         // Only what the lists use: saving the last channel, its picture quality or audio track
         // (on every channel change) used to rebuild every list over every channel, right when a
         // slower box needed its processor to start the new channel.
-        combine(displayChannels, userState.distinctUntilChanged { a, b -> sameForLists(a, b) }, settings) { a, b, c -> Triple(a, b, c) },
+        combine(
+            // TVXO: "Hide dead channels" (Settings → Live TV) leaves out what the last scan found dead.
+            combine(displayChannels, deadScanner.hiddenKeys) { list, dead ->
+                com.nuvio.tv.livetv.extras.DeadScanLogic.hide(list, dead, dead.isNotEmpty()) { it.key }
+            },
+            userState.distinctUntilChanged { a, b -> sameForLists(a, b) },
+            settings
+        ) { a, b, c -> Triple(a, b, c) },
         session.currentGroupId,
         searchQuery,
         combine(hasSources, com.nuvio.tv.livetv.parental.ParentalControls.unlocked) { h, _ -> h }

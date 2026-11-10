@@ -2688,6 +2688,14 @@ private fun GuideRow(
                 )
                 Spacer(Modifier.width(4.dp))
             }
+            // TVXO: the last dead channel scan couldn't reach this channel.
+            if (!reorderMode && !moving && visible == null) {
+                com.nuvio.tv.livetv.extras.DeadChannelMark(
+                    channel.key,
+                    if (channelFocused) cell.text else NuvioTheme.colors.TextSecondary,
+                    gdp(14f)
+                )
+            }
             // Catch-up available on this channel (not while managing visibility, like quality).
             if (channel.catchup != null && !reorderMode && !moving && visible == null) {
                 Icon(
