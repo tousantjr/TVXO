@@ -3437,4 +3437,10 @@
     <string name="autosync_label_synced">Auto synced</string>
     <string name="stream_resume_from_time">Resume from %1$s</string>
     <string name="stream_resume_from_percent">Resume from %1$d%%</string>
+    <!-- TVXO extras -->
+    <string name="tvxo_guide_alerts">Guide Alerts</string>
+    <string name="tvxo_use_your_phone">Use your phone</string>
+    <string name="tvxo_scan_dead_channels">Scan for Dead Channels</string>
+    <string name="tvxo_hide_dead_channels">Hide Dead Channels</string>
+    <string name="tvxo_live_score_bar">Live Score Bar</string>
 </resources>

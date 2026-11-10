@@ -93,6 +93,10 @@ fun NuvioNavHost(
     com.nuvio.tv.livetv.sports.SportsHost(navController)
     // Live TV fork: pinned game scoreboards in the corner while something plays.
     com.nuvio.tv.livetv.sports.SportsPinsHost(navController)
+    // TVXO: live score strip + score alerts for My Teams (reads Sports data only).
+    com.nuvio.tv.livetv.extras.LiveScoreBarHost(navController)
+    // TVXO: guide keyword alerts, on top of whatever screen you're on.
+    com.nuvio.tv.livetv.extras.GuideAlertHost(navController)
 }
 
 @Composable

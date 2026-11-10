@@ -1549,6 +1549,17 @@ internal fun LiveTvSettingsContent(
                 }
             }
 
+            // ------------------------------------------------------------ TVXO extras (TvxoExtrasSettings.kt)
+            if (show(LiveTvPage.GUIDE)) item(key = "guide_alerts") {
+                GuideAlertsSettings { t, sum, rows -> LiveSection(t, sum, GuideAlertsIcon, "guide_alerts" in open, { toggle("guide_alerts") }, content = rows) }
+            }
+            if (show(LiveTvPage.MAIN)) item(key = "dead_channels") {
+                DeadChannelsSettings { t, sum, rows -> LiveSection(t, sum, DeadChannelsIcon, "dead_channels" in open, { toggle("dead_channels") }, content = rows) }
+            }
+            if (show(LiveTvPage.PLAYBACK)) item(key = "score_bar") {
+                ScoreBarSettings { t, sum, rows -> LiveSection(t, sum, ScoreBarIcon, "score_bar" in open, { toggle("score_bar") }, content = rows) }
+            }
+
             // ------------------------------------------------------------ Recordings
             if (show(LiveTvPage.PLAYBACK)) item(key = "recordings") {
                 val recContext = androidx.compose.ui.platform.LocalContext.current
@@ -2383,6 +2394,14 @@ internal fun AddXtreamSourceDialog(viewModel: LiveTvSettingsViewModel, onDone: (
         onSaveAll = { v, _, vod, live ->
             if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3], importVod = vod, importLive = live)
             onDone()
+        },
+        // TVXO: "Use your phone" fills Server / Username / Password from a phone, then saves as above.
+        extraLabel = "Use your phone",
+        extraContent = { onResult, onCancel ->
+            com.nuvio.tv.livetv.extras.PhoneXtreamLoginDialog(
+                onLogin = { l -> onResult(mapOf(1 to l.server, 2 to l.username, 3 to l.password)) },
+                onCancel = onCancel
+            )
         }
     )
 }
@@ -2403,17 +2422,39 @@ private fun SourceFormDialog(
     toggleLive: Pair<String, Boolean>? = null,
     onSaveAll: ((values: List<String>, guide: Boolean, vod: Boolean, live: Boolean) -> Unit)? = null,
     /** Checks the values before saving: a message to show instead of saving, or null when fine. */
-    validate: ((List<String>) -> String?)? = null
+    validate: ((List<String>) -> String?)? = null,
+    /** An extra button (Xtream: "Use your phone") that opens [extraContent] in place of the form. */
+    extraLabel: String? = null,
+    /** What it sends fills the fields (by index), then the form saves as with Save. */
+    extraContent: (@Composable (onResult: (Map<Int, String>) -> Unit, onCancel: () -> Unit) -> Unit)? = null
 ) {
     val values = remember { fields.map { mutableStateOf(it.initial) } }
     var problem by remember { mutableStateOf<String?>(null) }
     var toggleValue by remember { mutableStateOf(toggle?.second ?: true) }
     var toggle2Value by remember { mutableStateOf(toggle2?.second ?: true) }
     var toggleLiveValue by remember { mutableStateOf(toggleLive?.second ?: true) }
+    var extraOpen by remember { mutableStateOf(false) }
     val firstField = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(extraOpen) {
+        if (extraOpen) return@LaunchedEffect
         delay(80)
         runCatching { firstField.requestFocus() }
+    }
+    fun save() {
+        val v = values.map { it.value.trim() }
+        problem = validate?.invoke(v)
+        if (problem == null) when {
+            onSaveAll != null -> onSaveAll(v, toggleValue, toggle2Value, toggleLiveValue)
+            onSaveBoth != null -> onSaveBoth(v, toggleValue, toggle2Value)
+            else -> onSave(v, toggleValue)
+        }
+    }
+    if (extraOpen && extraContent != null) {
+        extraContent(
+            { filled -> filled.forEach { (i, v) -> values.getOrNull(i)?.value = v }; extraOpen = false; save() },
+            { extraOpen = false }
+        )
+        return
     }
     NuvioDialog(onDismiss = onDismiss, title = title, width = 620.dp) {
         // The fields scroll inside the dialog, so Save and Cancel always stay on screen
@@ -2472,19 +2513,10 @@ private fun SourceFormDialog(
         }
         SettingsDialogActionRow {
             SettingsDialogActionButton(text = "Cancel", onClick = onDismiss)
-            SettingsDialogActionButton(
-                text = "Save",
-                onClick = {
-                    val v = values.map { it.value.trim() }
-                    problem = validate?.invoke(v)
-                    if (problem == null) when {
-                        onSaveAll != null -> onSaveAll(v, toggleValue, toggle2Value, toggleLiveValue)
-                        onSaveBoth != null -> onSaveBoth(v, toggleValue, toggle2Value)
-                        else -> onSave(v, toggleValue)
-                    }
-                },
-                primary = true
-            )
+            if (extraLabel != null && extraContent != null) {
+                SettingsDialogActionButton(text = extraLabel, onClick = { extraOpen = true })
+            }
+            SettingsDialogActionButton(text = "Save", onClick = { save() }, primary = true)
         }
     }
 }
