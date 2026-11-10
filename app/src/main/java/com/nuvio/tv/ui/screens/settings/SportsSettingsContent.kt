@@ -168,6 +168,19 @@ fun SportsSettingsContent(
                         s.bestChannelFirst,
                         { update { it.copy(bestChannelFirst = !it.bestChannelFirst) } }
                     )
+                    SettingsToggleRow(
+                        androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_settings_odds),
+                        androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_settings_odds_sub),
+                        s.showOdds,
+                        { update { it.copy(showOdds = !it.showOdds) } }
+                    )
+                    SettingsActionRow(
+                        title = androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_settings_animations),
+                        subtitle = androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_settings_animations_sub),
+                        value = animLabel(s.animations),
+                        leadingIcon = Icons.Default.Star,
+                        onClick = { dialog = "animations" }
+                    )
                 }
             }
             item(key = "reminders") {
@@ -275,6 +288,13 @@ fun SportsSettingsContent(
             options = SportsScoreDelay.CHOICES.map { SettingsPickerOption(it, SportsScoreDelay.label(it)) },
             selectedValue = s.scoreDelaySeconds,
             onOptionSelected = { v -> update { it.copy(scoreDelaySeconds = v) }; close() },
+            onDismiss = close
+        )
+        "animations" -> SettingsSingleChoiceDialog(
+            title = androidx.compose.ui.res.stringResource(com.nuvio.tv.R.string.sports_settings_animations),
+            options = listOf("full", "reduced", "off").map { SettingsPickerOption(it, animLabel(it)) },
+            selectedValue = s.animations,
+            onOptionSelected = { v -> update { it.copy(animations = v) }; close() },
             onDismiss = close
         )
         "remind" -> SettingsSingleChoiceDialog(
@@ -441,3 +461,13 @@ private fun LinksDialog(s: SportsSettings, viewModel: SportsViewModel, onForgetA
         runCatching { target.requestFocus() }
     }
 }
+
+/** "Full" / "Reduced" / "Off" for the Sports animations setting. */
+@Composable
+private fun animLabel(key: String): String = androidx.compose.ui.res.stringResource(
+    when (key) {
+        "reduced" -> com.nuvio.tv.R.string.sports_anim_reduced
+        "off" -> com.nuvio.tv.R.string.sports_anim_off
+        else -> com.nuvio.tv.R.string.sports_anim_full
+    }
+)

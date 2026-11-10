@@ -207,7 +207,11 @@ data class SportsSettings(
     /** "Channels from" on the game page ("" = all; see [ChannelRegions]). */
     val channelRegion: String = "",
     /** League Networks: a network's id (see [LeagueNetworks]) -> the channel you picked for it. */
-    val leagueNetworkChannels: Map<String, String> = emptyMap()
+    val leagueNetworkChannels: Map<String, String> = emptyMap(),
+    /** Sports animations: "full", "reduced" or "off" (see [SportsAnimLevel]). */
+    val animations: String = "full",
+    /** The odds and win-probability panel on game pages. */
+    val showOdds: Boolean = true
 ) {
     fun toJson(): String = JSONObject()
         .put("showInSidebar", showInSidebar)
@@ -232,6 +236,8 @@ data class SportsSettings(
         .put("preferredGroups", JSONArray(preferredGroups.toList()))
         .put("channelRegion", channelRegion)
         .put("leagueNetworkChannels", JSONObject(leagueNetworkChannels as Map<*, *>))
+        .put("animations", animations)
+        .put("showOdds", showOdds)
         .toString()
 
     companion object {
@@ -263,7 +269,9 @@ data class SportsSettings(
                     leagueChannels = o.optJSONObject("leagueChannels").stringMap(),
                     preferredGroups = o.optJSONArray("preferredGroups").strings().toSet(),
                     channelRegion = o.optString("channelRegion", ""),
-                    leagueNetworkChannels = o.optJSONObject("leagueNetworkChannels").stringMap()
+                    leagueNetworkChannels = o.optJSONObject("leagueNetworkChannels").stringMap(),
+                    animations = o.optString("animations", d.animations).ifBlank { d.animations },
+                    showOdds = o.optBoolean("showOdds", d.showOdds)
                 )
             }.getOrDefault(SportsSettings())
         }

@@ -108,6 +108,15 @@ class SportsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val player: androidx.media3.common.Player? get() = playback.player
+    /** For Multiview opened from Sports (it pauses and resumes this player itself). */
+    internal val playbackController: LiveTvPlaybackController get() = playback
+
+    /**
+     * Multiview from Sports: each live game's best working channel (one per channel), My Teams'
+     * games only when [mineOnly], your teams' games first. At most four.
+     */
+    fun multiviewChannels(mineOnly: Boolean, first: SportsEvent? = null): List<LiveChannel> =
+        SportsMultiview.pick(repo.events.value, repo.matches.value, repo.follows.value, mineOnly, first?.id)
     fun attachPlayer(): androidx.media3.common.Player = playback.attach()
     fun detachPlayer() { playback.detach() }
     fun onSurfaceAttached() = playback.onSurfaceAttached()

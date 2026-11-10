@@ -100,12 +100,18 @@ internal fun LiveTvMultiviewScreen(
     channels: List<LiveChannel>,
     playback: LiveTvPlaybackController,
     onFullScreen: (LiveChannel) -> Unit,
-    onExit: () -> Unit
+    onExit: () -> Unit,
+    /** More channels to start with (Multiview opened from Sports with several live games). */
+    initialChannels: List<LiveChannel> = emptyList()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var nextId by remember { mutableIntStateOf(1) }
-    var tiles by remember { mutableStateOf(listOfNotNull(initial).map { MvTile(0, it) }) }
+    val startTiles = remember {
+        (listOfNotNull(initial) + initialChannels).distinctBy { it.key }.take(MultiviewLayout.MAX_TILES)
+            .mapIndexed { i, ch -> MvTile(i, ch) }
+    }
+    var nextId by remember { mutableIntStateOf(startTiles.size.coerceAtLeast(1)) }
+    var tiles by remember { mutableStateOf(startTiles) }
     var focus by remember { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf<MvMenu?>(null) }
     var handedOff by remember { mutableStateOf(false) }
