@@ -3436,4 +3436,37 @@
     <string name="autosync_label_synced">Auto synced</string>
     <string name="stream_resume_from_time">Resume from %1$s</string>
     <string name="stream_resume_from_percent">Resume from %1$d%%</string>
+    <!-- Sports Hub upgrades -->
+    <string name="sports_play_by_play">Play-by-play</string>
+    <string name="sports_box_score">Box score</string>
+    <string name="sports_final">Final</string>
+    <string name="sports_odds_title">Odds &amp; win probability</string>
+    <string name="sports_odds_line">Line: %1$s</string>
+    <string name="sports_odds_total">Total: %1$s</string>
+    <string name="sports_odds_moneyline">Money line: %1$s</string>
+    <string name="sports_odds_provider">Odds by %1$s</string>
+    <string name="sports_game_started">GAME STARTED</string>
+    <string name="sports_game_started_watch">Press Play to watch on %1$s</string>
+    <string name="sports_game_started_no_channel">No matching channel found</string>
+    <string name="sports_splash_win">%1$s WIN!</string>
+    <string name="sports_splash_score">%1$s SCORE!</string>
+    <string name="sports_week_chip">My Teams This Week</string>
+    <string name="sports_week_previous">Previous week</string>
+    <string name="sports_week_this">This week</string>
+    <string name="sports_week_next">Next week</string>
+    <string name="sports_week_range">%1$s – %2$s</string>
+    <string name="sports_week_no_teams">Follow some teams to see their games this week.</string>
+    <string name="sports_week_hint">Select a game to open it. Hold to watch on its channel.</string>
+    <string name="sports_multiview_all">Multiview · %1$d live</string>
+    <string name="sports_multiview_mine">Multiview · My Teams</string>
+    <string name="sports_multiview_button">Multiview</string>
+    <string name="sports_multiview_none">No live games with a matching channel</string>
+    <string name="sports_highlights_row">Highlights for your teams</string>
+    <string name="sports_settings_animations">Animations</string>
+    <string name="sports_settings_animations_sub">Score rolls, live dots, focus glow and team splashes</string>
+    <string name="sports_anim_full">Full</string>
+    <string name="sports_anim_reduced">Reduced</string>
+    <string name="sports_anim_off">Off</string>
+    <string name="sports_settings_odds">Show odds &amp; win probability</string>
+    <string name="sports_settings_odds_sub">Betting lines and win chances on game pages</string>
 </resources>

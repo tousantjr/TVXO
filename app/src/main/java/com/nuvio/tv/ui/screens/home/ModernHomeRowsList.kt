@@ -499,6 +499,10 @@ internal fun ModernHomeRowsList(
                 if (liveTvHere && liveTvRowAbove == false && hasContinueWatching) {
                     com.nuvio.tv.livetv.home.LiveTvHomeRow(hideUnlessFocused = true, above = false, startPadding = 52.dp, titleStyle = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
                 }
+                // Sports: highlights of your teams' recent games, after Continue watching (or the first row).
+                if (if (hasContinueWatching) row.key == MODERN_CONTINUE_WATCHING_ROW_KEY else rowIndex == 0) {
+                    com.nuvio.tv.livetv.sports.SportsHomeHighlightsRow(startPadding = 52.dp, titleStyle = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+                }
                 }
             }
         }

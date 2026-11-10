@@ -342,7 +342,9 @@ class SportsRepository @Inject constructor(
         settings.map { it.channelRegion }.distinctUntilChanged(),
         _addonLive
     ) { m0, region, addon ->
-        val m = if (region.isBlank()) m0 else m0.mapValues { (_, list) -> ChannelRegions.regionFirst(list, region) }
+        // TVXO stock build has no dead channel scanner: nothing is ranked as dead.
+        val alive = SportsDeadRanking.all(m0, emptySet())
+        val m = if (region.isBlank()) alive else alive.mapValues { (_, list) -> ChannelRegions.regionFirst(list, region) }
         // Streams from your sports addons (HighFly…) go after your own channels.
         if (addon.isEmpty()) m else {
             val out = HashMap(m)
@@ -2277,7 +2279,20 @@ class SportsRepository @Inject constructor(
 
     /** The channel to tune for a reminder or "watch now": the best match, if any. */
     fun bestChannel(eventId: String): ChannelMatch? =
-        _matches.value[eventId]?.let { ChannelRegions.regionFirst(it, settings.value.channelRegion) }?.firstOrNull()
+        _matches.value[eventId]
+            ?.let { SportsDeadRanking.matches(it, emptySet()) }
+            ?.let { ChannelRegions.regionFirst(it, settings.value.channelRegion) }?.firstOrNull()
+
+    /** Replays and highlights of [ev] from your sports addons (for the Home row), looked up once and kept. */
+    private val highlightCache = java.util.concurrent.ConcurrentHashMap<String, List<ChannelMatch>>()
+    suspend fun highlightsFor(ev: SportsEvent): List<ChannelMatch> {
+        highlightCache[ev.id]?.let { return it }
+        _addonVod.value[ev.id]?.takeIf { it.isNotEmpty() }?.let { highlightCache[ev.id] = it; return it }
+        val found = runCatching { withContext(Dispatchers.IO) { addonSource.find(ev).vod } }.getOrNull() ?: return emptyList()
+        if (highlightCache.size > 40) highlightCache.clear()
+        highlightCache[ev.id] = found
+        return found
+    }
 
     fun channelsForPicker(): List<LiveChannel> = channelStore.displayChannels.value
 

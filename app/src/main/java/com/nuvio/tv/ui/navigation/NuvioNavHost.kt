@@ -1542,6 +1542,10 @@ private fun PlaybackNavHost(
                     com.nuvio.tv.livetv.sports.SportsWatchLaunch.request(2, channelKey)
                     navController.navigate(Screen.SportsMultiview.route) { launchSingleTop = true }
                 },
+                onOpenMultiviewPanes = { panes, channelKey ->
+                    com.nuvio.tv.livetv.sports.SportsWatchLaunch.request(panes, channelKey)
+                    navController.navigate(Screen.SportsMultiview.route) { launchSingleTop = true }
+                },
                 // Back on a game opened from another page: that page again, as it was (like
                 // picking it in the side menu).
                 onReturnTo = { route ->

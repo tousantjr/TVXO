@@ -611,6 +611,10 @@ fun GridHomeContent(
             if (liveTvRowAbove == false) item(key = "live_tv_home_below", span = { GridItemSpan(maxLineSpan) }, contentType = "live_tv_home") {
                 com.nuvio.tv.livetv.home.LiveTvHomeRow(above = false, startPadding = 0.dp, titleStyle = MaterialTheme.typography.headlineMedium)
             }
+            // Sports: highlights of your teams' recent games (hidden when there are none).
+            item(key = "sports_highlights", span = { GridItemSpan(maxLineSpan) }, contentType = "sports_highlights") {
+                com.nuvio.tv.livetv.sports.SportsHomeHighlightsRow(startPadding = 0.dp, titleStyle = MaterialTheme.typography.headlineMedium)
+            }
             if (uiState.continueWatchingEnabled && uiState.upcomingItems.isNotEmpty()) {
                 item(
                     key = "upcoming_section",

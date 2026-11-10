@@ -1566,6 +1566,8 @@ open class MainActivity : ComponentActivity() {
         // only claims the first highlight while nobody has pressed anything yet).
         if (event.action == KeyEvent.ACTION_DOWN) com.nuvio.tv.livetv.home.LiveTvHomeFocus.lastKeyAt = android.os.SystemClock.uptimeMillis()
         if (ambientIdleController.consumeKeyEvent(event)) return true
+        // Sports "Game started" pop-up: Play/Pause switches to the game (only while it shows).
+        if (com.nuvio.tv.livetv.sports.SportsStartedPrompt.onKey(event)) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (longPressBackHeld.value) {
                 if (event.action == KeyEvent.ACTION_UP) longPressBackHeld.value = false
