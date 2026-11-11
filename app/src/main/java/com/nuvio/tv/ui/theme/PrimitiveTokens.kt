@@ -6,6 +6,9 @@ object NuvioPrimitives {
     val transparent = Color.Transparent
     val black = Color(0xFF000000)
     val white = Color(0xFFFFFFFF)
+    // TVXO brand colours, sampled from the TVXO logo.
+    val tvxoPink = Color(0xFFFF0D7D)
+    val tvxoLime = Color(0xFFBBF615)
     val neutral950 = Color(0xFF0D0D0D)
     val neutral925 = Color(0xFF111111)
     val neutral900 = Color(0xFF1A1A1A)

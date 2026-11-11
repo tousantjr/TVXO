@@ -277,7 +277,7 @@ data class DrawerItem(
 internal const val LIVE_TV_GROUP_ROUTE = "livetv_menu_group"
 
 private data class MainUiPrefs(
-    val theme: AppTheme = AppTheme.WHITE,
+    val theme: AppTheme = AppTheme.TVXO_PINK,
     val customThemeColors: CustomThemeColors = CustomThemeColors.Default,
     val memberAccess: MemberAccess = MemberAccess.None,
     val font: AppFont = AppFont.INTER,
@@ -610,7 +610,7 @@ open class MainActivity : ComponentActivity() {
                     experienceModeDataStore.mode,
                 ) { themeAndAccess, font, amoledMode, amoledSurfacesMode, experienceMode ->
                     MainUiPrefs(
-                        theme = themeAndAccess.first.theme ?: AppTheme.WHITE,
+                        theme = themeAndAccess.first.theme ?: AppTheme.TVXO_PINK,
                         customThemeColors = themeAndAccess.first.customColors,
                         memberAccess = themeAndAccess.second,
                         font = font,
@@ -753,7 +753,7 @@ open class MainActivity : ComponentActivity() {
                             .apply()
                     }
                     val activeTheme = mainUiPrefs.theme
-                    if (splashPreferencesReady && activeTheme != AppTheme.WHITE) {
+                    if (splashPreferencesReady && activeTheme != AppTheme.TVXO_PINK) {
                         splashPrefs.edit().putString("theme_$activeProfileId", activeTheme.name).apply()
                     } else if (splashPreferencesReady) {
                         splashPrefs.edit().remove("theme_$activeProfileId").apply()
@@ -772,7 +772,7 @@ open class MainActivity : ComponentActivity() {
                         ?: activeTheme.takeIf { splashPreferencesReady }
                         ?: splashPrefs.getString("theme_$activeProfileId", null)
                             ?.let { name -> AppTheme.entries.firstOrNull { it.name == name } }
-                        ?: AppTheme.WHITE
+                        ?: AppTheme.TVXO_PINK
                     SplashBackground(
                         profileColorHex = if (hasFocusedOverride) focusedSplashColor else (colorHex ?: fallbackColor),
                         backgroundUrl = resolvedBgUrl,

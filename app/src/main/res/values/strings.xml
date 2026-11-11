@@ -339,6 +339,7 @@
     <string name="theme_color_amber">Amber</string>
     <string name="theme_color_rose">Rose</string>
     <string name="theme_color_white">White</string>
+    <string name="theme_color_tvxo_pink" translatable="false">TVXO Pink</string>
     <string name="theme_color_custom">Custom</string>
     <string name="custom_theme_title">Your custom gradient</string>
     <string name="custom_theme_subtitle">Choose three colors for your theme. Select a color to edit it.</string>

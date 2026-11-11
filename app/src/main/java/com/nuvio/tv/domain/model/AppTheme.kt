@@ -1,6 +1,8 @@
 package com.nuvio.tv.domain.model
 
 enum class AppTheme(val displayName: String) {
+    /** TVXO: the hot pink of the TVXO logo, lime as the second colour. The default theme. */
+    TVXO_PINK("TVXO Pink"),
     CUSTOM("Custom"),
     GOLD("Gold"),
     JADE("Jade"),
