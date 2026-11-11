@@ -3469,4 +3469,29 @@
     <string name="sports_anim_off">Off</string>
     <string name="sports_settings_odds">Show odds &amp; win probability</string>
     <string name="sports_settings_odds_sub">Betting lines and win chances on game pages</string>
+    <!-- Live TV: Guide Coverage report -->
+    <string name="guide_coverage_title">Guide Coverage</string>
+    <string name="guide_coverage_entry_sub">Which of your channels have TV guide listings, and which don\'t</string>
+    <string name="guide_coverage_loading">Checking your channels against the TV guide…</string>
+    <string name="guide_coverage_no_playlists">No playlist with live channels is turned on. Add or turn on a playlist first.</string>
+    <string name="guide_coverage_no_channels">No channels are loaded yet. Try again once your playlist has finished updating.</string>
+    <string name="guide_coverage_no_guide">None of your %1$d channels has TV guide listings yet. Update your guides, or add an EPG source, then refresh.</string>
+    <string name="guide_coverage_failed">Couldn\'t check guide coverage: %1$s</string>
+    <string name="guide_coverage_headline">%1$d%% of your channels have a TV guide</string>
+    <string name="guide_coverage_summary">%1$s of %2$s channels have listings in the next 24 hours · %3$s without · %4$s programmes stored</string>
+    <string name="guide_coverage_refresh">Refresh</string>
+    <string name="guide_coverage_close">Close</string>
+    <string name="guide_coverage_by_group">By group (worst first)</string>
+    <string name="guide_coverage_by_playlist">By playlist</string>
+    <string name="guide_coverage_by_guide">By guide (channels each guide covers)</string>
+    <string name="guide_coverage_missing">Channels with no guide</string>
+    <string name="guide_coverage_none_missing">Every channel has guide listings.</string>
+    <string name="guide_coverage_value">%1$s/%2$s · %3$d%%</string>
+    <string name="guide_coverage_guide_value">%1$s channels</string>
+    <string name="guide_coverage_guide_programmes">%1$s programmes</string>
+    <string name="guide_coverage_group_hint">Select to see its channels with no guide</string>
+    <string name="guide_coverage_missing_count">%1$s without a guide</string>
+    <string name="guide_coverage_locked">%1$s more in a locked group (names not shown)</string>
+    <string name="guide_coverage_more_channels">…and %1$s more</string>
+    <string name="guide_coverage_more_groups">Show all %1$s groups</string>
 </resources>
