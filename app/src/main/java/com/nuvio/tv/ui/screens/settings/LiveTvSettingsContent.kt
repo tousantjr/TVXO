@@ -504,12 +504,8 @@ internal fun LiveTvSettingsContent(
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddXtream }
                     )
-                    SettingsActionRow(
-                        title = "Add Stalker / Ministra Portal",
-                        subtitle = "Use the portal URL and MAC address supplied by your provider",
-                        leadingIcon = Icons.Default.Add,
-                        onClick = { dialog = LiveDialog.AddStalker }
-                    )
+                    // TVXO: the "Add Stalker / Ministra Portal" row is hidden (Xtream-only sign-in).
+                    // Existing Stalker entries still show above and can be edited or removed.
                     SubHeading("TV Guides (EPG)")
                     epgs.forEach { e ->
                         SettingsActionRow(

@@ -1,8 +1,7 @@
 name: TVXO Release
 
-# NOTE: this file lives in ci/ and is NOT active. To enable it, copy it to
-# .github/workflows/tvxo-release.yml (e.g. via the GitHub website) and add the 4 Actions
-# secrets described in TVXO_BUILD_GUIDE.md, section "Enable automatic CI later".
+# Active copy: .github/workflows/tvxo-release.yml (ci/tvxo-release.yml is kept identical).
+# Needs the Actions secrets listed below; see TVXO_BUILD_GUIDE.md.
 
 # Builds a signed TVXO release APK and publishes it to this repository's GitHub Releases,
 # where the in-app updater looks for it (owner/repo is set by `tvxo.updateRepo` in
@@ -23,7 +22,7 @@ name: TVXO Release
 #   TVXO_KEYSTORE_PASSWORD   keystore password
 #   TVXO_KEY_ALIAS           key alias
 #   TVXO_KEY_PASSWORD        key password
-# Optional secrets (features stay off when missing): TMDB_API_KEY, TRAKT_CLIENT_ID,
+# Optional secrets (features stay off when missing): TMDB_API_KEY, TVDB_API_KEY, TRAKT_CLIENT_ID,
 #   TRAKT_CLIENT_SECRET, SIMKL_CLIENT_ID, SIMKL_APP_NAME, MDBLIST_CLIENT_ID,
 #   GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, PREMIUMIZE_CLIENT_ID,
 #   INTRODB_API_URL, TVXO_PRIVACY_POLICY_URL
@@ -102,6 +101,7 @@ jobs:
       - name: Write optional app keys
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TVDB_API_KEY: ${{ secrets.TVDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
           SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
@@ -116,6 +116,7 @@ jobs:
           : > keys.properties
           add() { if [ -n "$2" ]; then echo "$1=$2" >> keys.properties; fi; }
           add TMDB_API_KEY "$TMDB_API_KEY"
+          add TVDB_API_KEY "$TVDB_API_KEY"
           add TRAKT_CLIENT_ID "$TRAKT_CLIENT_ID"
           add TRAKT_CLIENT_SECRET "$TRAKT_CLIENT_SECRET"
           add SIMKL_CLIENT_ID "$SIMKL_CLIENT_ID"
@@ -188,9 +189,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK=$(ls out/*arm64-v8a*.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls out/*universal*.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls out/*.apk | head -1)
+          # Universal first: Sony Bravia and many Google TVs run 32-bit (armeabi-v7a) userspace,
+          # so an arm64-only APK shows "This app isn't compatible with your TV."
+          APK=$(ls out/*universal*.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls out/*armeabi-v7a*.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls out/*arm64-v8a*.apk 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then echo "::error::No universal, armeabi-v7a or arm64-v8a APK found in out/ for the Downloader link"; exit 1; fi
+          echo "Downloader link will serve: $APK"
           mkdir -p dl
           cp "$APK" dl/TVXO.apk
           if ! gh release view downloader -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
