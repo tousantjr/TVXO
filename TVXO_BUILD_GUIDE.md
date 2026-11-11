@@ -266,3 +266,8 @@ After the real logo was added, an incremental `./gradlew :app:assembleFullDebug`
 - `color/tvxo_launcher_background` = `#ff000000`.
 - The banner, the xxxhdpi `iptv_ic_launcher` and the `tvxo_ic_launcher_foreground` inside the APK are pixel-identical to the generated files.
 
+
+### Sports: everything added on top of stock (PR #10)
+- All upstream Sports updates up to `dev` 3e7a0fbe0 (2026-11-11).
+- Upstream open PR #105 (bounded guide browsing; Search and Sports still read the full guide). Its author has it on merge hold because measured memory peaks were higher (median 129 → 140 MiB); included on request. Merged with the Stalker archive ids kept.
+- The TVXO 13.9 Sports Hub upgrades (odds and win probability, play-by-play, box score, Game Started prompt, team splashes, My Teams This Week, Home highlights row, animations setting). Their Multiview buttons now open the app's built-in Multiview (Sports start, one pane per live game, up to 4). Dead-channel ranking is off because the stock build has no dead channel scanner.
