@@ -264,7 +264,7 @@ internal class SportsMatcher(
         val guideAt = db.changes
         // The guide's own stamp, kept across restarts: what was found last time (saved) still holds
         // after a restart while the guide is the same.
-        val rev = runCatching { db.revision() }.getOrNull()
+        val rev = if (input.readGuide) runCatching { db.revision() }.getOrNull() else null
         val cacheKey = ((rev ?: guideAt) * 1_000_003L + nd0.fingerprint) * 31 + input.shiftMs
         if (input.readGuide && !slotsLoaded) {
             slotsLoaded = true

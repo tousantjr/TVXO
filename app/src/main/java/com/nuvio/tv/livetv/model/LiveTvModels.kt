@@ -261,7 +261,11 @@ data class EpgProgram(
     /** Provider archive identifier, retained through guide storage and time shifts. */
     val providerProgramId: String? = null,
     /** Portal identity which issued the archive id; other guides can still provide the text. */
-    val providerSourceIdentity: String? = null
+    val providerSourceIdentity: String? = null,
+    /** A bounded UI copy; actions must resolve canonical details before saving metadata. */
+    @Transient val isDisplayProjection: Boolean = false,
+    /** In-memory key for exact hydration when several stored listings share one start time. */
+    @Transient val guideRowId: Long? = null
 ) {
     fun isLive(nowMs: Long): Boolean = nowMs in startMs until stopMs
     fun progress(nowMs: Long): Float {

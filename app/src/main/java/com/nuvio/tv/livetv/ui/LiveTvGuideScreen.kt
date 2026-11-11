@@ -63,6 +63,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import com.nuvio.tv.livetv.data.retainGuideTargetOwnership
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,6 +72,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInRoot
@@ -116,6 +118,8 @@ import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -127,7 +131,7 @@ private enum class GuideColumn { CHANNEL, PROGRAM }
 /** What the cursor currently sits on in a channel row. */
 private data class GuideBlock(val startMs: Long, val stopMs: Long, val program: EpgProgram?)
 
-private data class MenuTarget(val channel: LiveChannel, val block: GuideBlock?)
+private data class MenuTarget(val channel: LiveChannel, val block: GuideBlock?, val streamProgram: EpgProgram? = null)
 
 private fun floorSlot(ms: Long) = ms - Math.floorMod(ms, SLOT_MS)
 
@@ -304,16 +308,18 @@ private fun LiveTvGuideScreenBody(
         val n = com.nuvio.tv.livetv.data.LiveTvRepository.normalize(titleMarks(p.title).title)
         return if (seriesList.any { it.channel.key == ch.key && it.norm == n }) "Stop recording series" else "Record series"
     }
-    fun doRecord(ch: LiveChannel, p: EpgProgram) {
+    fun doRecord(ch: LiveChannel, p: EpgProgram, ownership: AutoCloseable? = null) {
         val nowMs = System.currentTimeMillis()
-        val msg = if (nowMs >= p.startMs && nowMs < p.stopMs && recordingUntil.containsKey(ch.key)) viewModel.toggleRecording(ch)
-        else viewModel.toggleScheduled(ch, p)
+        val msg = if (nowMs >= p.startMs && nowMs < p.stopMs && recordingUntil.containsKey(ch.key))
+            withGuideOwnership(ownership) { viewModel.toggleRecording(ch) }
+        else viewModel.toggleScheduled(ch, p, ownership)
         com.nuvio.tv.livetv.record.LiveTvNotice.show(msg)
     }
-    fun doSeries(ch: LiveChannel, p: EpgProgram) {
-        com.nuvio.tv.livetv.record.LiveTvNotice.show(viewModel.toggleSeries(ch, p))
+    fun doSeries(ch: LiveChannel, p: EpgProgram, ownership: AutoCloseable? = null) {
+        com.nuvio.tv.livetv.record.LiveTvNotice.show(viewModel.toggleSeries(ch, p, ownership))
     }
     val programs by viewModel.programs.collectAsStateWithLifecycle()
+    RetainGuideBrowsePrograms(programs)
     val status by viewModel.status.collectAsStateWithLifecycle()
     val playback by viewModel.playbackState.collectAsStateWithLifecycle()
     // A channel playing in the preview window: keep the TV awake (no screen saver), like full
@@ -389,10 +395,6 @@ private fun LiveTvGuideScreenBody(
     var row by remember { mutableIntStateOf(0) }
     var cursorMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var windowStart by remember { mutableLongStateOf(floorSlot(System.currentTimeMillis())) }
-    // Load listings for the hours being looked at (scrolling ahead, or back for catch-up).
-    LaunchedEffect(windowStart) {
-        viewModel.ensureGuideRange(windowStart - 2 * 3_600_000L, windowStart + guideWindowMs(settings) + 6 * 3_600_000L)
-    }
     // Going back in time on catch-up channels: fetch their full catch-up archive (many guide
     // files only reach about a day back; the provider keeps up to a week or more).
     var pendingGroupId by remember { mutableStateOf<String?>(null) }
@@ -464,6 +466,24 @@ private fun LiveTvGuideScreenBody(
     /** Schedule a Recording (long-press menu): the channel it's for. */
     var manualRecordingFor by remember { mutableStateOf<LiveChannel?>(null) }
     var infoTarget by remember { mutableStateOf<MenuTarget?>(null) }
+    val targetOwners = remember { GuideTargetRegistry<MenuTarget>() }
+    androidx.compose.runtime.SideEffect { targetOwners.commit(listOf(menuTarget, infoTarget)) }
+    DisposableEffect(targetOwners) { onDispose { targetOwners.close() } }
+    fun ownTarget(target: MenuTarget): MenuTarget? {
+        val selected = if (target.block?.program == null) target.copy(
+            streamProgram = programs[target.channel.key]?.firstOrNull { now >= it.startMs && now < it.stopMs }
+        ) else target
+        if (targetOwners.capture(selected, listOf(menuTarget, infoTarget),
+                selected.block?.program?.isDisplayProjection == true || selected.streamProgram?.isDisplayProjection == true) {
+                programs.retainGuideTargetOwnership()
+            }) return selected
+        com.nuvio.tv.livetv.record.LiveTvNotice.show("Programme details are unavailable. Please try again.")
+        return null
+    }
+    fun forkTarget(target: MenuTarget): com.nuvio.tv.livetv.data.GuideTargetOwnership? =
+        targetOwners.fork(target).also {
+            if (it == null) com.nuvio.tv.livetv.record.LiveTvNotice.show("Programme details are unavailable. Please try again.")
+        }
     var searchOpen by remember { mutableStateOf(false) }
     var textPrompt by remember { mutableStateOf<TextPrompt?>(null) }
     var groupPickerFor by remember { mutableStateOf<LiveChannel?>(null) }
@@ -488,12 +508,13 @@ private fun LiveTvGuideScreenBody(
 
     // "Unassigned channels" (from the Assign EPG panel): only channels with no guide data.
     var epgUnassignedOnly by remember { mutableStateOf(false) }
+    val guideChannelsWithListings by viewModel.guideChannelsWithListings.collectAsStateWithLifecycle()
     val channels = when {
         visibilityMode -> visibilityChannels
         favoritesMode -> favoritesChannels
         reorderActive -> reorderList
         savedOrder != null -> savedOrder!!
-        epgUnassignedOnly -> ui.channels.filter { programs[it.key].isNullOrEmpty() }
+        epgUnassignedOnly -> ui.channels.filter { it.key !in guideChannelsWithListings }
         else -> ui.channels
     }
     fun finishChannelVisibility() {
@@ -525,14 +546,30 @@ private fun LiveTvGuideScreenBody(
         }
     }
     val selectedGroupTitle = ui.groups.firstOrNull { it.id == ui.selectedGroupId }?.title ?: "All channels"
-    // The group on screen gets its listings for every day ahead (Guide Days Ahead), in the
-    // background, so scrolling ahead in it doesn't run out after half a day.
-    // Also after a guide update, which keeps only the hours around now in memory.
+    // Decode a screen and a prefetch margin. The stored guide still covers every channel/day.
     val guideGeneration by viewModel.guideGeneration.collectAsStateWithLifecycle()
-    LaunchedEffect(ui.selectedGroupId, ui.channels.size, guideGeneration) {
-        delay(400) // flicking through groups: only the one you stop on
-        viewModel.ensureGroupFullRange(ui.channels.map { it.key })
+    LaunchedEffect(channels, windowStart, guideGeneration, settings.epgOffsetMinutes, guideWindowMs(settings)) {
+        snapshotFlow { (listState.firstVisibleItemIndex / 8) to (row / 8) }
+            .distinctUntilChanged()
+            .collectLatest { (firstPage, focusedPage) ->
+                if (channels.isEmpty()) return@collectLatest
+                // Pointer scrolling moves the visible rows without moving the virtual cursor;
+                // D-pad jumps can move the cursor before LazyColumn catches up. Cover both.
+                fun segment(page: Int, count: Int): List<String> {
+                    val start = (page * 8 - 8).coerceIn(0, channels.size)
+                    val end = (start + count).coerceAtMost(channels.size)
+                    return channels.subList(start, end).map { it.key }
+                }
+                val keys = (listOfNotNull(channels.getOrNull(row)?.key) + segment(firstPage, 48) + segment(focusedPage, 32)).distinct()
+                viewModel.ensureGuideWindow(keys, windowStart - 3_600_000L,
+                    windowStart + guideWindowMs(settings) + 2 * 3_600_000L)
+            }
     }
+
+    LaunchedEffect(channels.getOrNull(row)?.key, cursorMs, column, now, settings.epgOffsetMinutes) {
+        channels.getOrNull(row)?.let { viewModel.ensureGuideFocus(it.key, if (column == GuideColumn.CHANNEL) now else cursorMs) }
+    }
+    DisposableEffect(viewModel) { onDispose { viewModel.releaseGuideWindow() } }
 
     // A different group opens at its top. (It used to jump to the playing channel when that
     // channel was in the group too, e.g. after playing it from Favorites.) Opening Live TV and
@@ -816,14 +853,28 @@ private fun LiveTvGuideScreenBody(
         }
     }
 
-    fun findInNuvio(program: EpgProgram) {
+    fun findInNuvio(program: EpgProgram, channelKey: String, ownership: AutoCloseable) {
         // For a series with a "Show - Episode" title, search for the show.
-        LiveTvSearchBridge.request(com.nuvio.tv.livetv.data.LiveTvPosterResolver.searchTitleFor(program, null))
-        onFindInNuvio()
+        scope.launch {
+            val full = if (program.isDisplayProjection) viewModel.details(channelKey, program) else program
+            if (full.isDisplayProjection) {
+                com.nuvio.tv.livetv.record.LiveTvNotice.show("Programme details are unavailable. Please try again.")
+                return@launch
+            }
+            LiveTvSearchBridge.request(com.nuvio.tv.livetv.data.LiveTvPosterResolver.searchTitleFor(full, null))
+            onFindInNuvio()
+        }.releaseGuideOwnershipOnCompletion(ownership)
     }
 
     val focusedChannel = channels.getOrNull(row)
     val focusedPrograms = rememberGuidePrograms(focusedChannel, programs[focusedChannel?.key].orEmpty(), now, settings.epgPastHours)
+    val guideFocusPage by viewModel.guideFocusPage.collectAsStateWithLifecycle()
+    val horizontalMoves = remember { GuideHorizontalMoveQueue() }
+    val focusedGuideAnchor = if (column == GuideColumn.CHANNEL) now else cursorMs
+    val focusedGuideError = guideFocusPage.takeIf {
+        it.channelKey == focusedChannel?.key && it.anchorMs == focusedGuideAnchor
+    }?.errorMessage
+    val focusedProgrammePending = focusedChannel?.let { viewModel.isGuideFocusPending(it.key, focusedGuideAnchor, programs) } == true
 
     fun blockAt(list: List<EpgProgram>, at: Long): GuideBlock {
         list.firstOrNull { at >= it.startMs && at < it.stopMs }?.let { return GuideBlock(it.startMs, it.stopMs, it) }
@@ -933,14 +984,21 @@ private fun LiveTvGuideScreenBody(
         if (!ui.hasSources) { onOpenSettings(); return }
         val ch = focusedChannel ?: return
         if (column == GuideColumn.CHANNEL) { playChannel(ch); return }
+        if (viewModel.isGuideFocusPending(ch.key, cursorMs, programs)) {
+            if (focusedGuideError == null) viewModel.ensureGuideFocus(ch.key, cursorMs)
+            return
+        }
         val block = focusedBlock ?: return
         when {
             now >= block.startMs && now < block.stopMs -> playChannel(ch)
             block.stopMs <= now && block.program != null &&
                 CatchupUrlBuilder.isAvailable(ch, block.program, now) -> {
-                if (viewModel.playCatchup(ch, block.program)) goFullscreen()
+                val ownership = programs.retainGuideTargetOwnership()
+                if (block.program.isDisplayProjection && ownership == null)
+                    com.nuvio.tv.livetv.record.LiveTvNotice.show("Programme details are unavailable. Please try again.")
+                else if (viewModel.playCatchup(ch, block.program, ownership = ownership)) goFullscreen()
             }
-            else -> infoTarget = MenuTarget(ch, block)
+            else -> infoTarget = ownTarget(MenuTarget(ch, block))
         }
     }
 
@@ -958,7 +1016,16 @@ private fun LiveTvGuideScreenBody(
     // The cursor is always on a program. "CHANNEL" now just means "resting on what's on now"
     // (the guide keeps following the clock); "PROGRAM" means browsing ahead or back in time.
     fun moveRight() {
-        if (focusedChannel == null) return
+        val ch = focusedChannel ?: return
+        val at = if (column == GuideColumn.CHANNEL) now else cursorMs
+        if (focusedGuideError != null || viewModel.isGuideFocusPending(ch.key, at, programs)) {
+            horizontalMoves.offer(ch.key, at, direction = 1)
+            // Only a user's horizontal input retries a failed focused page.
+            val latest = viewModel.guideFocusPage.value
+            if (latest.errorMessage != null || latest.channelKey != ch.key || latest.anchorMs != at)
+                viewModel.ensureGuideFocus(ch.key, at)
+            return
+        }
         if (column == GuideColumn.CHANNEL) {
             column = GuideColumn.PROGRAM
             cursorMs = now
@@ -968,9 +1035,12 @@ private fun LiveTvGuideScreenBody(
         if (block.stopMs >= limit) return
         cursorMs = block.stopMs
         while (cursorMs >= windowStart + guideWindowMs(settings) - SLOT_MS / 2) windowStart += SLOT_MS
+        // Set the pending anchor before another remote event can interpret an unloaded gap.
+        viewModel.ensureGuideFocus(ch.key, cursorMs)
     }
 
     fun resetToNow() {
+        horizontalMoves.clear()
         column = GuideColumn.CHANNEL
         windowStart = floorSlot(now)
         cursorMs = now
@@ -1010,12 +1080,32 @@ private fun LiveTvGuideScreenBody(
             }
             return
         }
+        if (focusedGuideError != null || viewModel.isGuideFocusPending(ch.key, from, programs)) {
+            horizontalMoves.offer(ch.key, from, direction = -1, held = held)
+            val latest = viewModel.guideFocusPage.value
+            if (latest.errorMessage != null || latest.channelKey != ch.key || latest.anchorMs != from)
+                viewModel.ensureGuideFocus(ch.key, from)
+            return
+        }
         column = GuideColumn.PROGRAM
         cursorMs = block.startMs - 1
         while (cursorMs < windowStart) windowStart -= SLOT_MS
+        viewModel.ensureGuideFocus(ch.key, cursorMs)
         // Stepping back onto what's on now: rest there, so the next Left opens the groups.
         val landed = blockAt(focusedPrograms, cursorMs)
         if (now >= landed.startMs && now < landed.stopMs && ch.catchup == null) resetToNow()
+    }
+
+    LaunchedEffect(guideFocusPage, programs, focusedChannel?.key, focusedGuideAnchor, groupsOpen, nameFocus,
+        fullscreen, menuTarget, infoTarget) {
+        if (groupsOpen || nameFocus || fullscreen || menuTarget != null || infoTarget != null || focusedGuideError != null) {
+            horizontalMoves.clear()
+            return@LaunchedEffect
+        }
+        val ch = focusedChannel ?: run { horizontalMoves.clear(); return@LaunchedEffect }
+        val move = horizontalMoves.takeReady(ch.key, focusedGuideAnchor,
+            focusedGuideError != null || viewModel.isGuideFocusPending(ch.key, focusedGuideAnchor, programs)) ?: return@LaunchedEffect
+        if (move.direction > 0) moveRight() else moveLeft(move.held)
     }
 
     CompositionLocalProvider(LocalLiveSolidHighlight provides settings.solidHighlight, LocalGuideDarkness provides settings.guideInfoBackground) {
@@ -1522,7 +1612,11 @@ private fun LiveTvGuideScreenBody(
                                 if (isOk) {
                                     fun openMenu() {
                                         longPressFired = true
-                                        focusedChannel?.let { menuTarget = MenuTarget(it, focusedBlock) }
+                                        focusedChannel?.let { ch ->
+                                            if (column == GuideColumn.PROGRAM && viewModel.isGuideFocusPending(ch.key, cursorMs, programs)) {
+                                                if (focusedGuideError == null) viewModel.ensureGuideFocus(ch.key, cursorMs)
+                                            } else menuTarget = ownTarget(MenuTarget(ch, focusedBlock))
+                                        }
                                     }
                                     if (event.type == KeyEventType.KeyDown) {
                                         if (event.nativeKeyEvent.repeatCount == 0) {
@@ -1633,7 +1727,7 @@ private fun LiveTvGuideScreenBody(
                                     event.key == Key.MediaFastForward -> { repeat(4) { moveRight() }; true }
                                     event.key == Key.MediaRewind -> { repeat(4) { moveLeft(held = true) }; true }
                                     event.key == Key.Menu || event.key == Key.Info -> {
-                                        focusedChannel?.let { menuTarget = MenuTarget(it, focusedBlock) }
+                                        focusedChannel?.let { menuTarget = ownTarget(MenuTarget(it, focusedBlock)) }
                                         true
                                     }
                                             event.key == Key.Search -> { LiveTvSearchBridge.origin.value = LiveTvSearchBridge.GUIDE; onOpenNuvioSearch(); true }
@@ -1717,6 +1811,8 @@ private fun LiveTvGuideScreenBody(
                                             isPlaying = ch.key == playback.channelKey,
                                             focusColumn = if (index == row && (gridFocused || epgPickerFor != null || logoPickerFor != null) && !nameFocus && !reorderActive) column else null,
                                             focusedBlock = if (index == row) focusedBlock else null,
+                                            loadingFocusedProgramme = index == row && focusedProgrammePending,
+                                            focusedProgrammeError = if (index == row) focusedGuideError else null,
                                             visible = if (visibilityMode) ch.key !in pendingHidden else null,
                                             onToggleVisibility = if (visibilityMode) ({
                                                 row = index
@@ -2137,12 +2233,13 @@ private fun LiveTvGuideScreenBody(
         menuTarget?.let { target ->
             ChannelContextMenu(
                 target = target,
+                acquireProgramOwnership = { _ -> forkTarget(target) },
                 reminderSet = target.block?.program?.let { p -> user.reminders.any { it.channelKey == target.channel.key && it.startMs == p.startMs } } == true,
-                onRemind = { p -> viewModel.toggleReminder(target.channel, p); menuTarget = null },
+                onRemind = { p -> forkTarget(target)?.let { viewModel.toggleReminder(target.channel, p, it) }; menuTarget = null },
                 recordLabel = recordLabel(target.channel, target.block?.program),
-                onRecord = { p -> menuTarget = null; doRecord(target.channel, p) },
+                onRecord = { p -> forkTarget(target)?.let { doRecord(target.channel, p, it) }; menuTarget = null },
                 seriesLabel = seriesLabel(target.channel, target.block?.program),
-                onSeries = { p -> menuTarget = null; doSeries(target.channel, p) },
+                onSeries = { p -> forkTarget(target)?.let { doSeries(target.channel, p, it) }; menuTarget = null },
                 onScheduleRecording = { menuTarget = null; manualRecordingFor = target.channel },
                 canRestart = viewModel.canWatchFromStart(target.channel),
                 restartLabel = viewModel.restartLabel(target.channel),
@@ -2156,8 +2253,9 @@ private fun LiveTvGuideScreenBody(
                 onDismiss = { menuTarget = null },
                 onWatch = { menuTarget = null; viewModel.preview(target.channel); goFullscreen() },
                 onCatchup = { program ->
+                    val ownership = forkTarget(target)
                     menuTarget = null
-                    if (viewModel.playCatchup(target.channel, program)) goFullscreen()
+                    if (ownership != null && viewModel.playCatchup(target.channel, program, ownership = ownership)) goFullscreen()
                 },
                 onToggleFavorite = { viewModel.toggleFavorite(target.channel); menuTarget = null },
                 onMoveFavorite = { d ->
@@ -2172,24 +2270,26 @@ private fun LiveTvGuideScreenBody(
                 onRemoveFromGroup = { gid -> viewModel.removeFromGroup(gid, target.channel); menuTarget = null },
                 onAddToGroup = { menuTarget = null; groupPickerFor = target.channel },
                 onRename = {
+                    val channel = target.channel
                     menuTarget = null
                     textPrompt = TextPrompt(
                         title = "Rename channel",
-                        initial = target.channel.name,
+                        initial = channel.name,
                         hint = "Leave empty to use the playlist name",
-                        onConfirm = { viewModel.renameChannel(target.channel, it) }
+                        onConfirm = { viewModel.renameChannel(channel, it) }
                     )
                 },
                 onChangeEpg = { menuTarget = null; epgPickerFor = target.channel },
                 onChangeLogo = { menuTarget = null; logoPickerFor = target.channel },
                 onRenumber = {
+                    val channel = target.channel
                     menuTarget = null
                     textPrompt = TextPrompt(
                         title = "Channel number",
-                        initial = target.channel.number.toString(),
+                        initial = channel.number.toString(),
                         hint = "Leave empty to use the playlist number",
                         numeric = true,
-                        onConfirm = { viewModel.setChannelNumber(target.channel, it.trim().toIntOrNull()) }
+                        onConfirm = { viewModel.setChannelNumber(channel, it.trim().toIntOrNull()) }
                     )
                 },
                 onHide = {
@@ -2242,8 +2342,8 @@ private fun LiveTvGuideScreenBody(
                     menuTarget = null
                 },
                 onProgramInfo = { menuTarget = null; infoTarget = target },
-                streamProgram = target.block?.program ?: viewModel.currentProgram(target.channel.key),
-                onFindInNuvio = { p -> menuTarget = null; findInNuvio(p) },
+                streamProgram = target.block?.program ?: target.streamProgram,
+                onFindInNuvio = { p -> forkTarget(target)?.let { findInNuvio(p, target.channel.key, it) }; menuTarget = null },
                 onSearch = { menuTarget = null; LiveTvSearchBridge.origin.value = LiveTvSearchBridge.GUIDE; onOpenNuvioSearch() },
                 onRefresh = { menuTarget = null; viewModel.refresh() },
                 onGuideDisplay = { menuTarget = null; guideGearOpen = true },
@@ -2259,28 +2359,36 @@ private fun LiveTvGuideScreenBody(
             )
         }
         infoTarget?.let { target ->
-            ProgramInfoDialog(
-                target = target,
-                now = now,
-                use24h = settings.use24HourClock,
-                showEpisode = settings.showEpisodeNumbers,
-                onDismiss = { infoTarget = null },
-                onFind = { p -> infoTarget = null; findInNuvio(p) },
-                onWatch = { infoTarget = null; playChannel(target.channel) },
-                onCatchup = { p ->
-                    infoTarget = null
-                    if (viewModel.playCatchup(target.channel, p)) goFullscreen()
-                },
-                reminderSet = target.block?.program?.let { p -> user.reminders.any { it.channelKey == target.channel.key && it.startMs == p.startMs } } == true,
-                onRemind = { p -> viewModel.toggleReminder(target.channel, p); infoTarget = null },
-                recordLabel = recordLabel(target.channel, target.block?.program),
-                onRecord = { p -> infoTarget = null; doRecord(target.channel, p) },
-                canRestart = viewModel.canWatchFromStart(target.channel),
-                onRestart = {
-                    infoTarget = null
-                    if (viewModel.watchFromStart(target.channel)) goFullscreen()
-                }
-            )
+            CompositionLocalProvider(LocalShowDetails provides { key, program ->
+                val ownership = targetOwners.fork(target)
+                    ?: throw kotlinx.coroutines.CancellationException("Guide target was released")
+                try { viewModel.details(key, program) } finally { ownership.close() }
+            }) {
+                ProgramInfoDialog(
+                    target = target,
+                acquireProgramOwnership = { _ -> forkTarget(target) },
+                    now = now,
+                    use24h = settings.use24HourClock,
+                    showEpisode = settings.showEpisodeNumbers,
+                    onDismiss = { infoTarget = null },
+                    onFind = { p -> forkTarget(target)?.let { findInNuvio(p, target.channel.key, it) }; infoTarget = null },
+                    onWatch = { infoTarget = null; playChannel(target.channel) },
+                    onCatchup = { p ->
+                        val ownership = forkTarget(target)
+                        infoTarget = null
+                        if (ownership != null && viewModel.playCatchup(target.channel, p, ownership = ownership)) goFullscreen()
+                    },
+                    reminderSet = target.block?.program?.let { p -> user.reminders.any { it.channelKey == target.channel.key && it.startMs == p.startMs } } == true,
+                    onRemind = { p -> forkTarget(target)?.let { viewModel.toggleReminder(target.channel, p, it) }; infoTarget = null },
+                    recordLabel = recordLabel(target.channel, target.block?.program),
+                    onRecord = { p -> forkTarget(target)?.let { doRecord(target.channel, p, it) }; infoTarget = null },
+                    canRestart = viewModel.canWatchFromStart(target.channel),
+                    onRestart = {
+                        infoTarget = null
+                        if (viewModel.watchFromStart(target.channel)) goFullscreen()
+                    }
+                )
+            }
         }
         textPrompt?.let { prompt ->
             TextInputDialog(
@@ -2771,6 +2879,9 @@ private fun GuideRow(
     isPlaying: Boolean,
     focusColumn: GuideColumn?,
     focusedBlock: GuideBlock?,
+    /** A missing focused cell is a loading slice until its bounded query has been published. */
+    loadingFocusedProgramme: Boolean = false,
+    focusedProgrammeError: String? = null,
     /** In Manage visibility: true = shown, false = hidden. Null otherwise. */
     visible: Boolean? = null,
     onToggleVisibility: (() -> Unit)? = null,
@@ -2948,7 +3059,7 @@ private fun GuideRow(
                     androidx.compose.material3.Text(
                         // The channel's name, so you can see what the row is (24/7 channels'
                         // names also say what's on). Dim and italic: nothing's actually listed.
-                        text = channel.name,
+                        text = focusedProgrammeError ?: if (loadingFocusedProgramme) "Loading program information…" else channel.name,
                         color = if (emptyRowFocused) emptyColors.text else NuvioTheme.colors.TextTertiary,
                         fontSize = gsp(14f),
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -2970,7 +3081,7 @@ private fun GuideRow(
                     if (gw > 4.dp) strip += StripItem(
                         x = gx, width = gw,
                         // Something is on; the guide just doesn't say what.
-                        title = if (gw > 90.dp) "No information" else "",
+                        title = if (gw > 90.dp) { focusedProgrammeError ?: if (loadingFocusedProgramme) "Loading…" else "No information" } else "",
                         subtitle = null,
                         fill = gapFill, edge = Color.White.copy(alpha = 0.09f),
                         text = NuvioTheme.colors.TextTertiary, italic = true
@@ -2999,7 +3110,7 @@ private fun GuideRow(
                     )
                     focusedShow = {
                         ProgramBlock(
-                            title = marks.title,
+                            title = focusedProgrammeError ?: marks.title,
                             // "Show times in the guide": start and end under the title.
                             subtitle = subtitle,
                             x = x, width = w,
@@ -3040,7 +3151,7 @@ private fun GuideRow(
                 val x = xOf(focusedBlock.startMs)
                 val w = (xOf(focusedBlock.stopMs) - x).coerceAtLeast(2.dp)
                 ProgramBlock(
-                    title = "No information", subtitle = null, x = x, width = w,
+                    title = focusedProgrammeError ?: if (loadingFocusedProgramme) "Loading…" else "No information", subtitle = null, x = x, width = w,
                     colors = liveCellColors(focused = true, idle = guideSurface()),
                     focused = true, progress = null, continuesLeft = false
                 )
@@ -3682,6 +3793,7 @@ private fun GroupItem(
 @Composable
 private fun ChannelContextMenu(
     target: MenuTarget,
+    acquireProgramOwnership: ((EpgProgram) -> AutoCloseable?)? = null,
     isFavorite: Boolean,
     inFavoritesGroup: Boolean,
     now: Long,
@@ -3735,7 +3847,9 @@ private fun ChannelContextMenu(
     val program = target.block?.program
     val canCatchup = program != null && program.stopMs <= now && CatchupUrlBuilder.isAvailable(ch, program, now)
     // The Calendar's bell: follow this show, or put this movie's airing on the Calendar.
-    val bell = com.nuvio.tv.livetv.calendar.rememberLiveBell(program ?: streamProgram, ch)
+    val bellProgram = program ?: streamProgram
+    val bell = com.nuvio.tv.livetv.calendar.rememberLiveBell(bellProgram, ch,
+        if (bellProgram == null) null else acquireProgramOwnership?.let { acquire -> { acquire(bellProgram) } })
     LiveDialog(onDismiss = onDismiss, width = 460.dp) {
         LiveText("${ch.number}  ${ch.name}", size = 20.sp, weight = FontWeight.Bold)
         LiveText(ch.group, color = NuvioTheme.colors.TextSecondary, size = 13.sp)
@@ -4436,6 +4550,7 @@ internal fun MenuItem(label: String, modifier: Modifier = Modifier, onClick: () 
 @Composable
 private fun ProgramInfoDialog(
     target: MenuTarget,
+    acquireProgramOwnership: ((EpgProgram) -> AutoCloseable?)? = null,
     now: Long,
     use24h: Boolean,
     showEpisode: Boolean = true,
@@ -4453,7 +4568,8 @@ private fun ProgramInfoDialog(
     val first = remember { FocusRequester() }
     val block = target.block
     val p = rememberShowDetails(target.channel.key, block?.program)
-    val infoBell = com.nuvio.tv.livetv.calendar.rememberLiveBell(p, target.channel)
+    val infoBell = com.nuvio.tv.livetv.calendar.rememberLiveBell(p, target.channel,
+        if (p == null) null else acquireProgramOwnership?.let { acquire -> { acquire(p) } })
     LiveDialog(onDismiss = onDismiss, width = 640.dp) {
         LiveText(p?.title ?: target.channel.name, size = 24.sp, weight = FontWeight.Bold, maxLines = 2)
         Spacer(Modifier.height(6.dp))
