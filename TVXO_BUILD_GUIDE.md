@@ -1,7 +1,18 @@
 # TVXO Build Guide
 
-TVXO is a fork of [NuvioPlusIPTV](https://github.com/homelessbrian/NuvioPlusIPTV) (branch `dev`, commit `828b3330`),
+TVXO is a fork of [NuvioPlusIPTV](https://github.com/homelessbrian/NuvioPlusIPTV) (branch `dev`, commit `3e7a0fbe`),
 which is itself a fork of [Nuvio / NuvioTV](https://github.com/NuvioMedia/NuvioTV). License: GPL-3.0.
+
+## Reverted to stock upstream (after 1.1.0-beta.13.10)
+
+The app was reset to stock NuvioPlusIPTV `dev` (`3e7a0fbe`). Only the TVXO identity is kept on top:
+package `com.tvxo.tv`, the name, icons and banners, the TVXO Pink default theme, TVXO signing and updater
+(tousantjr/TVXO), Setup Sync off, the TVXO release workflow (the Downloader link serves the universal APK),
+no account screen on first run, the Xtream login opening when Live TV has no source, an Xtream-only add row
+(M3U and Stalker add rows are hidden), and the "Playback unavailable" fix from PR #9.
+These TVXO features were dropped: TVDB episode order, TVXO Multiview, guide alerts, phone login, dead channel
+scanner, live score bar, extra XMLTV guide sources, the ReSeq/IPTVnator additions, and the 13.9 Sports Hub upgrades.
+The old code is kept at tag `pre-revert-13.10`.
 
 All TVXO work is on the local branch **`tvxo-rebrand`** in this folder. Nothing has been pushed anywhere.
 The upstream remote is named `upstream`, and its push URL is set to `DISABLED` so you can't push to homelessbrian by accident.
