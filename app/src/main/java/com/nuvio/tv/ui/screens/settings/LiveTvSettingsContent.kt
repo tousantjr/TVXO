@@ -61,6 +61,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.Key
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.nuvio.tv.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
@@ -191,6 +193,7 @@ private sealed interface LiveDialog {
     data class EditEpg(val source: EpgSource) : LiveDialog
     data object HiddenChannels : LiveDialog
     data object HiddenGroups : LiveDialog
+    data object GuideCoverage : LiveDialog
     data class PlaylistGuideShift(val source: PlaylistSource) : LiveDialog
     data class PlaylistCatchupShift(val source: PlaylistSource) : LiveDialog
     data class EpgSourceShift(val source: EpgSource) : LiveDialog
@@ -521,6 +524,12 @@ internal fun LiveTvSettingsContent(
                         subtitle = "Extra TV listings from an XMLTV link (ending in .xml or .xml.gz). Guides linked in your playlists load by themselves.",
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddEpg }
+                    )
+                    SettingsActionRow(
+                        title = stringResource(R.string.guide_coverage_title),
+                        subtitle = stringResource(R.string.guide_coverage_entry_sub),
+                        leadingIcon = Icons.Default.Schedule,
+                        onClick = { dialog = LiveDialog.GuideCoverage }
                     )
                     SubHeading("Updates")
                     SettingsActionRow(
@@ -1988,6 +1997,7 @@ internal fun LiveTvSettingsContent(
             onUnhideAll = { viewModel.unhideAllChannels(); close() },
             onDismiss = close
         )
+        LiveDialog.GuideCoverage -> GuideCoverageDialog(onDismiss = close)
         LiveDialog.HiddenGroups -> UnhideDialog(
             title = "Hidden groups",
             entries = user.hiddenGroups.sorted().map { it to viewModel.groupLabel(it) },

@@ -211,6 +211,27 @@ class EpgDatabase @Inject constructor(@ApplicationContext context: Context) :
         return out
     }
 
+    /** A playlist channel's guide binding: the guide (EPG source / file id) and how many listings it stores. */
+    class GuideBinding(val sourceId: String, val programs: Int)
+
+    /** Which guide each of these playlist channels is bound to, and its stored listing count (Guide Coverage). */
+    fun guideBindings(channels: Collection<String>): Map<String, GuideBinding> {
+        val out = HashMap<String, GuideBinding>()
+        channels.distinct().chunked(400).forEach { part ->
+            readableDatabase.rawQuery(
+                "SELECT c.ch, g.src, g.cnt FROM chan AS c JOIN guide_ch AS g ON g.gid = c.gid WHERE c.ch IN (" +
+                    part.joinToString(",") { "?" } + ")",
+                part.toTypedArray()
+            ).forwardOnly().use { c ->
+                while (c.moveToNext()) {
+                    val src = c.getString(1) ?: continue
+                    out[c.getString(0)] = GuideBinding(src, c.getInt(2))
+                }
+            }
+        }
+        return out
+    }
+
     /** Availability comes from every stored binding, independently of resident guide tiles. */
     fun channelsWithListings(fromMs: Long? = null, toMs: Long? = null, channels: Set<String>? = null): Set<String> {
         fun read(): Set<String> {
