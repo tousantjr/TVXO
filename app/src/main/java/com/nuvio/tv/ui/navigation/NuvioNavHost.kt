@@ -93,10 +93,6 @@ fun NuvioNavHost(
     com.nuvio.tv.livetv.sports.SportsHost(navController)
     // Live TV fork: pinned game scoreboards in the corner while something plays.
     com.nuvio.tv.livetv.sports.SportsPinsHost(navController)
-    // TVXO: live score strip + score alerts for My Teams (reads Sports data only).
-    com.nuvio.tv.livetv.extras.LiveScoreBarHost(navController)
-    // TVXO: guide keyword alerts, on top of whatever screen you're on.
-    com.nuvio.tv.livetv.extras.GuideAlertHost(navController)
 }
 
 @Composable
@@ -1325,14 +1321,19 @@ private fun PlaybackNavHost(
                         com.nuvio.tv.livetv.ondemand.OnDemandPlay.KEY, onDemandUid
                     )
                 },
-                onPlayOnDemand = { url, title, type, poster ->
+                onPlayOnDemand = { url, title, type, poster, contentId, contentName, season, episode, episodeName ->
                     navController.navigate(
                         Screen.Player.createRoute(
                             streamUrl = url,
                             title = title,
+                            contentId = contentId,
                             contentType = type,
-                            contentName = title,
+                            contentName = contentName,
                             poster = poster,
+                            videoId = if (type == "series" && season != null && episode != null) "$contentId:$season:$episode" else contentId,
+                            season = season,
+                            episode = episode,
+                            episodeTitle = episodeName,
                             addonName = com.nuvio.tv.livetv.ondemand.OnDemandStreams.GROUP_NAME
                         )
                     )
@@ -1425,6 +1426,11 @@ private fun PlaybackNavHost(
                 onOpenSettings = { navController.navigate(Screen.LiveTvSettings.route) },
                 // Recordings opens from the guide now (Back comes back to the guide).
                 onOpenRecordings = { navController.navigate(Screen.Recordings.route) { launchSingleTop = true } },
+                onOpenMultiview = { navController.navigate(Screen.LiveTvMultiview.route) { launchSingleTop = true } },
+                onOpenSportsMultiview = { panes, channelKey ->
+                    com.nuvio.tv.livetv.sports.SportsWatchLaunch.request(panes, channelKey)
+                    navController.navigate(Screen.SportsMultiview.route) { launchSingleTop = true }
+                },
                 onFindInNuvio = {
                     // Back from search returns to the guide.
                     navController.navigate(Screen.Search.route) { launchSingleTop = true }
@@ -1435,28 +1441,23 @@ private fun PlaybackNavHost(
                         launchSingleTop = true
                         restoreState = true
                     }
+                },
+                // A recording played full screen: Back goes to the screen it was picked on.
+                onReturnTo = { route ->
+                    if (!navController.popBackStack(route, inclusive = false)) {
+                        navController.navigate(route) { launchSingleTop = true }
+                    }
                 }
             )
         }
 
         composable(Screen.Recordings.route) {
-            // Live TV fork: recorded shows, played in Nuvio's own player.
+            // Live TV fork: recorded shows, played full screen in Live TV's own player (its seek
+            // bar, 30 s skips); Back comes back here.
             com.nuvio.tv.livetv.record.RecordingsScreen(
-                onPlay = { url, title, poster, recordingId, fromStart ->
-                    navController.navigate(
-                        Screen.Player.createRoute(
-                            streamUrl = url,
-                            title = title,
-                            // Its own kind, so the player keeps its place for next time but leaves
-                            // it out of Continue Watching, watch history and Trakt.
-                            contentId = com.nuvio.tv.livetv.record.RecordingResume.contentIdFor(recordingId),
-                            contentType = com.nuvio.tv.livetv.record.RecordingResume.CONTENT_TYPE,
-                            contentName = title,
-                            poster = poster,
-                            startFromBeginning = fromStart,
-                            addonName = "Recordings"
-                        )
-                    )
+                onPlay = { _, _, _, recordingId, fromStart ->
+                    com.nuvio.tv.livetv.record.RecordingLaunch.open(recordingId, fromStart, Screen.Recordings.route)
+                    navController.navigate(Screen.LiveTvPlayer.route) { launchSingleTop = true }
                 }
             )
         }
@@ -1496,20 +1497,10 @@ private fun PlaybackNavHost(
                     }
                 },
                 onOpenLive = { com.nuvio.tv.livetv.sports.openLiveTvFullscreen(navController) },
-                onPlayRecording = { url, title, poster, recordingId ->
-                    // Like Recordings: Nuvio's own player, kept out of Continue Watching and history.
-                    navController.navigate(
-                        Screen.Player.createRoute(
-                            streamUrl = url,
-                            title = title,
-                            contentId = com.nuvio.tv.livetv.record.RecordingResume.contentIdFor(recordingId),
-                            contentType = com.nuvio.tv.livetv.record.RecordingResume.CONTENT_TYPE,
-                            contentName = title,
-                            poster = poster,
-                            startFromBeginning = false,
-                            addonName = "Recordings"
-                        )
-                    )
+                onPlayRecording = { _, _, _, recordingId ->
+                    // Like Recordings: full screen in Live TV's player; Back comes back here.
+                    com.nuvio.tv.livetv.record.RecordingLaunch.open(recordingId, false, Screen.Calendar.route)
+                    navController.navigate(Screen.LiveTvPlayer.route) { launchSingleTop = true }
                 },
                 onOpenGame = { id ->
                     // Back on the game comes back here (the Calendar, where you were), not to the
@@ -1547,6 +1538,14 @@ private fun PlaybackNavHost(
             // Live TV fork: the Sports page (scores, schedules, which of your channels show each game).
             if (sportsShown) com.nuvio.tv.livetv.sports.SportsScreen(
                 onOpenLive = { com.nuvio.tv.livetv.sports.openLiveTvFullscreen(navController) },
+                onOpenMultiview = { channelKey ->
+                    com.nuvio.tv.livetv.sports.SportsWatchLaunch.request(2, channelKey)
+                    navController.navigate(Screen.SportsMultiview.route) { launchSingleTop = true }
+                },
+                onOpenMultiviewPanes = { panes, channelKey ->
+                    com.nuvio.tv.livetv.sports.SportsWatchLaunch.request(panes, channelKey)
+                    navController.navigate(Screen.SportsMultiview.route) { launchSingleTop = true }
+                },
                 // Back on a game opened from another page: that page again, as it was (like
                 // picking it in the side menu).
                 onReturnTo = { route ->
@@ -1587,14 +1586,19 @@ private fun PlaybackNavHost(
                         com.nuvio.tv.livetv.ondemand.OnDemandPlay.KEY, onDemandUid
                     )
                 },
-                onPlay = { url, title, type, poster ->
+                onPlay = { url, title, type, poster, contentId, contentName, season, episode, episodeName ->
                     navController.navigate(
                         Screen.Player.createRoute(
                             streamUrl = url,
                             title = title,
+                            contentId = contentId,
                             contentType = type,
-                            contentName = title,
+                            contentName = contentName,
                             poster = poster,
+                            videoId = if (type == "series" && season != null && episode != null) "$contentId:$season:$episode" else contentId,
+                            season = season,
+                            episode = episode,
+                            episodeTitle = episodeName,
                             addonName = com.nuvio.tv.livetv.ondemand.OnDemandStreams.GROUP_NAME
                         )
                     )
@@ -1606,6 +1610,28 @@ private fun PlaybackNavHost(
                     com.nuvio.tv.livetv.ui.LiveTvSearchBridge.origin.value = com.nuvio.tv.livetv.ui.LiveTvSearchBridge.ON_DEMAND
                     navController.navigate(Screen.Search.route) { launchSingleTop = true }
                 }
+            )
+        }
+
+        composable(Screen.LiveTvMultiview.route) {
+            com.nuvio.tv.livetv.multiview.MultiviewScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.SportsMultiview.route) {
+            com.nuvio.tv.livetv.multiview.MultiviewScreen(
+                onBack = { navController.popBackStack() },
+                startOnSports = true,
+                onSingle = {
+                    // Return directly to the guide. Restoring its saved stack can resurrect a
+                    // previous Multiview child that would release the incoming single player.
+                    if (!navController.popBackStack(Screen.LiveTv.route, inclusive = false)) {
+                        navController.navigate(Screen.LiveTv.route) {
+                            popUpTo(Screen.SportsMultiview.route) { inclusive = true }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                    }
+                },
             )
         }
 

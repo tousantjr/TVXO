@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -74,6 +76,7 @@ import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.livetv.model.effectiveGuideSize
 import com.nuvio.tv.ui.screens.collection.NuvioTextField
 import com.nuvio.tv.ui.theme.NuvioTheme
+import com.nuvio.tv.ui.theme.brandWordmarkResource
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -180,6 +183,7 @@ private sealed interface LiveDialog {
     data object AddXtream : LiveDialog
     data object AddStalker : LiveDialog
     data object AddEpg : LiveDialog
+    data object AddFromPhone : LiveDialog
     data class PlaylistActions(val source: PlaylistSource) : LiveDialog
     data class CatchupZone(val source: PlaylistSource) : LiveDialog
     data class EditPlaylist(val source: PlaylistSource) : LiveDialog
@@ -225,7 +229,7 @@ private sealed interface LiveDialog {
     data class Confirm(val title: String, val message: String, val label: String, val action: () -> Unit) : LiveDialog
 }
 
-private val EPG_OFFSETS = (-24..24).map { it * 30 }
+private val EPG_OFFSETS = (-48..48).map { it * 30 }
 private val REFRESH_HOURS = listOf(3, 6, 12, 24, 48, 72, 168)
 private val BANNER_SECONDS = listOf(3, 5, 8, 10, 15)
 private val FUTURE_DAYS = listOf(1, 2, 3, 5, 7, 10, 14)
@@ -463,17 +467,23 @@ internal fun LiveTvSettingsContent(
                     onToggle = { toggle("sources") }
                 ) {
                     SubHeading("Playlists")
+                    SettingsActionRow(
+                        title = "Add From Your Phone",
+                        subtitle = "Scan a QR code, then paste your playlist link, Xtream login or EPG link on your phone instead of typing it with the remote",
+                        leadingIcon = Icons.Default.PhoneAndroid,
+                        onClick = { dialog = LiveDialog.AddFromPhone }
+                    )
                     if (status.loading) LoadingLine(status.message ?: "Updating…")
                     playlists.forEach { pl ->
                         val account = accounts[pl.id]
                         val expiring = pl.enabled && account?.expiringSoon() == true
                         SettingsActionRow(
-                            title = pl.name + if (pl.isStalker) " (Stalker)" else if (pl.isXtream) " (Xtream)" else "",
+                            title = pl.name + when { pl.isStalker -> " (Stalker)"; pl.isXtream -> " (Xtream)"; else -> "" },
                             subtitle = when {
-                                pl.isXtream && pl.enabled && !pl.importLive && pl.importVod -> "Movies & series only (TV channels off)"
-                                pl.isXtream && pl.enabled && !pl.importLive && !pl.importVod -> "Nothing included: turn on TV channels or movies & series under Edit"
+                                pl.hasCatalog && pl.enabled && !pl.importLive && pl.importVod -> "Movies & series only (TV channels off)"
+                                pl.hasCatalog && pl.enabled && !pl.importLive && !pl.importVod -> "Nothing included: turn on TV channels or movies & series under Edit"
                                 else -> sourceStatus(pl.enabled, pl.lastUpdatedMs, pl.lastError, "${pl.channelCount} channels") +
-                                    (if (pl.isXtream && pl.importVod && pl.enabled) " · + movies & series" else "")
+                                    (if (pl.hasCatalog && pl.importVod && pl.enabled) " · + movies & series" else "")
                             } + (account?.expiryLabel()?.let { " · Expires $it" } ?: ""),
                             value = when {
                                 !pl.enabled -> "Off"
@@ -486,25 +496,17 @@ internal fun LiveTvSettingsContent(
                             onClick = { dialog = LiveDialog.PlaylistActions(pl) }
                         )
                     }
+                    // TVXO: Xtream Codes is the only source type offered. The M3U add row was
+                    // removed; existing M3U entries (e.g. from a restored backup) still show and can be edited/removed.
                     SettingsActionRow(
                         title = "Add Xtream Codes Login",
                         subtitle = "Sign in with the server, username and password from your provider. Its TV guide comes with it.",
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddXtream }
                     )
-                    SettingsActionRow(
-                        title = "Add M3U Playlist",
-                        subtitle = "A playlist link (.m3u / .m3u8). Add its XMLTV guide below if the playlist doesn't link one.",
-                        leadingIcon = Icons.Default.Add,
-                        onClick = { dialog = LiveDialog.AddM3u }
-                    )
-                    SettingsActionRow(
-                        title = "Add Stalker / MAG Portal",
-                        subtitle = "A portal URL and the MAC address your provider authorised. Live channels and the portal's guide.",
-                        leadingIcon = Icons.Default.Add,
-                        onClick = { dialog = LiveDialog.AddStalker }
-                    )
-                    SubHeading("Extra Guide Sources (XMLTV)")
+                    // TVXO: the "Add Stalker / Ministra Portal" row is hidden (Xtream-only sign-in).
+                    // Existing Stalker entries still show above and can be edited or removed.
+                    SubHeading("TV Guides (EPG)")
                     epgs.forEach { e ->
                         SettingsActionRow(
                             title = e.name,
@@ -515,16 +517,10 @@ internal fun LiveTvSettingsContent(
                         )
                     }
                     SettingsActionRow(
-                        title = "Add Extra Guide Source (XMLTV)",
-                        subtitle = "An XMLTV link (.xml or .xml.gz). Your provider's own guide stays the main one: extra guides only fill channels it has no listings for, and empty time slots.",
+                        title = "Add EPG Source",
+                        subtitle = "Extra TV listings from an XMLTV link (ending in .xml or .xml.gz). Guides linked in your playlists load by themselves.",
                         leadingIcon = Icons.Default.Add,
                         onClick = { dialog = LiveDialog.AddEpg }
-                    )
-                    SettingsActionRow(
-                        title = "Refresh Guide Now",
-                        subtitle = "Downloads your provider's guide and every extra guide source again, in the background",
-                        leadingIcon = Icons.Default.Refresh,
-                        onClick = { viewModel.refreshGuide() }
                     )
                     SubHeading("Updates")
                     SettingsActionRow(
@@ -540,6 +536,12 @@ internal fun LiveTvSettingsContent(
                     SettingsActionRow(
                         "Check Guides for Updates Every", "How often TV listings are downloaded again",
                         hoursLabel(s.epgRefreshHours), onClick = { dialog = LiveDialog.EpgRefresh }
+                    )
+                    SettingsToggleRow(
+                        "Show update banners",
+                        "Show playlist, EPG and On Demand update progress. Updates continue in the background when hidden.",
+                        s.showImportProgress,
+                        { update { it.copy(showImportProgress = !it.showImportProgress) } }
                     )
                 }
             }
@@ -724,7 +726,7 @@ internal fun LiveTvSettingsContent(
                         onClick = { viewModel.onDemand.refreshNow() }
                     )
                     // One switch per Xtream login (logins added before On Demand start switched off).
-                    playlists.filter { it.isXtream }.forEach { pl ->
+                    playlists.filter { it.hasCatalog }.forEach { pl ->
                         SettingsToggleRow(
                             "Movies & Series from ${pl.name}",
                             if (pl.importVod) "Included" else "Not included. Switch on to import this provider's movies and series.",
@@ -1549,17 +1551,6 @@ internal fun LiveTvSettingsContent(
                 }
             }
 
-            // ------------------------------------------------------------ TVXO extras (TvxoExtrasSettings.kt)
-            if (show(LiveTvPage.GUIDE)) item(key = "guide_alerts") {
-                GuideAlertsSettings { t, sum, rows -> LiveSection(t, sum, GuideAlertsIcon, "guide_alerts" in open, { toggle("guide_alerts") }, content = rows) }
-            }
-            if (show(LiveTvPage.MAIN)) item(key = "dead_channels") {
-                DeadChannelsSettings { t, sum, rows -> LiveSection(t, sum, DeadChannelsIcon, "dead_channels" in open, { toggle("dead_channels") }, content = rows) }
-            }
-            if (show(LiveTvPage.PLAYBACK)) item(key = "score_bar") {
-                ScoreBarSettings { t, sum, rows -> LiveSection(t, sum, ScoreBarIcon, "score_bar" in open, { toggle("score_bar") }, content = rows) }
-            }
-
             // ------------------------------------------------------------ Recordings
             if (show(LiveTvPage.PLAYBACK)) item(key = "recordings") {
                 val recContext = androidx.compose.ui.platform.LocalContext.current
@@ -1704,16 +1695,19 @@ internal fun LiveTvSettingsContent(
             onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addPlaylist(v[0], v[1], v[2]); close() }
         )
         LiveDialog.AddXtream -> AddXtreamSourceDialog(viewModel, onDone = close)
-        LiveDialog.AddStalker -> StalkerSourceDialog(viewModel, source = null, onDone = close)
-        LiveDialog.AddEpg -> SourceFormDialog(
-            title = "Add extra guide source (XMLTV)",
-            fields = listOf(FormField("Name", "Extra guide"), FormField("XMLTV URL", "https://…/epg.xml.gz")),
+        LiveDialog.AddStalker -> StalkerSourceDialog(
             onDismiss = close,
-            onSave = { v, _ ->
-                val url = v[1].trim()
-                if (url.isNotBlank()) viewModel.addEpg(v[0].trim().ifBlank { guideNameFromUrl(url) }, url)
+            onSave = { name, config, guide, vod, live ->
+                viewModel.addStalker(name, config, vod, live, guide)
                 close()
             }
+        )
+        LiveDialog.AddFromPhone -> AddFromPhoneDialog(viewModel = viewModel, onDismiss = close)
+        LiveDialog.AddEpg -> SourceFormDialog(
+            title = "Add EPG source",
+            fields = listOf(FormField("Name", "Guide"), FormField("XMLTV URL", "http://…/epg.xml.gz")),
+            onDismiss = close,
+            onSave = { v, _ -> if (v[1].isNotBlank()) viewModel.addEpg(v[0], v[1]); close() }
         )
         is LiveDialog.PlaylistActions -> ActionListDialog(
             title = d.source.name,
@@ -1740,21 +1734,21 @@ internal fun LiveTvSettingsContent(
                 // Which stream format to ask for. Xtream: Auto follows what the account allows.
                 // M3U links: Auto keeps the playlist's own links; TS / HLS switch links that can
                 // be switched (Xtream-style links, Dispatcharr).
-                "Stream format: " + when (d.source.streamFormat) {
+                if (!d.source.isStalker) ("Stream format: " + when (d.source.streamFormat) {
                     "ts" -> "TS"; "m3u8" -> "HLS (m3u8)"; else -> if (d.source.isXtream) "Auto" else "As in playlist"
-                } to {
+                }) to {
                     val next = when (d.source.streamFormat) { "auto" -> "ts"; "ts" -> "m3u8"; else -> "auto" }
                     viewModel.savePlaylist(d.source.copy(streamFormat = next))
                     close()
-                },
+                } else null,
                 // Which clock replay links are written in. Automatic: the one the provider's
                 // server reports (or that the app worked out); pick one when that's wrong.
-                "Catch-up time zone: " + catchupZoneLabel(d.source) to { dialog = LiveDialog.CatchupZone(d.source) },
+                if (!d.source.isStalker) ("Catch-up time zone: " + catchupZoneLabel(d.source)) to { dialog = LiveDialog.CatchupZone(d.source) } else null,
                 // Time shifts for this playlist: its built-in guide, and its catch-up.
                 ("Guide time shift: " + offsetLabel(d.source.guideShiftMinutes)).takeIf { d.source.liveEnabled }?.let {
                     it to { dialog = LiveDialog.PlaylistGuideShift(d.source) }
                 },
-                ("Catch-up time shift: " + offsetLabel(d.source.catchupShiftMinutes)).takeIf { d.source.liveEnabled }?.let {
+                ("Catch-up time shift: " + offsetLabel(d.source.catchupShiftMinutes)).takeIf { d.source.liveEnabled && !d.source.isStalker }?.let {
                     it to { dialog = LiveDialog.PlaylistCatchupShift(d.source) }
                 },
                 "Move up" to { viewModel.movePlaylist(d.source.id, -1); close() },
@@ -1780,7 +1774,11 @@ internal fun LiveTvSettingsContent(
         is LiveDialog.EditPlaylist -> {
             val src = d.source
             if (src.isStalker) {
-                StalkerSourceDialog(viewModel, source = src, onDone = close)
+                StalkerSourceDialog(src, onDismiss = close, onSave = { name, config, guide, vod, live ->
+                    viewModel.savePlaylist(src.copy(name = name, sourceType = "stalker", stalkerConfig = config,
+                        useEmbeddedEpg = guide, importVod = vod, importLive = live))
+                    close()
+                })
             } else if (src.isXtream) {
                 SourceFormDialog(
                     title = "Edit Xtream login",
@@ -1833,7 +1831,7 @@ internal fun LiveTvSettingsContent(
                 "Update now" to { viewModel.saveEpg(d.source); close() },
                 ("Time shift: " + offsetLabel(d.source.shiftMinutes)) to { dialog = LiveDialog.EpgSourceShift(d.source) },
                 (if (d.source.enabled) "Disable" else "Enable") to { viewModel.setEpgEnabled(d.source.id, !d.source.enabled); close() },
-                "Remove this guide source" to { dialog = LiveDialog.ConfirmDeleteEpg(d.source) }
+                "Delete EPG source" to { dialog = LiveDialog.ConfirmDeleteEpg(d.source) }
             ),
             onDismiss = close
         )
@@ -1978,14 +1976,10 @@ internal fun LiveTvSettingsContent(
             onConfirm = { viewModel.removeEpg(d.source.id); close() }
         )
         is LiveDialog.EditEpg -> SourceFormDialog(
-            title = "Edit extra guide source",
+            title = "Edit EPG source",
             fields = listOf(FormField("Name", "", d.source.name), FormField("XMLTV URL", "", d.source.url)),
             onDismiss = close,
-            onSave = { v, _ ->
-                val url = v[1].trim()
-                if (url.isNotBlank()) viewModel.saveEpg(d.source.copy(name = v[0].trim().ifBlank { guideNameFromUrl(url) }, url = url))
-                close()
-            }
+            onSave = { v, _ -> viewModel.saveEpg(d.source.copy(name = v[0], url = v[1])); close() }
         )
         LiveDialog.HiddenChannels -> UnhideDialog(
             title = "Hidden channels",
@@ -2374,6 +2368,161 @@ private fun DriveSignInDialog(prompt: com.nuvio.tv.livetv.sync.SignInPrompt, onC
 // ==================================================================== dialogs
 
 /**
+ * "Add from your phone": a QR code opens a page on the home network where a playlist link, an
+ * Xtream login or an EPG link can be pasted on the phone. Whatever is sent is added right away
+ * (the code in the address means only someone who can see this screen can use it).
+ */
+@Composable
+private fun AddFromPhoneDialog(viewModel: LiveTvSettingsViewModel, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val closeFocus = remember { FocusRequester() }
+    var handle by remember { mutableStateOf<com.nuvio.tv.livetv.crash.AddFromPhoneServer.Handle?>(null) }
+    var noNetwork by remember { mutableStateOf(false) }
+    var added by remember { mutableStateOf(listOf<String>()) }
+    val logoRes = com.nuvio.tv.livetv.branding.LiveTvBranding.iptvWordmark(NuvioTheme.currentTheme.brandWordmarkResource)
+    val accentArgb = NuvioTheme.colors.Secondary.toArgb()
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val tvName = runCatching {
+            android.provider.Settings.Global.getString(context.contentResolver, "device_name")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: android.os.Build.MODEL ?: "your TV"
+        val h = com.nuvio.tv.livetv.crash.AddFromPhoneServer.start(
+            tvName = tvName,
+            accent = String.format("#%06X", accentArgb and 0xFFFFFF),
+            logo = { runCatching { context.resources.openRawResource(logoRes).use { it.readBytes() } }.getOrNull() }
+        ) { e ->
+            val line = when (e.kind) {
+                "xtream" -> {
+                    val name = e.name.ifBlank { "Xtream" }
+                    viewModel.addXtream(name, e.server, e.username, e.password, importVod = e.includeVod, importLive = e.includeLive)
+                    "Xtream login \"$name\""
+                }
+                "epg" -> {
+                    val name = e.name.ifBlank { "EPG" }
+                    viewModel.addEpg(name, e.url)
+                    "TV guide \"$name\""
+                }
+                else -> {
+                    val name = e.name.ifBlank { "Playlist" }
+                    viewModel.addPlaylist(name, e.url, e.userAgent)
+                    if (e.epgUrl.isNotBlank()) viewModel.addEpg("$name guide", e.epgUrl)
+                    "Playlist \"$name\"" + if (e.epgUrl.isNotBlank()) " and its guide" else ""
+                }
+            }
+            added = added + line
+            "Added $line. It's loading on your TV now. You can add another."
+        }
+        handle = h
+        noNetwork = h == null
+        onDispose { h?.stop() }
+    }
+    LaunchedEffect(Unit) {
+        delay(80)
+        runCatching { closeFocus.requestFocus() }
+    }
+    val qrBitmap = remember(handle?.url) {
+        handle?.url?.let { runCatching { com.nuvio.tv.core.qr.QrCodeGenerator.generate(it, 420, margin = 1) }.getOrNull() }
+    }
+    NuvioDialog(onDismiss = onDismiss, title = "Add From Your Phone", width = 620.dp) {
+        if (noNetwork) {
+            Text(
+                text = "Connect this TV to your home Wi-Fi or network to add playlists from your phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = NuvioTheme.colors.TextSecondary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                qrBitmap?.let {
+                    androidx.compose.foundation.Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "QR code",
+                        modifier = Modifier.size(196.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+                ) {
+                    Text(
+                        text = "1. Put your phone on the same Wi-Fi as this TV.\n2. Scan the code with your phone's camera.\n3. Paste your playlist link, Xtream login or EPG link and tap Send to TV.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NuvioTheme.colors.TextSecondary
+                    )
+                    handle?.url?.let {
+                        Text(
+                            text = "No camera? Type this on your phone: " + it.removePrefix("http://"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NuvioTheme.colors.TextPrimary
+                        )
+                    }
+                }
+            }
+            Text(
+                text = if (added.isEmpty()) "Waiting for your phone… you can add more than one."
+                else "Added: " + added.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (added.isEmpty()) NuvioTheme.colors.TextSecondary else NuvioTheme.colors.Secondary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        SettingsDialogActionRow(horizontalAlignment = Alignment.CenterHorizontally) {
+            androidx.compose.foundation.layout.Box(Modifier.focusRequester(closeFocus)) {
+                SettingsDialogActionButton(text = if (added.isEmpty()) "Close" else "Done", onClick = onDismiss)
+            }
+        }
+    }
+}
+
+/** Provider identity is explicit; no MAC/device identifiers are generated or guessed. */
+@Composable
+private fun StalkerSourceDialog(
+    source: PlaylistSource? = null,
+    onDismiss: () -> Unit,
+    onSave: (String, com.nuvio.stalker.StalkerConfig, Boolean, Boolean, Boolean) -> Unit
+) {
+    val config = source?.stalkerConfig
+    SourceFormDialog(
+        title = if (source == null) "Add Stalker / Ministra portal" else "Edit Stalker / Ministra portal",
+        fields = listOf(
+            FormField("Name", "My provider", source?.name.orEmpty()),
+            FormField("Portal URL", "https://…/stalker_portal/c/", config?.portalUrl.orEmpty()),
+            FormField("Provider-issued MAC address", "00:00:00:00:00:00", config?.mac.orEmpty()),
+            FormField("Username (optional)", "", config?.username.orEmpty()),
+            FormField("Password (optional)", "", config?.password.orEmpty()),
+            FormField("Serial number (optional)", "", config?.serialNumber.orEmpty()),
+            FormField("Device ID (optional)", "", config?.deviceId.orEmpty()),
+            FormField("Device ID 2 (optional)", "", config?.deviceId2.orEmpty()),
+            FormField("Signature (optional)", "", config?.signature.orEmpty()),
+            FormField("Provider time zone", "UTC", config?.timezone ?: "UTC"),
+            FormField("Language", "en", config?.language ?: "en")
+        ),
+        advancedFrom = 3,
+        preserveWhitespaceAt = setOf(3, 4, 5, 6, 7, 8),
+        validate = { values ->
+            val address = runCatching { java.net.URI(values[1]) }.getOrNull()
+            when {
+                address?.scheme?.lowercase() !in listOf("http", "https") || address?.host.isNullOrBlank() || address?.rawUserInfo != null -> "Enter the full HTTP or HTTPS portal URL supplied by your provider."
+                !Regex("^[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}$").matches(values[2]) -> "Enter the MAC address supplied by your provider."
+                else -> null
+            }
+        },
+        toggle = "Load built-in guide" to (source?.useEmbeddedEpg ?: true),
+        toggleLive = "Include TV channels" to (source?.importLive ?: true),
+        toggle2 = "Include movies & series (On Demand)" to (source?.importVod ?: true),
+        onDismiss = onDismiss,
+        onSave = { _, _ -> },
+        onSaveAll = { values, guide, vod, live ->
+            onSave(values[0], com.nuvio.stalker.StalkerConfig(values[1], values[2], values[3], values[4], values[5],
+                values[6], values[7], values[8], values[9].ifBlank { "UTC" }, values[10].ifBlank { "en" }), guide, vod, live)
+        }
+    )
+}
+
+/**
  * The Xtream Codes login form (Settings > Live TV > Add Xtream Codes login). Also opened straight
  * from the Live TV page when no source is set up yet. [onDone] runs after Save or Cancel.
  */
@@ -2394,14 +2543,6 @@ internal fun AddXtreamSourceDialog(viewModel: LiveTvSettingsViewModel, onDone: (
         onSaveAll = { v, _, vod, live ->
             if (v[1].isNotBlank()) viewModel.addXtream(v[0], v[1], v[2], v[3], importVod = vod, importLive = live)
             onDone()
-        },
-        // TVXO: "Use your phone" fills Server / Username / Password from a phone, then saves as above.
-        extraLabel = "Use your phone",
-        extraContent = { onResult, onCancel ->
-            com.nuvio.tv.livetv.extras.PhoneXtreamLoginDialog(
-                onLogin = { l -> onResult(mapOf(1 to l.server, 2 to l.username, 3 to l.password)) },
-                onCancel = onCancel
-            )
         }
     )
 }
@@ -2421,40 +2562,20 @@ private fun SourceFormDialog(
     /** Xtream: "Include TV channels", shown first. Its value goes to [onSaveAll]. */
     toggleLive: Pair<String, Boolean>? = null,
     onSaveAll: ((values: List<String>, guide: Boolean, vod: Boolean, live: Boolean) -> Unit)? = null,
-    /** Checks the values before saving: a message to show instead of saving, or null when fine. */
+    advancedFrom: Int? = null,
     validate: ((List<String>) -> String?)? = null,
-    /** An extra button (Xtream: "Use your phone") that opens [extraContent] in place of the form. */
-    extraLabel: String? = null,
-    /** What it sends fills the fields (by index), then the form saves as with Save. */
-    extraContent: (@Composable (onResult: (Map<Int, String>) -> Unit, onCancel: () -> Unit) -> Unit)? = null
+    preserveWhitespaceAt: Set<Int> = emptySet()
 ) {
     val values = remember { fields.map { mutableStateOf(it.initial) } }
-    var problem by remember { mutableStateOf<String?>(null) }
+    var showAdvanced by remember { mutableStateOf(false) }
+    var formError by remember { mutableStateOf<String?>(null) }
     var toggleValue by remember { mutableStateOf(toggle?.second ?: true) }
     var toggle2Value by remember { mutableStateOf(toggle2?.second ?: true) }
     var toggleLiveValue by remember { mutableStateOf(toggleLive?.second ?: true) }
-    var extraOpen by remember { mutableStateOf(false) }
     val firstField = remember { FocusRequester() }
-    LaunchedEffect(extraOpen) {
-        if (extraOpen) return@LaunchedEffect
+    LaunchedEffect(Unit) {
         delay(80)
         runCatching { firstField.requestFocus() }
-    }
-    fun save() {
-        val v = values.map { it.value.trim() }
-        problem = validate?.invoke(v)
-        if (problem == null) when {
-            onSaveAll != null -> onSaveAll(v, toggleValue, toggle2Value, toggleLiveValue)
-            onSaveBoth != null -> onSaveBoth(v, toggleValue, toggle2Value)
-            else -> onSave(v, toggleValue)
-        }
-    }
-    if (extraOpen && extraContent != null) {
-        extraContent(
-            { filled -> filled.forEach { (i, v) -> values.getOrNull(i)?.value = v }; extraOpen = false; save() },
-            { extraOpen = false }
-        )
-        return
     }
     NuvioDialog(onDismiss = onDismiss, title = title, width = 620.dp) {
         // The fields scroll inside the dialog, so Save and Cancel always stay on screen
@@ -2467,7 +2588,10 @@ private fun SourceFormDialog(
             verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
         ) {
         fields.forEachIndexed { i, field ->
-            Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)) {
+            if (advancedFrom != null && i == advancedFrom) SettingsToggleRow(
+                title = "Advanced provider settings", subtitle = "Only enter values supplied by your provider",
+                checked = showAdvanced, onToggle = { showAdvanced = !showAdvanced })
+            if (advancedFrom == null || i < advancedFrom || showAdvanced) Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)) {
                 Text(
                     text = field.label,
                     style = MaterialTheme.typography.bodySmall,
@@ -2508,49 +2632,24 @@ private fun SourceFormDialog(
             )
         }
         }
-        problem?.let {
-            Text(text = it, style = MaterialTheme.typography.bodySmall, color = NuvioTheme.colors.Error)
-        }
+        formError?.let { Text(it, color = NuvioTheme.colors.Error, style = MaterialTheme.typography.bodySmall) }
         SettingsDialogActionRow {
             SettingsDialogActionButton(text = "Cancel", onClick = onDismiss)
-            if (extraLabel != null && extraContent != null) {
-                SettingsDialogActionButton(text = extraLabel, onClick = { extraOpen = true })
-            }
-            SettingsDialogActionButton(text = "Save", onClick = { save() }, primary = true)
+            SettingsDialogActionButton(
+                text = "Save",
+                onClick = {
+                    val v = values.mapIndexed { i, value -> if (i in preserveWhitespaceAt) value.value else value.value.trim() }
+                    formError = validate?.invoke(v)
+                    if (formError == null) when {
+                        onSaveAll != null -> onSaveAll(v, toggleValue, toggle2Value, toggleLiveValue)
+                        onSaveBoth != null -> onSaveBoth(v, toggleValue, toggle2Value)
+                        else -> onSave(v, toggleValue)
+                    }
+                },
+                primary = true
+            )
         }
     }
-}
-
-/** Add or edit a Stalker / Ministra (MAG) portal (adapted from Nuvio ReSeq). */
-@Composable
-internal fun StalkerSourceDialog(viewModel: LiveTvSettingsViewModel, source: PlaylistSource?, onDone: () -> Unit) {
-    SourceFormDialog(
-        title = if (source == null) "Add Stalker / MAG portal" else "Edit Stalker portal",
-        fields = listOf(
-            FormField("Name", "My portal", source?.name.orEmpty()),
-            FormField("Portal URL", "http://portal.example.com/c/", source?.stalkerPortal.orEmpty()),
-            FormField("MAC address", "00:1A:79:00:00:00", source?.stalkerMac.orEmpty()),
-            FormField("Username (only if the portal asks)", "Optional", source?.stalkerUsername.orEmpty()),
-            FormField("Password (only if the portal asks)", "Optional", source?.stalkerPassword.orEmpty()),
-            FormField("Serial number (only if the portal asks)", "Optional", source?.stalkerSerial.orEmpty())
-        ),
-        toggle = "Load the portal's guide" to (source?.useEmbeddedEpg ?: true),
-        validate = { com.nuvio.tv.livetv.data.StalkerPortalClient.validate(it[1], it[2]) },
-        onDismiss = onDone,
-        onSave = { v, guide ->
-            if (source == null) {
-                viewModel.addStalker(v[0], v[1], v[2], v[3], v[4], v[5], guide)
-            } else {
-                viewModel.savePlaylist(
-                    source.copy(
-                        name = v[0].ifBlank { source.name }, stalkerPortal = v[1], stalkerMac = v[2].uppercase(),
-                        stalkerUsername = v[3], stalkerPassword = v[4], stalkerSerial = v[5], useEmbeddedEpg = guide
-                    )
-                )
-            }
-            onDone()
-        }
-    )
 }
 
 @Composable
@@ -2810,7 +2909,3 @@ private fun SearchOrderList(order: List<String>, onChange: (List<String>) -> Uni
     }
 }
 
-
-/** A name for an extra guide added without one: the link's host ("epg.example.com"). */
-private fun guideNameFromUrl(url: String): String =
-    runCatching { java.net.URI(url).host?.removePrefix("www.") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Extra guide"

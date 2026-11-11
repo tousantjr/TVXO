@@ -24,16 +24,6 @@ object PlayerNextEpisodeRules {
             return if (index < 0) null else sorted.getOrNull(index + 1)
         }
 
-        // With a TVDB order chosen, follow its display numbers; the current episode is still found
-        // by provider numbers, and the returned Video keeps them for stream search and progress.
-        if (videos.any { it.displaySeason != null && it.displayEpisode != null }) {
-            val displayOrder = videos
-                .filter { it.season != null && it.episode != null && it.displaySeason != null && it.displayEpisode != null }
-                .sortedWith(compareBy<Video>({ it.displaySeason }, { it.displayEpisode }))
-            val index = displayOrder.indexOfFirst { it.season == currentSeason && it.episode == currentEpisode }
-            if (index >= 0) return displayOrder.getOrNull(index + 1)
-        }
-
         val sortedEpisodes = videos
             .filter { it.season != null && it.episode != null }
             .sortedWith(compareBy<Video> { it.season ?: Int.MAX_VALUE }.thenBy { it.episode ?: Int.MAX_VALUE })

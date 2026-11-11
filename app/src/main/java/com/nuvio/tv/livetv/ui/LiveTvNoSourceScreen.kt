@@ -86,9 +86,9 @@ internal fun LiveTvNoSourceScreen(onOpenSettings: () -> Unit) {
             LiveText("No Live TV source yet", size = 24.sp, weight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
             LiveText(
-                "Add your Xtream Codes login (server, username and password) to load your channels and TV guide. M3U playlists and Stalker portals can be added in Live TV settings.",
+                "Add your Xtream Codes login (server, username and password) to load your channels and TV guide.",
                 color = NuvioTheme.colors.TextSecondary,
-                maxLines = 4,
+                maxLines = 3,
                 align = androidx.compose.ui.text.style.TextAlign.Center
             )
             Spacer(Modifier.height(28.dp))

@@ -1224,9 +1224,6 @@ private fun IntegrationSettingsContent(
                                     }
                                 )
                             }
-                            item(key = "integration_hub_tvdb") {
-                                TvdbSettingsRow()
-                            }
                             item(key = "integration_hub_animeskip") {
                                 SettingsActionRow(
                                     title = "Anime-Skip",

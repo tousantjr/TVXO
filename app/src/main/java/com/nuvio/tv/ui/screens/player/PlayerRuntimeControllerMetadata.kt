@@ -69,7 +69,6 @@ internal fun PlayerRuntimeController.applyMetaDetails(meta: Meta) {
     val description = resolveDescription(meta)
 
     recomputeNextEpisode(resetVisibility = false)
-    applyTvdbEpisodeOrder(meta)
     _uiState.update { state ->
         state.copy(
             description = description ?: state.description,
@@ -217,20 +216,6 @@ private suspend fun PlayerRuntimeController.enrichDescriptionFromTmdb(id: String
     updateMediaSessionMetadata()
 }
 
-/** Re-numbers the episodes in the profile's chosen TVDB order (if any) so Next episode follows it. */
-private fun PlayerRuntimeController.applyTvdbEpisodeOrder(meta: Meta) {
-    val service = tvdbEpisodeOrder ?: return
-    if (meta.videos.isEmpty()) return
-    val loaded = meta.videos
-    scope.launch {
-        val ordered = service.orderVideos(profileId, listOf(meta.id, meta.imdbId, contentId), loaded)
-        // Skip when nothing changed or newer metadata replaced these episodes meanwhile.
-        if (ordered === loaded || metaVideos !== loaded) return@launch
-        metaVideos = ordered
-        recomputeNextEpisode(resetVisibility = false)
-    }
-}
-
 internal fun PlayerRuntimeController.recomputeNextEpisode(resetVisibility: Boolean) {
     val normalizedType = contentType?.lowercase()
     if (normalizedType !in listOf("series", "tv", "other", "cloud")) {
@@ -297,8 +282,6 @@ internal fun PlayerRuntimeController.recomputeNextEpisode(resetVisibility: Boole
         released = resolvedNext.released,
         hasAired = hasAired,
         available = resolvedNext.available,
-        displaySeason = resolvedNext.displaySeason,
-        displayEpisode = resolvedNext.displayEpisode,
         unairedMessage = if (hasAired) {
             null
         } else {

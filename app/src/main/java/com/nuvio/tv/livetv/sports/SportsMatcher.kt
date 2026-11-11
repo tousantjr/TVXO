@@ -40,7 +40,9 @@ internal class SportsMatcher(
         val settings: SportsSettings,
         val now: Long,
         /** Nobody is on the Sports page: take short breaks while reading the guide so the box stays smooth. */
-        val gentle: Boolean = false
+        val gentle: Boolean = false,
+        /** Show name, network and user picks promptly while the full guide search runs. */
+        val readGuide: Boolean = true
     )
 
     /** One guide find from step 1, kept to be used again while the guide and the half-hour's games stay the same. */
@@ -142,6 +144,10 @@ internal class SportsMatcher(
         // Events that run for days (a golf tournament, an F1 weekend from practice to the race) have
         // no single start time: while they're on, treat them as starting now.
         fun multiDay(ev: SportsEvent) = !ev.hasTime && ev.endMs != null
+        // Race weekends now carry each session's own time, but are still named only by the
+        // competition ("Formula 1", "Grand Prix"), so they're matched the same careful way.
+        fun raceWeekend(ev: SportsEvent) = ev.source == EventSource.ESPN &&
+            SportsCatalog.league(ev.leagueId)?.let { it.kind == LeagueKind.EVENT && it.sport == Sport.RACING } == true
         // Their ids: with no start time of their own, only a show that names the competition ("Formula 1",
         // "Grand Prix"…) counts, not one that merely shares a word or two with the title ("United States").
         val noStart = HashSet<String>()
@@ -153,7 +159,7 @@ internal class SportsMatcher(
                 ev.endMs!! + 24 * HOUR < input.now -> null
                 ev.startMs >= input.now -> ev
                 else -> ev.copy(startMs = input.now)
-            }?.also { if (!ev.hasTime) noStart.add(ev.id) }
+            }?.also { if (!ev.hasTime || raceWeekend(ev)) noStart.add(ev.id) }
         }
         val wanted = events.filter { ev ->
             ev.state != GameState.OFF &&
@@ -238,7 +244,7 @@ internal class SportsMatcher(
         // ---- 1. The guide, a half-hour slot at a time.
         // The guide is read once for all the slots (it used to be searched again for every slot,
         // which on a slower box took minutes); each show is checked against every slot's words as it goes by.
-        val guideSlots = teamEvents.filter { it.id !in linked }.groupBy { it.startMs / (30 * MINUTE) }.values.mapNotNull { slot ->
+        val guideSlots = teamEvents.filter { input.readGuide && it.id !in linked }.groupBy { it.startMs / (30 * MINUTE) }.values.mapNotNull { slot ->
             val slotStart = slot.minOf { it.startMs }
             val slotEnd = slot.maxOf { it.startMs }
             val words = slot.flatMap { ev -> terms[ev.id]?.sqlWords.orEmpty() }.map { it.trim() }.filter { it.length >= 3 }.toSet()
@@ -258,15 +264,15 @@ internal class SportsMatcher(
         val guideAt = db.changes
         // The guide's own stamp, kept across restarts: what was found last time (saved) still holds
         // after a restart while the guide is the same.
-        val rev = runCatching { db.revision() }.getOrNull()
+        val rev = if (input.readGuide) runCatching { db.revision() }.getOrNull() else null
         val cacheKey = ((rev ?: guideAt) * 1_000_003L + nd0.fingerprint) * 31 + input.shiftMs
-        if (!slotsLoaded) {
+        if (input.readGuide && !slotsLoaded) {
             slotsLoaded = true
             if (rev != null && slotCacheKey != cacheKey) loadSlots(cacheKey)?.let {
                 slotCache = it; slotCacheKey = cacheKey; savedSlotsKey = cacheKey
             }
         }
-        val prevCache = if (cacheKey == slotCacheKey) slotCache else emptyMap()
+        val prevCache = if (input.readGuide && cacheKey == slotCacheKey) slotCache else emptyMap()
         val newCache = HashMap<Long, List<SlotFind>>()
         val toScan = ArrayList<GuideSlot>()
         val toScanSig = ArrayList<Long?>()
@@ -340,14 +346,14 @@ internal class SportsMatcher(
             }
         }
         // The guide changed while it was being read: keep nothing, search it all next time.
-        if (db.changes == guideAt) {
+        if (input.readGuide && db.changes == guideAt) {
             // Saved when its half-hours changed (or it's for another guide), for the next app start.
             if (rev != null && (savedSlotsKey != cacheKey || newCache.keys != prevCache.keys)) {
                 saveSlots(cacheKey, newCache); savedSlotsKey = cacheKey
             }
             slotCache = newCache; slotCacheKey = cacheKey
         }
-        else { slotCache = emptyMap(); slotCacheKey = 0L }
+        else if (input.readGuide) { slotCache = emptyMap(); slotCacheKey = 0L }
         byGuide = found.size
         val tGuide = System.currentTimeMillis()
 
@@ -472,7 +478,8 @@ internal class SportsMatcher(
                         how = f.how,
                         program = f.program,
                         quality = input.quality[ch.key] ?: nameQuality(ch.name),
-                        catchup = ch.catchup != null && CatchupUrlBuilder.isAvailable(ch.catchup, f.program?.startMs ?: ev.startMs, input.now)
+                        catchup = if (ch.stalkerRef != null) f.program?.let { CatchupUrlBuilder.isAvailable(ch, it, input.now) } == true
+                        else ch.catchup != null && CatchupUrlBuilder.isAvailable(ch.catchup, f.program?.startMs ?: ev.startMs, input.now)
                     )
                 }
             if (list.isEmpty()) continue
@@ -565,16 +572,27 @@ internal class SportsMatcher(
                 val to = days.maxOf { it.second } - shiftMs
                 // (A description is only cleaned up when names you follow are looked for in it.)
                 val wantDesc = firstFollowed.isNotEmpty()
-                fun collect(src: From, into: Map<Long, ArrayList<Pair<String, EpgProgram>>>) =
-                    readRows(src, from, to, from, wantDesc, gentle = false) { ch, start, stop, title, descr, cat, nt, nd ->
+                fun collect(src: From, into: Map<Long, ArrayList<Pair<String, EpgProgram>>>) {
+                    fun consider(channels: List<String>, start: Long, stop: Long, title: String, descr: String?, cat: String?, nt: String, nd: String) {
                         val hit = has(nt, firstTitle) || has(nt, firstFollowed) || (wantDesc && has(nd, firstFollowed))
-                        if (!hit) return@readRows
+                        if (!hit) return
                         for ((ds, de) in days) {
                             if (start >= ds - shiftMs && start < de - shiftMs && stop > ds - shiftMs) {
-                                into[ds]?.add(ch to EpgProgram(startMs = start, stopMs = stop, title = title, description = descr, category = cat))
+                                val program = EpgProgram(startMs = start, stopMs = stop, title = title, description = descr, category = cat)
+                                channels.forEach { ch -> into[ds]?.add(ch to program) }
                             }
                         }
                     }
+                    if (src == From.GUIDE) {
+                        db.scanListingsGrouped(from, to, from) { channels, start, stop, title, descr, cat ->
+                            consider(channels, start, stop, title, descr, cat, norm(title), if (wantDesc && !descr.isNullOrEmpty()) norm(descr) else "")
+                        }
+                    } else {
+                        readRows(src, from, to, from, wantDesc, gentle = false) { ch, start, stop, title, descr, cat, nt, nd ->
+                            consider(listOf(ch), start, stop, title, descr, cat, nt, nd)
+                        }
+                    }
+                }
                 val src = pickSource(rev, from, to, titleWords + followed)
                 val t0 = System.currentTimeMillis()
                 collect(src, out)
@@ -807,14 +825,28 @@ internal class SportsMatcher(
         // Every word looked for, by its first word, so a show only needs checking against the few that start like one of its own words.
         val byFirst = byFirstWord(words)
         val seen = List(slots.size) { HashSet<String>() }
-        readRows(src, from, to, minStop, wantDesc = true, gentle = gentle) { ch, start, stop, title, descr, cat, nt, nd ->
-            val m = matchedWords(nt, nd, byFirst) ?: return@readRows
+        fun consider(channels: List<String>, start: Long, stop: Long, title: String, descr: String?, cat: String?, nt: String, nd: String) {
+            val m = matchedWords(nt, nd, byFirst) ?: return
             for (i in slots.indices) {
                 val s = slots[i]
                 if (start < s.fromMs || start >= s.toMs || stop <= s.minStopMs) continue
                 if (s.words.none { it in m }) continue
-                if (!seen[i].add("$ch|$start")) continue
-                out[i] += ch to EpgProgram(startMs = start, stopMs = stop, title = title, description = descr, category = cat)
+                val program = EpgProgram(startMs = start, stopMs = stop, title = title, description = descr, category = cat)
+                for (ch in channels) {
+                    if (!seen[i].add("$ch|$start")) continue
+                    out[i] += ch to program
+                }
+            }
+        }
+        if (src == From.GUIDE) {
+            var rows = 0
+            db.scanListingsGrouped(from, to, minStop) { channels, start, stop, title, descr, cat ->
+                if (gentle && ++rows % 1000 == 0) Thread.sleep(3)
+                consider(channels, start, stop, title, descr, cat, norm(title), if (descr.isNullOrEmpty()) "" else norm(descr))
+            }
+        } else {
+            readRows(src, from, to, minStop, wantDesc = true, gentle = gentle) { ch, start, stop, title, descr, cat, nt, nd ->
+                consider(listOf(ch), start, stop, title, descr, cat, nt, nd)
             }
         }
         return out
@@ -871,9 +903,15 @@ internal class SportsMatcher(
                 onRow(ch, start, stop, title, descr, cat, nt, if (wantDesc) nd else "")
             }
         } else {
-            db.scanListings(from, to, minStop) { ch, start, stop, title, descr, cat ->
-                if (gentle && ++rows % 1000 == 0) Thread.sleep(3)
-                onRow(ch, start, stop, title, descr, cat, norm(title), if (wantDesc && !descr.isNullOrEmpty()) norm(descr) else "")
+            db.scanListingsGrouped(from, to, minStop) { channels, start, stop, title, descr, cat ->
+                // HD, SD and backup channels often point to the same guide show. Normalize
+                // its text once, then hand the result to each channel that uses it.
+                val nt = norm(title)
+                val nd = if (wantDesc && !descr.isNullOrEmpty()) norm(descr) else ""
+                for (ch in channels) {
+                    if (gentle && ++rows % 1000 == 0) Thread.sleep(3)
+                    onRow(ch, start, stop, title, descr, cat, nt, nd)
+                }
             }
         }
     }

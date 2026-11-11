@@ -68,7 +68,6 @@ class PlayerViewModel @Inject constructor(
     private val bingeGroupCacheDataStore: com.nuvio.tv.data.local.BingeGroupCacheDataStore,
     private val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
     private val episodeShufflePlayback: com.nuvio.tv.core.player.EpisodeShufflePlayback,
-    private val tvdbEpisodeOrder: com.nuvio.tv.data.tvdb.TvdbEpisodeOrderService,
     private val watchedItemsPreferences: com.nuvio.tv.data.local.WatchedItemsPreferences,
     private val watchedSeriesStateHolder: WatchedSeriesStateHolder,
     private val trackPreferenceDataStore: com.nuvio.tv.data.local.TrackPreferenceDataStore,
@@ -151,7 +150,6 @@ class PlayerViewModel @Inject constructor(
         serverPlayback = serverPlayback,
         serverStreams = serverStreams,
         party = partyRepository,
-        tvdbEpisodeOrder = tvdbEpisodeOrder,
         profileId = savedStateHandle.get<String>("profileId")?.toIntOrNull()
             ?: profileManager.activeProfileId.value,
         savedStateHandle = savedStateHandle,
@@ -344,6 +342,13 @@ class PlayerViewModel @Inject constructor(
         onResult: (Boolean) -> Unit
     ) {
         val url = controller.getCurrentStreamUrl()
+        if (com.nuvio.tv.core.player.isStalkerPlaybackAddress(url)) {
+            android.widget.Toast.makeText(activityContext,
+                com.nuvio.tv.core.player.STALKER_EXTERNAL_PLAYBACK_UNAVAILABLE,
+                android.widget.Toast.LENGTH_LONG).show()
+            onResult(false)
+            return
+        }
         if (url.isBlank()) {
             onResult(false)
             return

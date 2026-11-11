@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -40,6 +42,20 @@ class LiveTvPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
     private val profileManager: com.nuvio.tv.core.profile.ProfileManager
 ) {
+    // A provider edit/restore and publication of its staged imports are ordered together.
+    // Unrelated playback/display preferences do not wait for a catalogue import.
+    private val sourceMutations = Mutex()
+
+    suspend fun <T> withCurrentPlaylist(source: PlaylistSource, publish: () -> T): T = sourceMutations.withLock {
+        val latest = currentPlaylists().firstOrNull { it.id == source.id }
+        if (latest == null || !latest.isStalker || latest.stalkerConfig != source.stalkerConfig ||
+            latest.enabled != source.enabled || latest.importLive != source.importLive ||
+            latest.importVod != source.importVod || latest.useEmbeddedEpg != source.useEmbeddedEpg ||
+            latest.guideShiftMinutes != source.guideShiftMinutes || latest.catchupShiftMinutes != source.catchupShiftMinutes
+        ) throw com.nuvio.stalker.StalkerException(com.nuvio.stalker.StalkerError.STALE_SESSION)
+        publish()
+    }
+
     private val store: DataStore<Preferences> = PreferenceDataStoreFactory.create(
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
         produceFile = { context.preferencesDataStoreFile("live_tv") }
@@ -59,6 +75,7 @@ class LiveTvPreferences @Inject constructor(
         val epgs = stringPreferencesKey("epg_sources")
 
         val showInSidebar = booleanPreferencesKey("show_in_sidebar")
+        val showImportProgress = booleanPreferencesKey("show_import_progress")
         val showNames = booleanPreferencesKey("show_channel_names")
         val showNumbers = booleanPreferencesKey("show_channel_numbers")
         val markPlaying = booleanPreferencesKey("mark_playing_channel")
@@ -203,6 +220,7 @@ class LiveTvPreferences @Inject constructor(
         val guideInfoHidden = stringPreferencesKey("guide_info_hidden")
         val launcherRows = stringPreferencesKey("launcher_rows")
         val lockedGroups = stringSetPreferencesKey("locked_groups")
+        val collapsedPlaylists = stringSetPreferencesKey("collapsed_playlists")
         val reminders = stringPreferencesKey("reminders")
         val channelQuality = stringPreferencesKey("channel_quality")
         val channelAudio = stringPreferencesKey("channel_audio")
@@ -218,6 +236,8 @@ class LiveTvPreferences @Inject constructor(
         val hiddenGroups = stringSetPreferencesKey("hidden_groups")
         val favorites = stringPreferencesKey("favorites")
         val recent = stringPreferencesKey("recent")
+        /** Recently watched channel -> the group it was opened from, as JSON. */
+        val recentGroups = stringPreferencesKey("recent_groups")
         val lastChannel = stringPreferencesKey("last_channel")
         val previousChannel = stringPreferencesKey("previous_channel")
         val lastGroup = stringPreferencesKey("last_group")
@@ -246,7 +266,7 @@ class LiveTvPreferences @Inject constructor(
     private val currentProfile: Int get() = profileManager.activeProfileId.value
 
     private val personalStringKeys: List<Preferences.Key<String>> = listOf(
-        Keys.favorites, Keys.recent, Keys.lastChannel, Keys.previousChannel, Keys.lastGroup,
+        Keys.favorites, Keys.recent, Keys.recentGroups, Keys.lastChannel, Keys.previousChannel, Keys.lastGroup,
         Keys.groupOrder, Keys.customGroups, Keys.channelOrder, Keys.channelCopies, Keys.reminders,
         Keys.vodGroupOrder, Keys.vodSorts, Keys.sportsMine
     )
@@ -511,7 +531,8 @@ class LiveTvPreferences @Inject constructor(
             channelSurf = p[Keys.channelSurf] ?: d.channelSurf,
             barHidden = p[Keys.barHidden] ?: d.barHidden,
             guideInfoHidden = p[Keys.guideInfoHidden] ?: d.guideInfoHidden,
-            launcherRows = p[Keys.launcherRows] ?: d.launcherRows
+            launcherRows = p[Keys.launcherRows] ?: d.launcherRows,
+            showImportProgress = p[Keys.showImportProgress] ?: d.showImportProgress
         )
     }
 
@@ -552,6 +573,7 @@ class LiveTvPreferences @Inject constructor(
             hiddenGroups = p[Keys.hiddenGroups] ?: emptySet(),
             favorites = decodeStringList(p[Keys.favorites]),
             recent = decodeStringList(p[Keys.recent]),
+            recentGroups = decodeStringMap(p[Keys.recentGroups]),
             lastChannelKey = p[Keys.lastChannel],
             previousChannelKey = p[Keys.previousChannel],
             lastGroupId = p[Keys.lastGroup],
@@ -584,7 +606,7 @@ class LiveTvPreferences @Inject constructor(
 
     // ---------- sources ----------
 
-    suspend fun updatePlaylists(transform: (List<PlaylistSource>) -> List<PlaylistSource>) {
+    suspend fun updatePlaylists(transform: (List<PlaylistSource>) -> List<PlaylistSource>) = sourceMutations.withLock {
         var removed = emptySet<String>()
         store.edit { p ->
             val before = decodePlaylists(p[Keys.playlists])
@@ -613,10 +635,10 @@ class LiveTvPreferences @Inject constructor(
      * an old value is found: after updating, and after a setup from an older version is synced
      * or restored. Returns whether anything changed.
      */
-    suspend fun moveTimeShiftsToSources(): Boolean {
+    suspend fun moveTimeShiftsToSources(): Boolean = sourceMutations.withLock {
         var moved = false
         store.edit { p -> moved = moveTimeShifts(p) }
-        return moved
+        moved
     }
 
     private fun moveTimeShifts(p: androidx.datastore.preferences.core.MutablePreferences): Boolean {
@@ -843,6 +865,7 @@ class LiveTvPreferences @Inject constructor(
         p[Keys.barHidden] = s.barHidden
         p[Keys.guideInfoHidden] = s.guideInfoHidden
         p[Keys.launcherRows] = s.launcherRows
+        p[Keys.showImportProgress] = s.showImportProgress
     }
 
     // ---------- channel management ----------
@@ -1357,7 +1380,19 @@ class LiveTvPreferences @Inject constructor(
     }
 
     suspend fun clearRecent() {
-        store.edit { it[my(Keys.recent)] = encodeStringList(emptyList()) }
+        store.edit {
+            it[my(Keys.recent)] = encodeStringList(emptyList())
+            it[my(Keys.recentGroups)] = encodeStringMap(emptyMap())
+        }
+    }
+
+    /** Remembers the group [key] was opened from, for Recently Watched (only channels still in it are kept). */
+    suspend fun setRecentGroup(key: String, groupId: String) {
+        store.edit { p ->
+            val recent = decodeStringList(p[my(Keys.recent)]).toSet()
+            val map = decodeStringMap(p[my(Keys.recentGroups)]).filterKeys { it in recent && it != key }
+            p[my(Keys.recentGroups)] = encodeStringMap(map + (key to groupId))
+        }
     }
 
     /** [addToRecent] false: adult channels, which never go in Recently watched. */
@@ -1375,6 +1410,14 @@ class LiveTvPreferences @Inject constructor(
 
     suspend fun setLastGroup(groupId: String) {
         store.edit { it[my(Keys.lastGroup)] = groupId }
+    }
+
+    /** Playlists folded away in the guide's group list; kept between visits. */
+    suspend fun collapsedPlaylists(): Set<String> =
+        store.data.first()[my(Keys.collapsedPlaylists)] ?: emptySet()
+
+    suspend fun setCollapsedPlaylists(ids: Set<String>) {
+        store.edit { it[my(Keys.collapsedPlaylists)] = ids }
     }
 
     // ---------- Google Drive sync ----------
@@ -1434,7 +1477,7 @@ class LiveTvPreferences @Inject constructor(
     }
 
     /** Replaces this TV's Live TV setup with [data] from [exportForSync], keeping per-TV state. */
-    suspend fun importFromSync(data: JSONObject): Set<String> {
+    suspend fun importFromSync(data: JSONObject): Set<String> = sourceMutations.withLock {
         data.optJSONObject(com.nuvio.vpn.android.VpnBackup.KEY)?.optString("v")?.let {
             com.nuvio.vpn.android.VpnBackup.restoreSetup(context, it)
         }
@@ -1466,13 +1509,12 @@ class LiveTvPreferences @Inject constructor(
                             v = encodePlaylists(decodePlaylists(v).map { r ->
                                 localPlaylists[r.id]?.let { l ->
                                     if (l.url != r.url || l.xtreamServer != r.xtreamServer || l.xtreamUsername != r.xtreamUsername ||
-                                        l.xtreamPassword != r.xtreamPassword || l.userAgent != r.userAgent || l.streamFormat != r.streamFormat ||
-                                        l.stalkerPortal != r.stalkerPortal || l.stalkerMac != r.stalkerMac ||
-                                        l.stalkerUsername != r.stalkerUsername || l.stalkerPassword != r.stalkerPassword || l.stalkerSerial != r.stalkerSerial
+                                        l.xtreamPassword != r.xtreamPassword || l.sourceType != r.sourceType || l.stalkerConfig != r.stalkerConfig || l.userAgent != r.userAgent || l.streamFormat != r.streamFormat
                                     ) changed += r.id
                                     r.copy(
                                         lastUpdatedMs = l.lastUpdatedMs, lastError = l.lastError, channelCount = l.channelCount,
-                                        serverTimezone = l.serverTimezone, catchupNoHlsSince = l.catchupNoHlsSince
+                                        serverTimezone = l.serverTimezone, catchupNoHlsSince = l.catchupNoHlsSince,
+                                        fallbackUserAgent = l.fallbackUserAgent.ifBlank { r.fallbackUserAgent }
                                     )
                                 } ?: r
                             })
@@ -1490,7 +1532,10 @@ class LiveTvPreferences @Inject constructor(
             // A setup from an older version: its one-for-everything time shifts onto each source.
             moveTimeShifts(p)
         }
-        return changed
+        // A changed portal identity must refresh its catalogue too, even when the source id is unchanged.
+        val portalIds = currentPlaylists().filter { it.isStalker }.mapTo(HashSet()) { it.id }
+        (changed intersect portalIds).forEach { setOnDemandImportTime(it, 0L) }
+        changed
     }
 
     // ---------- JSON helpers ----------
@@ -1499,14 +1544,15 @@ class LiveTvPreferences @Inject constructor(
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             val arr = JSONArray(raw)
-            (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
                 PlaylistSource(
                     id = o.optString("id"),
                     name = o.optString("name"),
                     url = o.optString("url"),
                     enabled = o.optBoolean("enabled", true),
                     userAgent = o.optString("userAgent"),
+                    fallbackUserAgent = o.optString("fallbackUserAgent"),
                     useEmbeddedEpg = o.optBoolean("useEmbeddedEpg", true),
                     xtreamServer = o.optString("xtreamServer"),
                     xtreamUsername = o.optString("xtreamUsername"),
@@ -1524,9 +1570,10 @@ class LiveTvPreferences @Inject constructor(
                     logoSource = o.optString("logoSource").ifBlank { "playlist" },
                     guideShiftMinutes = o.optInt("guideShiftMinutes", 0),
                     catchupShiftMinutes = o.optInt("catchupShiftMinutes", 0),
-                    stalkerPortal = o.optString("stalkerPortal"), stalkerMac = o.optString("stalkerMac"),
-                    stalkerUsername = o.optString("stalkerUsername"), stalkerPassword = o.optString("stalkerPassword"),
-                    stalkerSerial = o.optString("stalkerSerial")
+                    sourceType = o.optString("sourceType").ifBlank { o.optString("providerKind").ifBlank { if (o.optJSONObject("stalkerConfig") != null || o.optJSONObject("stalker") != null) "stalker" else "" } },
+                    stalkerConfig = (o.optJSONObject("stalkerConfig") ?: o.optJSONObject("stalker"))?.let { value ->
+                        runCatching { com.nuvio.stalker.StalkerConfig.fromJson(kotlinx.serialization.json.Json.parseToJsonElement(value.toString()) as kotlinx.serialization.json.JsonObject) }.getOrNull()
+                    }
                 )
             }
         }.getOrDefault(emptyList())
@@ -1539,6 +1586,7 @@ class LiveTvPreferences @Inject constructor(
                 JSONObject()
                     .put("id", s.id).put("name", s.name).put("url", s.url)
                     .put("enabled", s.enabled).put("userAgent", s.userAgent)
+                    .put("fallbackUserAgent", s.fallbackUserAgent)
                     .put("useEmbeddedEpg", s.useEmbeddedEpg)
                     .put("xtreamServer", s.xtreamServer).put("xtreamUsername", s.xtreamUsername)
                     .put("xtreamPassword", s.xtreamPassword)
@@ -1553,9 +1601,11 @@ class LiveTvPreferences @Inject constructor(
                     .put("logoSource", s.logoSource)
                     .put("guideShiftMinutes", s.guideShiftMinutes)
                     .put("catchupShiftMinutes", s.catchupShiftMinutes)
-                    .put("stalkerPortal", s.stalkerPortal).put("stalkerMac", s.stalkerMac)
-                    .put("stalkerUsername", s.stalkerUsername).put("stalkerPassword", s.stalkerPassword)
-                    .put("stalkerSerial", s.stalkerSerial)
+                    .apply {
+                        val type = if (s.isStalker) "stalker" else s.sourceType
+                        if (type.isNotBlank()) put("sourceType", type)
+                        s.stalkerConfig?.let { put("stalkerConfig", JSONObject(it.toJson().toString())) }
+                    }
             )
         }
         return arr.toString()

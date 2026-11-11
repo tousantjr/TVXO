@@ -1,31 +1,21 @@
 # TVXO Build Guide
 
-TVXO is a fork of [NuvioPlusIPTV](https://github.com/homelessbrian/NuvioPlusIPTV) (branch `dev`, commit `828b3330`),
+TVXO is a fork of [NuvioPlusIPTV](https://github.com/homelessbrian/NuvioPlusIPTV) (branch `dev`, commit `3e7a0fbe`),
 which is itself a fork of [Nuvio / NuvioTV](https://github.com/NuvioMedia/NuvioTV). License: GPL-3.0.
+
+## Reverted to stock upstream (after 1.1.0-beta.13.10)
+
+The app was reset to stock NuvioPlusIPTV `dev` (`3e7a0fbe`). Only the TVXO identity is kept on top:
+package `com.tvxo.tv`, the name, icons and banners, the TVXO Pink default theme, TVXO signing and updater
+(tousantjr/TVXO), Setup Sync off, the TVXO release workflow (the Downloader link serves the universal APK),
+no account screen on first run, the Xtream login opening when Live TV has no source, an Xtream-only add row
+(M3U and Stalker add rows are hidden), and the "Playback unavailable" fix from PR #9.
+These TVXO features were dropped: TVDB episode order, TVXO Multiview, guide alerts, phone login, dead channel
+scanner, live score bar, extra XMLTV guide sources, the ReSeq/IPTVnator additions, and the 13.9 Sports Hub upgrades.
+The old code is kept at tag `pre-revert-13.10`.
 
 All TVXO work is on the local branch **`tvxo-rebrand`** in this folder. Nothing has been pushed anywhere.
 The upstream remote is named `upstream`, and its push URL is set to `DISABLED` so you can't push to homelessbrian by accident.
-
----
-
-## What's new (after the TVXO Pink / XMLTV release)
-
-Features adapted from [Nuvio ReSeq](https://github.com/abbaskip/Nuvio-ReSeq) by abbaskip (GPLv3); the Stalker part also follows [IPTVnator](https://github.com/4gray/iptvnator) (MIT, notice in `NOTICE-IPTVNATOR.md`).
-
-- **M3U playlists are back.** Settings > Live TV > Playlists & Guides has **Add M3U Playlist** again, next to **Add Xtream Codes Login**. The Live TV empty-state screen still opens the Xtream login first and mentions that M3U and Stalker can be added in settings.
-- **Stalker / MAG portals.** Settings > Live TV > Playlists & Guides > **Add Stalker / MAG Portal**: name, portal URL, MAC address, and optional username, password and serial for portals that need them. It imports live channels and the portal's own guide. Playback links are asked from the portal when a channel starts (they are short-lived), so the player never sees the portal's login. Code: `livetv/data/StalkerPortalClient.kt`, wired into `LiveTvRepository` (channels and guide) and `LiveTvPlaybackController` (links). **Only tested against fake portals in unit tests (27 tests), never against a real provider.**
-- **Rate button.** Movie and show pages have a **Rate** button that saves a 1-10 rating (shown as half stars) to Trakt, Simkl and MDBList at once, and can remove it. It appears only when at least one of those is signed in, and only shows services that can identify the title. Code: `core/tracking/PersonalRating.kt`, `data/repository/PersonalRatingsService.kt`, `ui/screens/detail/PersonalRatingsControl.kt`. ReSeq's "ask to rate after a movie" prompt was not added.
-- **Provider movies and shows in normal search**: already in TVXO before this change (the On Demand row in Search, `livetv/ondemand/OnDemandSearch.kt`), so nothing was added.
-- **TVDB episode order (display only).** Show pages have an **Episode order** button next to Rate. It lists *Provider order (default)* plus the orders TheTVDB has for that show (Aired, DVD, Absolute, ...). Choosing one changes only the season tabs, episode numbers and the Play/Resume label. Stream search, watch progress, Continue Watching and Trakt/Simkl/MDBList keep the provider's season/episode numbers, so nothing gets out of sync (unlike ReSeq, which rewrites progress keys across about 30 files). The choice is saved per profile and per show. Episodes are matched to TVDB by number confirmed by title or air date, then by title, then by air date. If fewer than 70% match, provider order stays and the dialog says why. Episodes TVDB can't place go under Specials. "Next episode" still follows provider order. **Needs a TVDB v4 API key**: either built in (secret/`local.properties` `TVDB_API_KEY`, see section 3) or typed on the TV in Settings > Integrations > TVDB. Code: `data/tvdb/`, `ui/screens/detail/TvdbOrderControl.kt`, `ui/screens/settings/TvdbSettings.kt`. Tested with unit tests only (`TvdbEpisodeOrderingTest`), not on a TV or against the live TVDB API.
-
-- **Unit tests all pass** (`./gradlew :app:testFullDebugUnitTest`: 2746 tests, 0 failures, 1 skipped). Four older tests had always failed on this fork: three subtitle tests, because the fork's VPN layer refuses network calls outside a running app, and one Trakt test, because builds without Trakt app keys skip token refresh. Playback-side HTTP now goes through `core/network/PlaybackCallFactory.kt`, which tests can swap for a plain client (the app always uses the VPN layer), and the Trakt test no longer depends on build keys.
-
-### Earlier (after 1.1.0-beta.13.1)
-
-- **TVXO Pink theme.** New theme preset **TVXO Pink**, now the default. Colours are sampled from the logo: pink `#FF0D7D` is the main accent (focus rings, selected items, buttons, progress, toggles, loaders) and lime `#BBF615` is the second colour (variant/containers, end of accent gradients). It uses near-black text on pink and lime, with black backgrounds. If someone had explicitly chosen another theme, they keep it. Change it under Settings > Appearance (theme colour).
-- **Extra guide sources (XMLTV).** Go to Settings > Live TV > Extra Guide Sources (XMLTV). Here you can add, edit or remove extra `.xml` / `.xml.gz` guide links, and there is a **Refresh Guide Now** action. Your Xtream provider's guide stays the main source. An extra guide takes over a channel only when the provider has no real listings for it. Otherwise it only fills empty time slots, with no overlapping shows. Channels are matched by tvg-id / epg_channel_id first, then by a normalised name (case-insensitive; `UK:`/`US:`/`|UK|` prefixes, HD/FHD/4K and punctuation are ignored). Guides are stream-parsed and cached in the background, and they refresh with the normal guide refresh (every 12 h by default). A broken link shows its error on its own row and doesn't stop the other guides.
-- **No account screen on first run.** TVXO has no account server, so the old QR sign-in screen ("QR unavailable") is skipped. First launch acts as if "Continue without account" was chosen and goes straight to the profile / addon setup and then home.
-- **Live TV with no source.** When no Xtream login is set up, opening Live TV shows the Xtream login form right away. If you cancel it, a page with **Add Xtream source** and **Open Live TV settings** buttons appears. Left or Back always returns to the sidebar. Loading and load errors now show text instead of a blank screen.
 
 ---
 
@@ -73,7 +63,6 @@ Go to Settings > Secrets and variables > Actions > New repository secret.
 | `TVXO_KEY_ALIAS` | yes | e.g. `tvxo` |
 | `TVXO_KEY_PASSWORD` | yes | key password |
 | `TMDB_API_KEY` | recommended | your own TMDB key (movie and show metadata) |
-| `TVDB_API_KEY` | optional | TheTVDB v4 API key (thetvdb.com/api-information) for TVDB episode orders; without it each user can enter their own key in Settings > Integrations > TVDB |
 | `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `SIMKL_CLIENT_ID`, `SIMKL_APP_NAME`, `MDBLIST_CLIENT_ID`, `PREMIUMIZE_CLIENT_ID` | optional | your own app registrations with those services |
 | `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` | optional | enables Live TV "Backup & Sync" to the user's own Google Drive (see section 9) |
 | `INTRODB_API_URL` | optional | defaults to `https://api.introdb.app/` |
@@ -83,9 +72,9 @@ The workflow stops with an error naming any missing required signing secret.
 
 ## 4. Build with GitHub Actions
 
-Workflow file: `.github/workflows/tvxo-release.yml` (manual trigger only). **Active since 2026-11-08**: it was added through the GitHub website together with the 4 Actions secrets. To release, open **Actions > TVXO Release > Run workflow**. `ci/tvxo-release.yml` is the reference copy; if you edit the workflow, keep both copies the same. The GitHub App that publishes this repo still cannot push changes under `.github/workflows/`, so edit the active file on the website.
+Workflow file: `ci/tvxo-release.yml` (manual trigger only). It is stored in `ci/` and is **not active yet**: the GitHub App used to publish this repo has no `workflows` or Actions-secrets permission, so it could not push files under `.github/workflows/`. To switch it on, see "Enable automatic CI later" below.
 
-### Enable automatic CI (already done, kept for reference / re-setup)
+### Enable automatic CI later
 
 1. On github.com open the repo > **Add file > Create new file**, name it `.github/workflows/tvxo-release.yml`, paste the full contents of `ci/tvxo-release.yml`, and commit to `main`. (Files under `.github/workflows/` can be created from the website with your own account; the GitHub App cannot.)
 2. Open **Settings > Secrets and variables > Actions > New repository secret** and add these 4 secrets:
@@ -99,21 +88,6 @@ Workflow file: `.github/workflows/tvxo-release.yml` (manual trigger only). **Act
 ### First release (published manually)
 
 The first release, `1.1.0-beta.13.1`, was built locally with the real keystore (`./gradlew :app:assembleFullRelease -PlivetvBuildNumber=1 -PlivetvVersionName=1.1.0-beta.13.1`, signing through the `TVXO_KEYSTORE_*` env vars) and published through the GitHub REST API. It used the same tag, title, prerelease flag and asset names the workflow produces. The `downloader` release's `TVXO.apk` is the **arm64-v8a** APK.
-
-Published on 2026-11-08 from commit `59d674eb` (https://github.com/tousantjr/TVXO/releases/tag/1.1.0-beta.13.1). versionCode is `107601`. All APKs are signed with cert SHA-256 `85:D5:6A:EC:96:BB:75:F9:A0:AB:52:B4:85:1E:97:D2:74:F8:8A:1D:84:DD:ED:2B:11:72:49:7B:FA:AC:FB:63` (APK Signature Scheme v2):
-
-| Asset | Size (bytes) |
-|---|---|
-| `TVXO-1.1.0-beta.13.1-arm64-v8a-release.apk` | 70,613,327 |
-| `TVXO-1.1.0-beta.13.1-armeabi-v7a-release.apk` | 68,814,829 |
-| `TVXO-1.1.0-beta.13.1-universal-release.apk` | 171,881,674 |
-| `downloader/TVXO.apk` (copy of arm64-v8a) | 70,613,327 |
-
-History note: to publish without the `workflows` permission, the branch history was rewritten with `git filter-repo --path .github/workflows --invert-paths`. All other history is kept; 54 commits that only touched workflow files dropped out. The original history is kept only in the local backup branches `tvxo-rebrand-backup-original` / `tvxo-rebrand-backup-with-ci` on the build machine, not on GitHub.
-
-### 1.1.0-beta.13.5 (published from the build machine)
-
-Built locally from `main` commit `0bf81fa0` with the release keystore (`-PlivetvBuildNumber=5 -PlivetvVersionName=1.1.0-beta.13.5`) and published through the REST API, because the publishing GitHub App can't start Actions runs. versionCode `107605`, same signing cert SHA-256 `85:D5:6A:EC:...:FB:63` as earlier releases. `downloader/TVXO.apk` is the arm64-v8a APK (sha256 `b2aaeeea...7dbc64`). The next CI run continues at `.6`.
 
 ### What the workflow does
 
@@ -216,9 +190,9 @@ Transparent images are extracted from the black background by brightness (alpha 
 | **Google Drive Backup & Sync** (`livetv/sync/LiveTvDriveSync.kt`) | the user's own Google Drive; needs **your** Google OAuth client | Kept. The card is shown **only** when `GOOGLE_DRIVE_CLIENT_ID` is set. To enable it, create a Google Cloud project, enable the Google Drive API, create an OAuth client of type **"TVs and Limited Input devices"** (the app uses Google's device-code flow, `oauth2.googleapis.com/device/code`, scope `drive.appdata`), and set both secrets. The backup file name is now "TVXO Live TV backup.json". |
 | Supporters / Ko-fi screen | nuvio.tv supporters API, Ko-fi links | **Disabled** (`AppFeaturePolicy.supportNuvioEnabled = false` in the `full` flavor). The About row and the navigation route are gone. |
 
-## 10. Live TV sources
+## 10. Live TV source: Xtream only
 
-Settings > Live TV > Playlists & Guides offers **Add Xtream Codes Login**, **Add M3U Playlist** and **Add Stalker / MAG Portal**. (Between 1.1.0-beta.13.1 and the ReSeq features update it was Xtream only.) The Live TV empty state opens the Xtream login first. The "TV Guides (EPG)" and "Extra Guide Sources (XMLTV)" rows add guide data, not channel sources.
+Settings > Live TV > Playlists & Guides now offers only **"Add Xtream Codes Login"**: name, server, username, password, plus two include toggles. The "Add M3U Playlist" row was removed. The M3U dialog code remains, unreachable, so the diff stays small. Existing M3U entries, e.g. from a restored backup, still appear and can be edited or removed. The Live TV empty-state text now says "Add your Xtream Codes login in Settings › Live TV." The "TV Guides (EPG)" rows were kept: they add extra guide data, not channel sources, and an Xtream login brings its own guide.
 
 ## 11. Full change list (branch `tvxo-rebrand`)
 
@@ -292,3 +266,8 @@ After the real logo was added, an incremental `./gradlew :app:assembleFullDebug`
 - `color/tvxo_launcher_background` = `#ff000000`.
 - The banner, the xxxhdpi `iptv_ic_launcher` and the `tvxo_ic_launcher_foreground` inside the APK are pixel-identical to the generated files.
 
+
+### Sports: everything added on top of stock (PR #10)
+- All upstream Sports updates up to `dev` 3e7a0fbe0 (2026-11-11).
+- Upstream open PR #105 (bounded guide browsing; Search and Sports still read the full guide). Its author has it on merge hold because measured memory peaks were higher (median 129 → 140 MiB); included on request. Merged with the Stalker archive ids kept.
+- The TVXO 13.9 Sports Hub upgrades (odds and win probability, play-by-play, box score, Game Started prompt, team splashes, My Teams This Week, Home highlights row, animations setting). Their Multiview buttons now open the app's built-in Multiview (Sports start, one pane per live game, up to 4). Dead-channel ranking is off because the stock build has no dead channel scanner.

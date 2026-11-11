@@ -61,14 +61,15 @@ class LiveTvSettingsViewModel @Inject constructor(
     fun addPlaylist(name: String, url: String, userAgent: String) =
         viewModelScope.launch { repository.addPlaylist(name, url, userAgent) }
 
-    fun addStalker(name: String, portal: String, mac: String, user: String, pass: String, serial: String, guide: Boolean = true) =
-        viewModelScope.launch {
-            repository.addStalker(name, portal, mac, user, pass, serial, guide)
-        }
-
     fun addXtream(name: String, server: String, user: String, pass: String, importVod: Boolean = true, importLive: Boolean = true) =
         viewModelScope.launch {
             repository.addXtream(name, server, user, pass, importVod, importLive)
+            onDemand.refreshSoon()
+        }
+
+    fun addStalker(name: String, config: com.nuvio.stalker.StalkerConfig, importVod: Boolean = true, importLive: Boolean = true, useEmbeddedEpg: Boolean = true) =
+        viewModelScope.launch {
+            repository.addStalker(name, config, importVod, importLive, useEmbeddedEpg)
             onDemand.refreshSoon()
         }
 
@@ -78,7 +79,7 @@ class LiveTvSettingsViewModel @Inject constructor(
         // Movies & series just switched on: import this provider now, whenever it was last
         // imported (switched off earlier, it had its titles removed but still counted as
         // "imported recently", so nothing came back for up to a day).
-        if (source.isXtream && source.importVod && source.enabled && before?.importVod == false) onDemand.refreshNow(source.id)
+        if (source.hasCatalog && source.importVod && source.enabled && (before?.importVod == false || before?.stalkerConfig != source.stalkerConfig)) onDemand.refreshNow(source.id)
         else onDemand.refreshSoon()
     }
     /**
@@ -87,7 +88,7 @@ class LiveTvSettingsViewModel @Inject constructor(
      */
     fun updatePlaylistNow(source: PlaylistSource) = viewModelScope.launch {
         repository.updatePlaylist(source)
-        if (source.isXtream && source.importVod && !source.liveEnabled) onDemand.refreshNow(source.id)
+        if (source.hasCatalog && source.importVod && !source.liveEnabled) onDemand.refreshNow(source.id)
         else onDemand.refreshSoon()
     }
     fun removePlaylist(id: String) = viewModelScope.launch {
@@ -103,7 +104,7 @@ class LiveTvSettingsViewModel @Inject constructor(
         repository.setPlaylistEnabled(id, enabled)
         // Its movies and series go away with it, and come back (imported again) when re-enabled.
         val pl = playlists.value.firstOrNull { it.id == id }
-        if (enabled && pl != null && pl.isXtream && pl.importVod) onDemand.refreshNow(id) else onDemand.refreshSoon()
+        if (enabled && pl != null && pl.hasCatalog && pl.importVod) onDemand.refreshNow(id) else onDemand.refreshSoon()
     }
     fun movePlaylist(id: String, delta: Int) = viewModelScope.launch { repository.movePlaylist(id, delta) }
     fun setPlaylistGuideShift(id: String, minutes: Int) = viewModelScope.launch { repository.setPlaylistGuideShift(id, minutes) }
@@ -116,8 +117,6 @@ class LiveTvSettingsViewModel @Inject constructor(
     fun setEpgEnabled(id: String, enabled: Boolean) = viewModelScope.launch { repository.setEpgEnabled(id, enabled) }
 
     fun refreshAll() = repository.refreshAll(force = true)
-    /** Downloads every guide again (the provider's and the extra XMLTV sources), in the background. */
-    fun refreshGuide() = repository.refreshEpgOnly()
 
     fun unhideChannel(key: String) = viewModelScope.launch { prefs.setChannelHidden(key, false) }
     fun unhideAllChannels() = viewModelScope.launch { prefs.clearHiddenChannels() }

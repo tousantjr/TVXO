@@ -45,9 +45,7 @@ data class Meta(
     val hasLandscapePoster: Boolean? = null,
     val hasLogo: Boolean? = null,
     val hasLinks: Boolean? = null,
-    val hasVideos: Boolean? = null,
-    /** Set when the episodes are shown in a TVDB order (see data/tvdb). */
-    val episodeOrder: EpisodeOrderInfo? = null
+    val hasVideos: Boolean? = null
 ) {
     val apiType: String
         get() = type.toApiString(rawType)
@@ -200,13 +198,7 @@ data class Video(
     val runtime: Int? = null, // episode runtime in minutes
     /** Per-episode rating supplied by the addon, when it provides one. */
     val rating: Double? = null,
-    val available: Boolean? = null,
-    /**
-     * Season/episode shown on screen when a TVDB order is chosen. [season]/[episode] stay the
-     * provider's numbers, which streams, watch progress and trackers keep using.
-     */
-    val displaySeason: Int? = null,
-    val displayEpisode: Int? = null
+    val available: Boolean? = null
 )
 
 @Immutable

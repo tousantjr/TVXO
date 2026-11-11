@@ -194,8 +194,7 @@ class ExternalPlaybackTracker @Inject constructor(
     private val cloudPlaybackProgressStore: CloudLibraryPlaybackProgressStore,
     private val cloudPlaybackSessionStore: CloudLibraryPlaybackSessionStore,
     private val profileManager: com.nuvio.tv.core.profile.ProfileManager,
-    private val torrentService: TorrentService,
-    private val tvdbEpisodeOrder: com.nuvio.tv.data.tvdb.TvdbEpisodeOrderService
+    private val torrentService: TorrentService
 ) {
     companion object {
         private const val TAG = "ExtPlaybackTracker"
@@ -396,6 +395,8 @@ class ExternalPlaybackTracker @Inject constructor(
         ownsTorrentStream: Boolean = false,
         context: Context
     ): Boolean {
+        // Refuse before persisting a pending handoff or starting external-player tracking.
+        if (isStalkerPlaybackAddress(url)) return false
         this.ownsTorrentStream = false
         this.pendingOwnsTorrentStream = ownsTorrentStream
         if (shouldCancelPendingAutoLaunch(autoLaunch)) {
@@ -916,10 +917,8 @@ class ExternalPlaybackTracker @Inject constructor(
         videos: List<Video>,
         preferredVideoId: String? = null
     ): ExternalNextEpisodeSnapshot {
-        // Follow the profile's chosen TVDB episode order, if any (unchanged otherwise).
-        val ordered = tvdbEpisodeOrder.orderVideos(metadata.profileId, listOf(metadata.contentId), videos)
-        loadedNextEpisodeMeta = metadata to ordered
-        return episodeShufflePlayback.externalSnapshot(metadata, ordered, preferredVideoId)
+        loadedNextEpisodeMeta = metadata to videos
+        return episodeShufflePlayback.externalSnapshot(metadata, videos, preferredVideoId)
     }
 
     private suspend fun resolveNextEpisodeSnapshot(

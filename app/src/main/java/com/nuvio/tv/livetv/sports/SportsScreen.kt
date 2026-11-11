@@ -118,6 +118,8 @@ object SportsLaunch {
     @Volatile private var returnSetAt = 0L
     fun openedFromSports(eventId: String) { returnTo = eventId; focusEvent = eventId; returnSetAt = System.currentTimeMillis() }
     fun takeReturnToSports(): Boolean = (returnTo != null).also { returnTo = null }
+    val isWatchingFromSports: Boolean get() = returnTo != null
+    val watchingEventId: String? get() = returnTo
     fun clearReturn() { returnTo = null; focusEvent = null }
     /** Live TV closed some other way: Back there no longer goes to Sports. */
     fun dropReturn() {
@@ -165,7 +167,10 @@ fun SportsScreen(
     onOpenLive: () -> Unit,
     /** Back on a game opened from another page (the Calendar): that page's route. */
     onReturnTo: (route: String) -> Unit = {},
-    viewModel: SportsViewModel = hiltViewModel()
+    viewModel: SportsViewModel = hiltViewModel(),
+    onOpenMultiview: (String?) -> Unit = {},
+    /** Multiview with [panes] panes, [channelKey] in the first one. */
+    onOpenMultiviewPanes: (panes: Int, channelKey: String?) -> Unit = { _, key -> onOpenMultiview(key) }
 ) {
     val events by viewModel.events.collectAsStateWithLifecycle()
     val known by viewModel.known.collectAsStateWithLifecycle()
@@ -183,6 +188,8 @@ fun SportsScreen(
 
     var day by rememberSaveable { mutableIntStateOf(0) }
     var chip by rememberSaveable { mutableStateOf<String?>(null) }
+    // All Events' sport row (Football…): kept here with the day and filter, so opening a game and coming back finds it still picked.
+    var allSportPick by rememberSaveable { mutableStateOf<String?>(null) }
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
     // The page the open game came from (the Calendar): Back goes back there, not to the hub.
     var fromRoute by rememberSaveable { mutableStateOf<String?>(null) }
@@ -291,12 +298,14 @@ fun SportsScreen(
         events.firstOrNull { ev -> matches[ev.id]?.any { it.channel.key == key } == true }?.let { SportsLaunch.openedFromSports(it.id) }
         onOpenLive()
     }
-    // Multiview from Sports: the live games' channels (null: closed).
-    var multiview by remember { mutableStateOf<List<LiveChannel>?>(null) }
+    // Multiview from Sports: opens the app's Multiview with one pane per live game (up to 4),
+    // the first game's channel already playing; the other panes are picked from its Sports list.
     fun openMultiview(mineOnly: Boolean, first: SportsEvent? = null) {
         val chans = viewModel.multiviewChannels(mineOnly, first)
-        if (chans.isEmpty()) LiveTvNotice.show(if (mineOnly) "None of your teams' live games has a channel yet" else "No live games with a channel right now")
-        else multiview = chans
+        if (chans.isEmpty()) { LiveTvNotice.show(if (mineOnly) "None of your teams' live games has a channel yet" else "No live games with a channel right now"); return }
+        val firstEvent = first ?: SportsMultiview.liveGames(events, matches, viewModel.repo.follows.value, mineOnly).firstOrNull()
+        SportsWatchLaunch.prepareEvent(chans.first().key, firstEvent?.id)
+        onOpenMultiviewPanes(chans.size.coerceIn(2, 4), chans.first().key)
     }
     com.nuvio.tv.livetv.ui.FrameMeter("Sports")
     androidx.compose.runtime.CompositionLocalProvider(LocalSportsAnim provides SportsAnimLevel.from(settings.animations)) {
@@ -417,6 +426,8 @@ fun SportsScreen(
                 onDay = { day = it },
                 chip = chip,
                 onChip = { chip = it },
+                allSportPick = allSportPick,
+                onAllSportPick = { allSportPick = it },
                 listState = listState,
                 requesterFor = ::requesterFor,
                 returnTo = returnTo,
@@ -427,6 +438,7 @@ fun SportsScreen(
                 onOpen = { ev -> fromRoute = null; fromLabel = null; openId = ev.id },
                 onQuickWatch = ::quickWatch,
                 onPick = { picker = true },
+                onOpenMultiview = { onOpenMultiview(playingKey) },
                 onWatchChannel = { ch -> viewModel.watchChannel(ch); onOpenLive() },
                 onMultiview = { mine -> openMultiview(mine) },
                 onMultiviewFrom = { ev -> openMultiview(mineOnly = false, first = ev) }
@@ -437,16 +449,6 @@ fun SportsScreen(
         if (videoOn) VideoLayer(slot, root, playerRef ?: viewModel.player, playing = playingKey != null, backdrop = backdrop, onAttached = { viewModel.onSurfaceAttached() })
     }
     fixFor?.let { ev -> FixChannelDialog(ev, matches[ev.id].orEmpty(), settings.hideScores, viewModel) { fixFor = null } }
-    multiview?.let { chans ->
-        com.nuvio.tv.livetv.multiview.LiveTvMultiviewScreen(
-            initial = chans.firstOrNull(),
-            initialChannels = chans.drop(1),
-            channels = remember { viewModel.repo.channelsForPicker() },
-            playback = viewModel.playbackController,
-            onFullScreen = { ch -> multiview = null; viewModel.watchChannel(ch); onOpenLive() },
-            onExit = { multiview = null }
-        )
-    }
     }
 }
 
@@ -538,6 +540,8 @@ private fun SportsHub(
     onDay: (Int) -> Unit,
     chip: String?,
     onChip: (String) -> Unit,
+    allSportPick: String?,
+    onAllSportPick: (String?) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
     requesterFor: (String) -> FocusRequester,
     returnTo: String?,
@@ -547,6 +551,7 @@ private fun SportsHub(
     onOpen: (SportsEvent) -> Unit,
     onQuickWatch: (SportsEvent) -> Unit,
     onPick: () -> Unit,
+    onOpenMultiview: () -> Unit,
     onWatchChannel: (LiveChannel) -> Unit,
     /** Multiview with every live game ([mineOnly]: My Teams' live games only). */
     onMultiview: (mineOnly: Boolean) -> Unit = {},
@@ -595,8 +600,7 @@ private fun SportsHub(
     val leagueView = effectiveChip.takeIf { it.startsWith(CHIP_LEAGUE) }?.removePrefix(CHIP_LEAGUE)
     // Days before yesterday: their games are fetched when you open one.
     LaunchedEffect(day) { if (day < -1) viewModel.repo.wantPast() }
-    // All Events only: narrow the day to one sport (the sport row under the days).
-    var allSportPick by rememberSaveable { mutableStateOf<String?>(null) }
+    // All Events only: narrow the day to one sport (the sport row under the days; kept by the screen above).
     // The day's games, sections and My Teams' rows: built by the view model in the background
     // (they used to be worked out here while the screen drew, every 15 seconds and every score).
     val pageQuery = SportsPageQuery(day, effectiveChip, allSportPick, rowsSport)
@@ -722,9 +726,9 @@ private fun SportsHub(
                 verticalAlignment = Alignment.CenterVertically,
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
             ) {
-                item(key = "sport_all") { FilterIcon("▦", "All", allSport == null, withLabel = true) { allSportPick = null; contentJump++ } }
+                item(key = "sport_all") { FilterIcon("▦", "All", allSport == null, withLabel = true) { onAllSportPick(null); contentJump++ } }
                 items(allSports, key = { "sport_" + it.name }) { sp ->
-                    FilterIcon(sp.icon, sp.label, allSport == sp.name, withLabel = true) { allSportPick = sp.name; contentJump++ }
+                    FilterIcon(sp.icon, sp.label, allSport == sp.name, withLabel = true) { onAllSportPick(sp.name); contentJump++ }
                 }
             }
         }
@@ -753,6 +757,7 @@ private fun SportsHub(
             item(key = CHIP_TABLES) { FilterIcon("🏆", "Tables", effectiveChip == CHIP_TABLES, upTo, withLabel = true) { pickChip(CHIP_TABLES) } }
             // Each league's own channel (NFL Network, NBA TV…).
             item(key = CHIP_NETWORKS) { FilterIcon("📡", "League Networks", effectiveChip == CHIP_NETWORKS, upTo, withLabel = true) { pickChip(CHIP_NETWORKS) } }
+            item(key = "multiview") { FilterIcon("▦", "Multiview", false, upTo, withLabel = true, onClick = onOpenMultiview) }
             // Sports you follow: My Teams for that sport only.
             if (followedSports.size > 1) {
                 item(key = "sep1") { ChipGap() }
@@ -1130,42 +1135,67 @@ private fun LeaguesBar(line: String, modifier: Modifier = Modifier, onClick: () 
 }
 
 /**
- * The leagues on All Events: OK turns one on or off. The ones on (and the ones you follow) are
- * listed first, then every other league; the order is fixed while the list is open so a league
+ * The leagues on All Events, grouped by sport (each group closed to begin with) with a search box
+ * on top. OK on a sport opens or closes it; OK on a league turns it on or off. Searching opens
+ * every sport that has a match. The order never changes while the list is open, so a league
  * doesn't jump away from the highlight when you press OK.
  */
 @Composable
 private fun LeaguesPicker(settings: SportsSettings, followed: Set<String>, onToggle: (League) -> Unit, onDismiss: () -> Unit) {
     val first = remember { FocusRequester() }
-    val (onNow, others) = remember { SportsCatalog.ordered(settings).partition { SportsCatalog.shown(it, settings) || it.id in followed } }
+    val field = remember { FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    var query by remember { mutableStateOf("") }
+    var open by remember { mutableStateOf(emptySet<Sport>()) }
+    val groups = remember {
+        val all = SportsCatalog.ordered(settings)
+        Sport.entries.mapNotNull { s -> all.filter { it.sport == s }.takeIf { it.isNotEmpty() }?.let { s to it } }
+    }
+    val q = query.trim().lowercase()
+    val searching = q.isNotEmpty()
+    val shown = if (!searching) groups else groups.mapNotNull { (s, list) ->
+        val hits = if (s.label.lowercase().contains(q)) list else list.filter { it.name.lowercase().contains(q) || it.short.lowercase().contains(q) }
+        if (hits.isEmpty()) null else s to hits
+    }
     SportsDialog(onDismiss = onDismiss, width = 620.dp) {
         LiveText("Leagues on All Events", size = 18.sp, weight = FontWeight.Bold)
-        LiveText("OK turns a league on or off. Leagues you follow always show.", color = SportsLook.Dim, size = 12.sp)
+        LiveText("OK turns a league on or off, and opens or closes a sport. Leagues you follow always show.", color = SportsLook.Dim, size = 12.sp)
         Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.heightIn(max = 400.dp).keepFocusWhileHeld(horizontal = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            fun rows(list: List<League>, firstRow: Boolean) {
-                itemsIndexed(list, key = { _, l -> l.id }) { i, l ->
-                    val mine = l.id in followed
-                    val on = mine || SportsCatalog.shown(l, settings)
+        LiveTextField(
+            value = query, onValueChange = { query = it }, hint = "Search leagues", focusRequester = field,
+            onDone = { keyboard?.hide(); runCatching { first.requestFocus() } }
+        )
+        Spacer(Modifier.height(8.dp))
+        if (searching && shown.isEmpty()) LiveText("No leagues match that search.", color = SportsLook.Dim, size = 12.sp)
+        LazyColumn(Modifier.heightIn(max = 360.dp).keepFocusWhileHeld(horizontal = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            shown.forEachIndexed { gi, (sport, list) ->
+                val isOpen = searching || sport in open
+                item(key = "g_${sport.name}") {
+                    val total = groups.first { it.first == sport }.second
+                    val on = total.count { it.id in followed || SportsCatalog.shown(it, settings) }
                     SportsMenuRow(
-                        label = (if (on) "✓   " else "      ") + "${l.sport.icon}  ${l.name}",
-                        detail = when {
-                            mine -> "Following"
-                            l.guideOnly -> "From your guide"
-                            else -> l.sport.label
-                        },
-                        modifier = if (firstRow && i == 0) Modifier.focusRequester(first) else Modifier,
-                        onClick = { if (!mine) onToggle(l) }
+                        label = (if (isOpen) "▾   " else "▸   ") + "${sport.icon}  ${sport.label}",
+                        detail = if (searching) "${list.size} found" else "$on of ${total.size} on",
+                        modifier = if (gi == 0) Modifier.focusRequester(first) else Modifier,
+                        onClick = { if (!searching) open = if (sport in open) open - sport else open + sport }
                     )
                 }
-            }
-            if (onNow.isNotEmpty()) {
-                item(key = "h_on") { SectionHeader("ON ALL EVENTS", count = null) }
-                rows(onNow, firstRow = true)
-            }
-            if (others.isNotEmpty()) {
-                item(key = "h_more") { SectionHeader("MORE LEAGUES", count = null) }
-                rows(others, firstRow = onNow.isEmpty())
+                if (isOpen) {
+                    items(list, key = { it.id }) { l ->
+                        val mine = l.id in followed
+                        val on = mine || SportsCatalog.shown(l, settings)
+                        SportsMenuRow(
+                            label = (if (on) "✓   " else "      ") + l.name,
+                            detail = when {
+                                mine -> "Following"
+                                l.guideOnly -> "From your guide"
+                                else -> null
+                            },
+                            modifier = Modifier.padding(start = 22.dp),
+                            onClick = { if (!mine) onToggle(l) }
+                        )
+                    }
+                }
             }
         }
     }

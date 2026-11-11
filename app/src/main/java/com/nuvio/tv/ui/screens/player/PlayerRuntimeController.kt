@@ -107,7 +107,6 @@ class PlayerRuntimeController(
     internal val serverPlayback: ServerPlayback,
     internal val serverStreams: ServerStreams,
     internal val party: com.nuvio.tv.core.party.PartyRepository,
-    internal val tvdbEpisodeOrder: com.nuvio.tv.data.tvdb.TvdbEpisodeOrderService? = null,
     internal val profileId: Int,
     savedStateHandle: SavedStateHandle,
     internal val scope: CoroutineScope
