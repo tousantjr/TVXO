@@ -1856,13 +1856,26 @@ class LiveTvRepository @Inject constructor(
         val existing = if (guideInDb) guideDb.channelRange(ch.key, from, to) else _programs.value[ch.key].orEmpty()
         val merged = (existing + imported).associateBy { it.startMs }.values.sortedBy { it.startMs }
         stalker.assertCurrent(pl)
-        rangeMutex.withLock {
-            prefs.withCurrentPlaylist(pl) {
-                if (guideInDb) guideDb.putChannelRange(ch.key, from, to, merged)
-                val current = _programs.value[ch.key].orEmpty()
-                val all = (current + merged).associateBy { it.startMs }.values.sortedBy { it.startMs }
-                _programs.value = _programs.value + (ch.key to all)
-                loadedFrom = minOf(loadedFrom, from)
+        var mutated = false
+        try {
+            rangeMutex.withLock {
+                prefs.withCurrentPlaylist(pl) {
+                    if (guideInDb) {
+                        beginGuideMutation()
+                        mutated = true
+                        guideDb.putChannelRange(ch.key, from, to, merged)
+                    } else {
+                        val current = _programs.value[ch.key].orEmpty()
+                        val all = (current + merged).associateBy { it.startMs }.values.sortedBy { it.startMs }
+                        _programs.value = _programs.value + (ch.key to all)
+                    }
+                }
+            }
+        } finally {
+            // Outside rangeMutex (publishing takes it). Refreshes every guide binding sharing these listings.
+            if (mutated) withContext(kotlinx.coroutines.NonCancellable) {
+                val affected = runCatching { guideDb.channelsSharingListings(setOf(ch.key)) }.getOrNull()
+                publishCommittedGuide(affected)
             }
         }
     }
