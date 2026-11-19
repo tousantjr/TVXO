@@ -68,15 +68,71 @@ data class PlaylistSource(
      * providers whose archive runs on a different clock than their guide.
      */
     val catchupShiftMinutes: Int = 0,
+    /**
+     * Guides switched off for this playlist in its Guides settings: an added guide's id, or
+     * [builtInGuideKey] for another playlist's built-in guide. Everything not listed is on, so
+     * new guides (and playlists saved before this existed) use every guide, like before.
+     */
+    val guidesOff: Set<String> = emptySet(),
     /** Explicit type survives a malformed portal configuration without treating it as M3U. */
     val sourceType: String = "",
-    val stalkerConfig: StalkerConfig? = null
+    val stalkerConfig: StalkerConfig? = null,
+    /**
+     * M3U links: the Xtream login found in the playlist's own channel links
+     * (".../live/user/pass/123.ts"), checked with the provider. For short links that don't show
+     * the login themselves. Blank when none was found.
+     */
+    val linkServer: String = "",
+    val linkUsername: String = "",
+    val linkPassword: String = "",
+    /** M3U links: the playlist also lists movies or episodes (found when it's read). */
+    val vodInPlaylist: Boolean = false
 ) {
     /** The user agent requests for this playlist go out with ("" = the app default). */
     val effectiveUserAgent: String get() = userAgent.ifBlank { fallbackUserAgent }
     val isStalker: Boolean get() = sourceType == "stalker" || stalkerConfig != null
     val isXtream: Boolean get() = !isStalker && xtreamServer.isNotBlank()
     val hasCatalog: Boolean get() = isXtream || isStalker
+
+    /**
+     * An M3U playlist that is really an Xtream login: the server, username and password, from
+     * the link itself (".../get.php?username=a&password=b") or else from its channel links
+     * ([linkServer]). Null for anything else.
+     */
+    val m3uLogin: Triple<String, String, String>? get() {
+        if (isStalker || isXtream) return null
+        return loginInLink() ?: linkServer.takeIf { it.isNotBlank() && linkUsername.isNotBlank() }
+            ?.let { Triple(it, linkUsername, linkPassword) }
+    }
+
+    /** The login in the playlist link itself (".../get.php?username=a&password=b"), if any. */
+    fun loginInLink(): Triple<String, String, String>? {
+        val link = tidyLink(url)
+        val path = link.substringBefore('?').trimEnd('/')
+        if (!path.endsWith("get.php", ignoreCase = true)) return null
+        val login = credentialsFromLink(link) ?: return null
+        val server = cleanXtreamServer(link)
+        return if (server.isNotBlank()) Triple(server, login.first, login.second) else null
+    }
+
+    /**
+     * Movies and series can be imported: an Xtream login, a Stalker portal, an M3U link with a
+     * login in it, or an M3U playlist that lists movies or episodes itself.
+     */
+    val hasVod: Boolean get() = hasCatalog || m3uLogin != null || vodInPlaylist
+
+    /**
+     * This source set up so the Xtream helpers (movies and series, their links) work: an M3U
+     * link with a login in it gets that login filled in. Live channels still come from the
+     * M3U link; this copy is never saved.
+     */
+    fun withVodLogin(): PlaylistSource {
+        val login = m3uLogin ?: return this
+        return copy(
+            xtreamServer = login.first, xtreamUsername = login.second, xtreamPassword = login.third,
+            userAgent = effectiveUserAgent
+        )
+    }
 
     /** The time zone catch-up links are written in: the one picked in settings, else the server's. */
     val catchupZone: String get() = catchupTimezone.ifBlank { serverTimezone }
@@ -113,6 +169,9 @@ data class PlaylistSource(
     private fun enc(s: String) = java.net.URLEncoder.encode(s.trim(), "UTF-8")
 
     companion object {
+        /** How another playlist's built-in guide is named in [guidesOff]. */
+        fun builtInGuideKey(playlistId: String) = "playlist:$playlistId"
+
         /**
          * A typed or pasted link made safe: dashes that only look like "-" (the longer dashes a
          * phone keyboard or a chat app swaps in, the non-breaking hyphen) become a real hyphen,
@@ -261,11 +320,7 @@ data class EpgProgram(
     /** Provider archive identifier, retained through guide storage and time shifts. */
     val providerProgramId: String? = null,
     /** Portal identity which issued the archive id; other guides can still provide the text. */
-    val providerSourceIdentity: String? = null,
-    /** A bounded UI copy; actions must resolve canonical details before saving metadata. */
-    @Transient val isDisplayProjection: Boolean = false,
-    /** In-memory key for exact hydration when several stored listings share one start time. */
-    @Transient val guideRowId: Long? = null
+    val providerSourceIdentity: String? = null
 ) {
     fun isLive(nowMs: Long): Boolean = nowMs in startMs until stopMs
     fun progress(nowMs: Long): Float {
@@ -301,22 +356,29 @@ data class PlaylistAccount(
     fun expiringSoon(now: Long = System.currentTimeMillis()): Boolean = (daysLeft(now) ?: Long.MAX_VALUE) <= 7
 
     /** "12 Mar 2027 (148 days)", "20 Oct 2026 (today)", or null. */
-    fun expiryLabel(now: Long = System.currentTimeMillis()): String? {
-        val days = daysLeft(now) ?: return null
-        val date = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(expiresAtMs))
-        val left = when {
-            expiresAtMs <= now -> "expired"
-            days == 0L -> "today"
-            days == 1L -> "1 day"
-            else -> "$days days"
+    fun expiryLabel(
+        now: Long = System.currentTimeMillis(),
+        locale: java.util.Locale = java.util.Locale.getDefault(),
+        remainingLabel: (days: Long, expired: Boolean) -> String = { days, expired ->
+            when {
+                expired -> "expired"
+                days == 0L -> "today"
+                days == 1L -> "1 day"
+                else -> "$days days"
+            }
         }
-        return "$date ($left)"
+    ): String? {
+        val days = daysLeft(now) ?: return null
+        val date = java.text.SimpleDateFormat("d MMM yyyy", locale).format(java.util.Date(expiresAtMs))
+        return "$date (${remainingLabel(days, expiresAtMs <= now)})"
     }
 }
 
 data class LiveTvSettings(
     val showInSidebar: Boolean = true,
     val showChannelNames: Boolean = true,
+    /** Long channel names wrap onto a second line in the guide instead of being cut off. */
+    val twoLineChannelNames: Boolean = false,
     val showChannelNumbers: Boolean = true,
     /** A red outline around the channel you're watching, in the guide's channel list. */
     val markPlayingChannel: Boolean = true,
@@ -353,6 +415,12 @@ data class LiveTvSettings(
     val autoReconnect: Boolean = true,
     /** A channel that won't play: switch to another channel by the same name (from another group or playlist). */
     val autoBackupChannel: Boolean = true,
+    /**
+     * Leaves out stray playlist entries: in a playlist whose links say what each entry is
+     * (/live/, /movie/, /series/), an entry with no such marker that's named like an episode
+     * ("S02 E02"). Those turned up as one-item Live TV groups.
+     */
+    val hideStrayEntries: Boolean = true,
     /** Catch-up replays saved to the device while they play, for instant skipping. */
     val catchupCache: Boolean = true,
     val channelSort: ChannelSort = ChannelSort.PLAYLIST,
@@ -649,7 +717,9 @@ data class EpgSourceChannels(
     val label: String,
     val channels: List<EpgChannelEntry>,
     /** Guide channel ids already feeding a playlist channel (matched or assigned). */
-    val usedIds: Set<String> = emptySet()
+    val usedIds: Set<String> = emptySet(),
+    /** The playlists this guide is switched on for (null = every playlist). */
+    val playlistIds: Set<String>? = null
 )
 
 data class EpgChannelEntry(
@@ -881,7 +951,7 @@ object DeveloperTools {
  */
 object LiveTvLoadReport {
     /** Which Live TV kit this app was built from: changed with every kit, so a report shows the exact build. */
-    const val KIT_STAMP = "2026-11-11 14:45"
+    const val KIT_STAMP = "2026-11-18 22:20"
 
     /** The first line of every report: kit and app version, so it's clear which build wrote it. */
     val buildLine: String

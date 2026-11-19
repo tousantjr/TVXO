@@ -75,7 +75,7 @@ import java.util.Locale
 /** True = focused items are filled with the accent color; false = tinted fill with an accent outline. */
 internal val LocalLiveSolidHighlight = staticCompositionLocalOf { false }
 
-/** "Guide darkness" setting ("standard" = Lightest, "darker" = Standard, "solid" = Darkest): the guide bars follow it. */
+/** "Guide darkness" setting ("standard" = Light, "darker" = Standard, "solid" = Dark): the guide bars follow it. */
 internal val LocalGuideDarkness = staticCompositionLocalOf { "darker" }
 
 private val TEXT_OVER_PICTURE = androidx.compose.ui.graphics.Shadow(
@@ -100,7 +100,8 @@ internal fun LiveText(
     align: TextAlign? = null,
     marquee: Boolean = false,
     /** A soft dark shadow, for text over the picture (the info panel). */
-    shadow: Boolean = false
+    shadow: Boolean = false,
+    lineHeight: TextUnit = TextUnit.Unspecified
 ) {
     Text(
         style = if (shadow) androidx.compose.material3.LocalTextStyle.current.copy(shadow = TEXT_OVER_PICTURE) else androidx.compose.material3.LocalTextStyle.current,
@@ -118,7 +119,8 @@ internal fun LiveText(
         maxLines = maxLines,
         softWrap = !(marquee && maxLines == 1),
         overflow = if (marquee && maxLines == 1) TextOverflow.Clip else TextOverflow.Ellipsis,
-        textAlign = align
+        textAlign = align,
+        lineHeight = lineHeight
     )
 }
 

@@ -153,6 +153,9 @@ import com.nuvio.tv.R
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.auth.DeviceSessionRegistration
 import com.nuvio.tv.core.deeplink.DeepLinkHandler
+import com.nuvio.tv.core.deeplink.DeepLinkInstallResult
+import com.nuvio.tv.data.repository.TrackingAddonConsentController
+import com.nuvio.tv.ui.components.TrackingAddonConsentDialog
 import com.nuvio.tv.core.deeplink.DeepLinkParser
 import com.nuvio.tv.core.player.PlayerWindowBackdrop
 import com.nuvio.tv.core.party.PartyRepository
@@ -230,6 +233,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 val LocalSidebarExpanded = compositionLocalOf { false }
+val LocalRootContentInset = compositionLocalOf { 0.dp }
+
+/** Live TV fork pages' room for the older side menu (only while the menu is showing). */
+val LocalForkPageInset = compositionLocalOf { 0.dp }
 
 /** Opens Nuvio's side menu from a screen (used by Live TV's back button). */
 val LocalOpenSidebar = compositionLocalOf<() -> Unit> { {} }
@@ -384,6 +391,9 @@ open class MainActivity : ComponentActivity() {
     lateinit var deepLinkHandler: DeepLinkHandler
 
     @Inject
+    lateinit var trackingAddonConsentController: TrackingAddonConsentController
+
+    @Inject
     lateinit var partyRepository: PartyRepository
 
     private val pendingDeepLinkUrl = MutableStateFlow<String?>(null)
@@ -463,7 +473,11 @@ open class MainActivity : ComponentActivity() {
         }
 
         // Extract extras set by the Continue Watching launcher channel preview programs.
-        val launchContentId = intent?.getStringExtra("contentId")
+        val isFreshLaunch = isFreshLaunchIntent(
+            hasSavedInstanceState = savedInstanceState != null,
+            intentFlags = intent?.flags ?: 0
+        )
+        val launchContentId = intent?.getStringExtra("contentId")?.takeIf { isFreshLaunch }
         val launchContentType = intent?.getStringExtra("contentType")
         val launchMode = intent?.getStringExtra("launchMode")
         val launchVideoId = intent?.getStringExtra("videoId")
@@ -926,8 +940,31 @@ open class MainActivity : ComponentActivity() {
                             if (pendingDeepLinkUrl.value == url) {
                                 pendingDeepLinkUrl.value = null
                             }
-                            Toast.makeText(context, installResult.message, Toast.LENGTH_LONG).show()
+                            if (installResult !is DeepLinkInstallResult.ConsentRequired) {
+                                Toast.makeText(context, installResult.message, Toast.LENGTH_LONG).show()
+                            }
                         }
+                    }
+
+                    val pendingTrackingInstall by trackingAddonConsentController.pending.collectAsState()
+                    pendingTrackingInstall?.let { pending ->
+                        TrackingAddonConsentDialog(
+                            addonName = pending.addon.displayName.ifBlank { pending.addon.baseUrl },
+                            onInstall = {
+                                lifecycleScope.launch {
+                                    val installed = trackingAddonConsentController.install() ?: return@launch
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.addon_install_success,
+                                            installed.displayName.ifBlank { installed.baseUrl }
+                                        ),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            onDismiss = trackingAddonConsentController::dismiss
+                        )
                     }
 
                     if (needsEssentialAddonSetup) {
@@ -965,6 +1002,23 @@ open class MainActivity : ComponentActivity() {
                     LaunchedEffect(actualRoute) {
                         optimisticRoute = null
                         ambientIdleController.onInteraction()
+                    }
+
+                    // The player and home are routes inside this activity, so leaving the
+                    // player or returning home never reaches onResume. Ask for the same
+                    // throttled watch state pull a foreground return gets.
+                    LaunchedEffect(navController) {
+                        var previousRoute: String? = null
+                        navController.currentBackStackEntryFlow.collect { entry ->
+                            val route = entry.destination.route
+                            if (route == previousRoute) return@collect
+                            val leftPlayer = previousRoute == Screen.Player.route
+                            val returnedHome = previousRoute != null && route == Screen.Home.route
+                            if (leftPlayer || returnedHome) {
+                                startupSyncService.requestNavigationSync()
+                            }
+                            previousRoute = route
+                        }
                     }
 
                     // Auto-play next episode for EXTERNAL players: the tracker resolves the
@@ -1112,7 +1166,9 @@ open class MainActivity : ComponentActivity() {
                                 if (pendingDeepLinkUrl.value == url) {
                                     pendingDeepLinkUrl.value = null
                                 }
-                                Toast.makeText(context, installResult.message, Toast.LENGTH_LONG).show()
+                                if (installResult !is DeepLinkInstallResult.ConsentRequired) {
+                                    Toast.makeText(context, installResult.message, Toast.LENGTH_LONG).show()
+                                }
                             }
                             null -> {
                                 pendingDeepLinkUrl.value = null
@@ -1157,9 +1213,12 @@ open class MainActivity : ComponentActivity() {
                     val recordingNow = allRecordings.any {
                         it.status == com.nuvio.tv.livetv.record.RecordingStatus.RECORDING
                     }
-                    val recordingsInSidebar = liveTvSettingsNow.recordingsInSidebar && liveTvInSidebar && (allRecordings.isNotEmpty() ||
-                        liveTvRecordingScheduler.schedules.collectAsState().value.isNotEmpty() ||
-                        liveTvRecordingScheduler.series.collectAsState().value.isNotEmpty())
+                    // Always read both lists: reading them only when the switches above are on made
+                    // the screen under the menu rebuild (Settings lost its place) when one changed.
+                    val hasSchedules = liveTvRecordingScheduler.schedules.collectAsState().value.isNotEmpty()
+                    val hasSeries = liveTvRecordingScheduler.series.collectAsState().value.isNotEmpty()
+                    val recordingsInSidebar = liveTvSettingsNow.recordingsInSidebar && liveTvInSidebar &&
+                        (allRecordings.isNotEmpty() || hasSchedules || hasSeries)
                     // Opened from the guide's ● button, Back goes back to the guide; from the menu it's a menu page.
                     val recordingsFromGuide = currentRoute == Screen.Recordings.route &&
                         navController.previousBackStackEntry?.destination?.route == Screen.LiveTv.route
@@ -1665,7 +1724,8 @@ private fun LegacySidebarScaffold(
     // Live TV fork: full screen now happens inside the Live TV screen (one video view that just
     // grows), which is one of the menu's pages, so the menu has to step aside for it.
     val liveTvFullscreen by com.nuvio.tv.livetv.ui.LiveTvFullscreen.active.collectAsState()
-    val showSidebar = currentRoute in rootRoutes && !liveTvFullscreen
+    val showSidebar = currentRoute in rootRoutes && !liveTvFullscreen &&
+        !com.nuvio.tv.livetv.ui.LiveTvFullscreen.pending
 
     LaunchedEffect(currentRoute) {
         longPressBackHeld.value = false
@@ -1949,19 +2009,30 @@ private fun LegacySidebarScaffold(
         }
         }
     ) {
-        val contentStartPadding by animateDpAsState(
+        // Applied per root destination (not on the NavHost container) so it only changes
+        // with the collapse setting, never during a navigation transition.
+        val rootContentInset by animateDpAsState(
+            targetValue = if (sidebarCollapsed) {
+                NuvioTheme.spacing.none
+            } else {
+                NuvioLayout.tokens.sidebarContentOffset
+            },
+            animationSpec = tween(NuvioMotion.tokens.durations.medium),
+            label = "rootContentInset"
+        )
+        // Live TV fork pages keep the old rule: room for the menu only while it's showing.
+        val forkPageInset by animateDpAsState(
             targetValue = if (showSidebar && !sidebarCollapsed) {
                 NuvioLayout.tokens.sidebarContentOffset
             } else {
                 NuvioTheme.spacing.none
             },
             animationSpec = tween(NuvioMotion.tokens.durations.medium),
-            label = "contentStartPadding"
+            label = "forkPageInset"
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = contentStartPadding)
                 .onPreviewKeyEvent { keyEvent ->
                     // Long-press Back on a root route directly opens the sidebar,
                     // bypassing the "scroll row to start" BackHandler in home content.
@@ -2013,6 +2084,8 @@ private fun LegacySidebarScaffold(
         ) {
             CompositionLocalProvider(
                 LocalSidebarExpanded provides (drawerState.currentValue == DrawerValue.Open),
+                LocalRootContentInset provides rootContentInset,
+                LocalForkPageInset provides forkPageInset,
                 LocalContentFocusRequester provides contentFocusRequester,
                 LocalOpenSidebar provides {
                     pendingSidebarFocusRequest = true
@@ -2022,7 +2095,8 @@ private fun LegacySidebarScaffold(
                 NuvioNavHost(
                     navController = navController,
                     startDestination = startDestination,
-                    hideBuiltInHeaders = hideBuiltInHeaders
+                    hideBuiltInHeaders = hideBuiltInHeaders,
+                    discoverIsRoot = Screen.Discover.route in rootRoutes
                 )
             }
         }
@@ -2190,7 +2264,8 @@ private fun ModernSidebarScaffold(
     // Live TV fork: full screen now happens inside the Live TV screen (one video view that just
     // grows), which is one of the menu's pages, so the menu has to step aside for it.
     val liveTvFullscreen by com.nuvio.tv.livetv.ui.LiveTvFullscreen.active.collectAsState()
-    val showSidebar = currentRoute in rootRoutes && !liveTvFullscreen
+    val showSidebar = currentRoute in rootRoutes && !liveTvFullscreen &&
+        !com.nuvio.tv.livetv.ui.LiveTvFullscreen.pending
     val sidebarTokens = NuvioComponents.tokens.sidebar
     val collapsedSidebarWidth = if (sidebarCollapsed) NuvioTheme.spacing.none else sidebarTokens.collapsedWidth
     val openSidebarWidth = sidebarTokens.expandedWidth

@@ -1,7 +1,10 @@
 package com.nuvio.tv.livetv.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nuvio.tv.R
+import com.nuvio.tv.core.util.withAppLocale
 import com.nuvio.tv.livetv.data.LiveTvPreferences
 import com.nuvio.tv.livetv.data.LiveTvRepository
 import com.nuvio.tv.livetv.data.LiveTvStatus
@@ -10,6 +13,7 @@ import com.nuvio.tv.livetv.model.LiveTvSettings
 import com.nuvio.tv.livetv.model.LiveUserState
 import com.nuvio.tv.livetv.model.PlaylistSource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -18,6 +22,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LiveTvSettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: LiveTvRepository,
     private val prefs: LiveTvPreferences,
     val driveSync: com.nuvio.tv.livetv.sync.LiveTvDriveSync,
@@ -50,6 +55,14 @@ class LiveTvSettingsViewModel @Inject constructor(
         viewModelScope.launch { prefs.updateSettings(transform) }
     }
 
+    /** "Hide Stray Entries": the channel list is made again once the switch is saved. */
+    fun toggleHideStrayEntries() {
+        viewModelScope.launch {
+            prefs.updateSettings { it.copy(hideStrayEntries = !it.hideStrayEntries) }
+            repository.rebuildChannelList()
+        }
+    }
+
     /** Settings that change which programs are kept need the guide re-read. */
     fun updateAndReloadEpg(transform: (LiveTvSettings) -> LiveTvSettings) {
         viewModelScope.launch {
@@ -58,20 +71,26 @@ class LiveTvSettingsViewModel @Inject constructor(
         }
     }
 
-    fun addPlaylist(name: String, url: String, userAgent: String) =
-        viewModelScope.launch { repository.addPlaylist(name, url, userAgent) }
+    fun addPlaylist(name: String, url: String, userAgent: String, epgUrl: String = "") =
+        viewModelScope.launch { repository.addPlaylist(name, url, userAgent, epgUrl) }
 
-    fun addXtream(name: String, server: String, user: String, pass: String, importVod: Boolean = true, importLive: Boolean = true) =
+    fun addXtream(name: String, server: String, user: String, pass: String, importVod: Boolean = true, importLive: Boolean = true, epgUrl: String = "") =
         viewModelScope.launch {
-            repository.addXtream(name, server, user, pass, importVod, importLive)
+            repository.addXtream(name, server, user, pass, importVod, importLive, epgUrl)
             onDemand.refreshSoon()
         }
 
-    fun addStalker(name: String, config: com.nuvio.stalker.StalkerConfig, importVod: Boolean = true, importLive: Boolean = true, useEmbeddedEpg: Boolean = true) =
+    fun addStalker(name: String, config: com.nuvio.stalker.StalkerConfig, importVod: Boolean = true, importLive: Boolean = true, useEmbeddedEpg: Boolean = true, epgUrl: String = "") =
         viewModelScope.launch {
-            repository.addStalker(name, config, importVod, importLive, useEmbeddedEpg)
+            repository.addStalker(name, config, importVod, importLive, useEmbeddedEpg, epgUrl)
             onDemand.refreshSoon()
         }
+
+    /** A playlist's Guides switch for an added guide or another playlist's built-in guide. */
+    fun setPlaylistGuide(playlistId: String, guideKey: String, on: Boolean) =
+        viewModelScope.launch { repository.setPlaylistGuide(playlistId, guideKey, on) }
+
+    fun playlistsWithOwnGuide(playlists: List<PlaylistSource>): Set<String> = repository.playlistsWithOwnGuide(playlists)
 
     fun savePlaylist(source: PlaylistSource) = viewModelScope.launch {
         val before = playlists.value.firstOrNull { it.id == source.id }
@@ -79,7 +98,7 @@ class LiveTvSettingsViewModel @Inject constructor(
         // Movies & series just switched on: import this provider now, whenever it was last
         // imported (switched off earlier, it had its titles removed but still counted as
         // "imported recently", so nothing came back for up to a day).
-        if (source.hasCatalog && source.importVod && source.enabled && (before?.importVod == false || before?.stalkerConfig != source.stalkerConfig)) onDemand.refreshNow(source.id)
+        if (source.hasVod && source.importVod && source.enabled && (before?.importVod == false || before?.stalkerConfig != source.stalkerConfig)) onDemand.refreshNow(source.id)
         else onDemand.refreshSoon()
     }
     /**
@@ -104,7 +123,7 @@ class LiveTvSettingsViewModel @Inject constructor(
         repository.setPlaylistEnabled(id, enabled)
         // Its movies and series go away with it, and come back (imported again) when re-enabled.
         val pl = playlists.value.firstOrNull { it.id == id }
-        if (enabled && pl != null && pl.hasCatalog && pl.importVod) onDemand.refreshNow(id) else onDemand.refreshSoon()
+        if (enabled && pl != null && pl.hasVod && pl.importVod) onDemand.refreshNow(id) else onDemand.refreshSoon()
     }
     fun movePlaylist(id: String, delta: Int) = viewModelScope.launch { repository.movePlaylist(id, delta) }
     fun setPlaylistGuideShift(id: String, minutes: Int) = viewModelScope.launch { repository.setPlaylistGuideShift(id, minutes) }
@@ -139,8 +158,10 @@ class LiveTvSettingsViewModel @Inject constructor(
     }
 
     fun testPoster(title: String) = viewModelScope.launch {
-        posterTest.value = "Searching…"
-        posterTest.value = runCatching { posterResolver.diagnose(title) }.getOrElse { "Test failed: ${it.message}" }
+        posterTest.value = context.withAppLocale().getString(R.string.iptv_settings_support_poster_searching)
+        posterTest.value = runCatching { posterResolver.diagnose(title) }.getOrElse {
+            context.withAppLocale().getString(R.string.iptv_settings_support_poster_test_failed, it.message ?: it.javaClass.simpleName)
+        }
     }
     fun removeReminder(channelKey: String, startMs: Long) = viewModelScope.launch { prefs.removeReminder(channelKey, startMs) }
     fun clearChannelCopies() = viewModelScope.launch { prefs.clearChannelCopies() }
@@ -158,7 +179,8 @@ class LiveTvSettingsViewModel @Inject constructor(
 
     /** Every group that can go in Quick Channels (see [buildRowGroupOptions]). */
     fun rowGroupOptions(): List<RowGroupOption> =
-        buildRowGroupOptions(userState.value, playlists.value, repository.channels.value)
+        buildRowGroupOptions(userState.value, playlists.value, repository.channels.value,
+            context.withAppLocale().getString(R.string.iptv_settings_support_playlist_fallback))
 
     fun groupLabel(id: String): String {
         userState.value.customGroups.firstOrNull { it.id == id }?.let { return it.name }
@@ -179,7 +201,8 @@ data class RowGroupOption(val id: String, val name: String, val playlist: String
 internal fun buildRowGroupOptions(
     user: LiveUserState,
     lists: List<PlaylistSource>,
-    channels: List<com.nuvio.tv.livetv.model.LiveChannel>
+    channels: List<com.nuvio.tv.livetv.model.LiveChannel>,
+    fallbackPlaylistName: String = "Playlist"
 ): List<RowGroupOption> {
     val names = lists.associate { it.id to it.name }
     val order = lists.withIndex().associate { (i, p) -> p.id to i }
@@ -190,6 +213,6 @@ internal fun buildRowGroupOptions(
     }
     val playlistGroups = found.entries
         .sortedBy { order[it.value.second] ?: Int.MAX_VALUE }
-        .map { (id, v) -> RowGroupOption(id, user.groupNames[id] ?: v.first, names[v.second] ?: "Playlist", v.third) }
+        .map { (id, v) -> RowGroupOption(id, user.groupNames[id] ?: v.first, names[v.second] ?: fallbackPlaylistName, v.third) }
     return user.customGroups.map { RowGroupOption(it.id, it.name, null, it.channelKeys.size) } + playlistGroups
 }

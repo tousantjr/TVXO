@@ -2,8 +2,13 @@ package com.nuvio.tv.livetv.multiview
 
 import com.nuvio.tv.livetv.model.LiveChannel
 
+/**
+ * Keep ONE..FOUR first and in this order: code that wants "the layout with N panes" takes the
+ * first entry with that count. The others are alternative arrangements with the same count.
+ */
 enum class MultiviewLayout(val paneCount: Int) {
-    ONE(1), TWO(2), THREE(3), FOUR(4)
+    ONE(1), TWO(2), THREE(3), FOUR(4),
+    TWO_STACKED(2), THREE_WIDE_TOP(3), THREE_BIG_LEFT(3), FOUR_WIDE_TOP(4)
 }
 
 /** Download-ahead targets share one budget, including empty/hidden slots. */
@@ -22,6 +27,8 @@ internal data class MultiviewPanePlayback(
     val isBuffering: Boolean = false,
     val isPlaying: Boolean = false,
     val error: String? = null,
+    /** The stream dropped and is being reconnected; the last picture stays up meanwhile. */
+    val isReconnecting: Boolean = false,
 )
 
 /** Ports let lifecycle and sound arbitration be tested without codecs or an Android device. */
@@ -46,6 +53,8 @@ internal class MultiviewSessionCore(
     private val createPlayer: (Int, Int, () -> Unit) -> MultiviewPanePlayer,
     private val onChanged: () -> Unit,
     private val mayPlayChannel: (LiveChannel) -> Boolean = { true },
+    /** A pane that couldn't even be set up: the reason goes to the report instead of being lost. */
+    private val onSetupFailed: (Int, LiveChannel, Exception) -> Unit = { _, _, _ -> },
 ) {
     var layout: MultiviewLayout = initialLayout
         private set
@@ -258,9 +267,10 @@ internal class MultiviewSessionCore(
             player.setPlaying(false)
             player.prepare(channel)
             setupErrors[paneId] = null
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
             releasePane(paneId)
             setupErrors[paneId] = "This TV couldn't start this stream. Try another channel."
+            runCatching { onSetupFailed(paneId, channel, failure) }
         }
     }
 

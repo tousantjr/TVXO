@@ -17,6 +17,7 @@ import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.data.local.TmdbSettingsDataStore
+import com.nuvio.tv.data.repository.AddonEpisodeAirDate
 import com.nuvio.tv.data.repository.ImdbEpisodeRatingsRepository
 import com.nuvio.tv.data.repository.MDBListRepository
 import com.nuvio.tv.data.repository.TraktCommentsService
@@ -35,6 +36,8 @@ import com.nuvio.tv.domain.model.TmdbSettings
 import com.nuvio.tv.domain.model.TraktCommentReview
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
+import com.nuvio.tv.domain.model.isSeriesLikeType
+import com.nuvio.tv.domain.model.isWatchedAsOneItem
 import com.nuvio.tv.domain.repository.LibraryRepository
 import com.nuvio.tv.domain.repository.MetaRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
@@ -617,7 +620,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeMovieWatched() {
-        if (itemType.lowercase() != "movie") return
+        if (isSeriesLikeType(itemType)) return
         viewModelScope.launch {
             _effectiveContentId.flatMapLatest { cid ->
                 _uiState.map { it.meta?.imdbId?.takeIf { id -> id != cid && id.isNotBlank() } }
@@ -1527,7 +1530,8 @@ class MetaDetailsViewModel @Inject constructor(
 
                 val ratings = imdbEpisodeRatingsRepository.getEpisodeRatings(
                     imdbId = imdbId,
-                    tmdbId = tmdbId
+                    tmdbId = tmdbId,
+                    addonEpisodes = meta.videos.map { AddonEpisodeAirDate(it.season, it.episode, it.released) }
                 )
 
                 _uiState.update { state ->
@@ -2456,7 +2460,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun toggleMovieWatched() {
         val meta = _uiState.value.meta ?: return
-        if (meta.apiType != "movie") return
+        if (!meta.isWatchedAsOneItem()) return
         if (_uiState.value.isMovieWatchedPending) return
 
         viewModelScope.launch {

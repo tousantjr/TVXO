@@ -26,6 +26,8 @@ internal class SportsFeeds {
         .callTimeout(40, TimeUnit.SECONDS)
         .followRedirects(true)
         .retryOnConnectionFailure(true)
+        // Our builds read the sports files through our own service (see ForkService).
+        .addInterceptor(com.nuvio.tv.livetv.data.ForkService.dataInterceptor)
         .build()
 
     private fun get(url: String): String {
@@ -119,6 +121,9 @@ internal class SportsFeeds {
     /** Every game of the next week with its TV channels by country (TheSportsDB's TV listings, kept by the nuvio-data job). */
     fun tvListingsRaw(): String = get(DATA_URL + "sportsdb/tv.json")
 
+    /** Team colours from TheSportsDB for every team-sport league in nuvio-data (re-read weekly by its job). */
+    fun teamColorsRaw(): String = get(DATA_URL + "sportsdb/colors.json")
+
     /** A TheSportsDB game's goals, cards, stats and line-ups (the nuvio-data job writes them). */
     /** The list of teams that have players (kept by the nuvio-data job). */
     fun playersIndexRaw(): String = get(DATA_URL + "sportsdb/players/index.json")
@@ -127,6 +132,9 @@ internal class SportsFeeds {
     fun playersRaw(teamId: String): String = get(DATA_URL + "sportsdb/players/$teamId.json")
 
     fun tsdbGameRaw(tsdbEventId: String): String = get(DATA_URL + "sportsdb/games/$tsdbEventId.json")
+
+    /** Any of our own data files by its full address (see [DATA_URL]). */
+    fun dataRaw(url: String): String = get(url)
 
     // ------------------------------------------------------------------ the shared ESPN schedule cache
 
@@ -321,12 +329,15 @@ internal class SportsFeeds {
          */
         class TsdbLeague(val league: League, val teams: List<TeamInfo>, val tsdbId: String = league.id.removePrefix("tsdb/"), val alias: Boolean = false)
 
-        /** Club colours aren't in the data: a steady colour per club, from its name. */
+        /**
+         * Colours missing from the data: a steady stand-in per team, from its name. The app knows a
+         * colour is one of these by working it out again (TeamColors), so never change them.
+         */
         private val CLUB_COLORS = longArrayOf(
             0xFFB71C1C, 0xFF0D47A1, 0xFF1B5E20, 0xFF4A148C, 0xFFE65100, 0xFF006064,
             0xFF880E4F, 0xFF263238, 0xFF33691E, 0xFF1A237E, 0xFFBF360C, 0xFF3E2723
         )
-        private fun clubColor(name: String): Long = CLUB_COLORS[Math.floorMod(name.lowercase(Locale.ROOT).hashCode(), CLUB_COLORS.size)]
+        fun clubColor(name: String): Long = CLUB_COLORS[Math.floorMod(name.lowercase(Locale.ROOT).hashCode(), CLUB_COLORS.size)]
 
         private fun clubAbbr(name: String): String {
             val words = name.split(' ', '-').filter { it.isNotBlank() && it.lowercase(Locale.ROOT) !in setOf("fc", "afc", "town", "city", "united", "the", "and", "&") }
@@ -997,6 +1008,7 @@ internal class SportsFeeds {
                 espnId = espnId,
                 endMs = endOf(session),
                 note = note,
+                sessions = sessions.map { EventSession(it.label, it.start, it.minutes, it.race) },
                 standings = runCatching { if (state == GameState.PRE && sessions.none { it.state != "pre" }) emptyList() else standingsOf(ev) }
                     .getOrDefault(emptyList())
             )
@@ -1295,18 +1307,7 @@ internal object OtherFeeds {
     private fun span(from: String, to: String): Pair<String, String> =
         (if (from.length == 6) from + "01" else from) to (if (to.length == 6) to + "31" else to)
 
-    // Formatting is synchronous; each worker owns its mutable calendars and keeps the exact
-    // patterns, locale, zones and default leniency of the former fresh formatter calls.
-    private val dayKeyFormatter = object : ThreadLocal<SimpleDateFormat>() {
-        override fun initialValue() = SimpleDateFormat("yyyyMMdd", Locale.US).apply { timeZone = EASTERN }
-    }
-    private val isoOutFormatter = object : ThreadLocal<SimpleDateFormat>() {
-        override fun initialValue() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-    }
-
-    private fun dayKey(ms: Long): String = dayKeyFormatter.get()!!.format(java.util.Date(ms))
+    private fun dayKey(ms: Long): String = SimpleDateFormat("yyyyMMdd", Locale.US).apply { timeZone = EASTERN }.format(java.util.Date(ms))
 
     private fun isoMs(s: String?): Long? {
         if (s.isNullOrBlank()) return null
@@ -1316,7 +1317,7 @@ internal object OtherFeeds {
             ?: runCatching { java.time.Instant.parse(if (s.length == 17 && s.endsWith("Z")) s.dropLast(1) + ":00Z" else s).toEpochMilli() }.getOrNull()
     }
 
-    private fun isoOut(ms: Long): String = isoOutFormatter.get()!!.format(java.util.Date(ms))
+    private fun isoOut(ms: Long): String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ms))
 
     private fun inSpan(ms: Long?, span: Pair<String, String>): Boolean {
         val d = dayKey(ms ?: return false)
@@ -1503,25 +1504,20 @@ internal object OtherFeeds {
         val games = LinkedHashMap<String, JSONObject>()
         for (i in 0 until season.length()) {
             val g = season.optJSONObject(i) ?: continue
-            val ev = htEvent(code, g, span) ?: continue
-            games[ev.optString("id")] = ev
+            val ev = htEvent(code, g) ?: continue
+            if (inSpan(isoMs(ev.optString("date")), span)) games[ev.optString("id")] = ev
         }
         for (i in 0 until bar.length()) {
-            val ev = htEvent(code, bar.optJSONObject(i) ?: continue, span) ?: continue
-            games[ev.optString("id")] = ev
+            val ev = htEvent(code, bar.optJSONObject(i) ?: continue) ?: continue
+            if (inSpan(isoMs(ev.optString("date")), span)) games[ev.optString("id")] = ev
         }
         return games.values.toList()
     }
 
     /** One HockeyTech game (the season list and the score bar name things differently). */
-    private fun htEvent(code: String, g: JSONObject, span: Pair<String, String>): JSONObject? {
+    private fun htEvent(code: String, g: JSONObject): JSONObject? {
         val id = g.any("game_id", "ID", "id") ?: return null
         val start = isoMs(g.any("GameDateISO8601")) ?: return null
-        val date = isoOut(start)
-        // A day request reuses the whole season. Reject its other dates before building
-        // teams, status, competitors and venue objects that the caller would discard.
-        // Use the same normalized date as the old post-conversion check.
-        if (!inSpan(isoMs(date), span)) return null
         val raw = g.any("game_status", "GameStatusStringLong", "GameStatusString").orEmpty()
         val low = raw.lowercase(Locale.ROOT)
         val statusCode = g.any("GameStatus", "status")
@@ -1560,7 +1556,7 @@ internal object OtherFeeds {
         val competition = JSONObject().put("status", status)
             .put("competitors", JSONArray().put(comp(home, true, hs, done && hN != null && vN != null && hN > vN)).put(comp(away, false, vs, done && hN != null && vN != null && vN > hN)))
         g.any("venue_name", "venue_location")?.let { competition.put("venue", JSONObject().put("fullName", it)) }
-        return JSONObject().put("id", "$code-$id").put("date", date).put("status", status)
+        return JSONObject().put("id", "$code-$id").put("date", isoOut(start)).put("status", status)
             .put("name", "${away.optString("displayName")} at ${home.optString("displayName")}")
             .put("competitions", JSONArray().put(competition))
     }

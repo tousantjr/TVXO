@@ -77,6 +77,7 @@ class LiveTvPreferences @Inject constructor(
         val showInSidebar = booleanPreferencesKey("show_in_sidebar")
         val showImportProgress = booleanPreferencesKey("show_import_progress")
         val showNames = booleanPreferencesKey("show_channel_names")
+        val twoLineNames = booleanPreferencesKey("two_line_channel_names")
         val showNumbers = booleanPreferencesKey("show_channel_numbers")
         val markPlaying = booleanPreferencesKey("mark_playing_channel")
         val showLogos = booleanPreferencesKey("show_channel_logos")
@@ -102,6 +103,7 @@ class LiveTvPreferences @Inject constructor(
         val clock24 = booleanPreferencesKey("clock_24h")
         val autoReconnect = booleanPreferencesKey("auto_reconnect")
         val autoBackupChannel = booleanPreferencesKey("auto_backup_channel")
+        val hideStrayEntries = booleanPreferencesKey("hide_stray_entries")
         val catchupCache = booleanPreferencesKey("catchup_cache")
         val channelSort = stringPreferencesKey("channel_sort")
         val solidHighlight = booleanPreferencesKey("solid_highlight")
@@ -153,6 +155,8 @@ class LiveTvPreferences @Inject constructor(
         val calendarSports = booleanPreferencesKey("calendar_sports")
         val calendarFollows = stringPreferencesKey("calendar_follows")
         val calendarHiddenShows = stringPreferencesKey("calendar_hidden_shows")
+        /** Profiles kept matched ("1,3" per group): each group shares one copy of its Live TV choices. */
+        val profileMatch = stringSetPreferencesKey("profile_match_groups")
         val calendarChannelPicks = stringPreferencesKey("calendar_channel_picks")
         val calendarPlans = stringPreferencesKey("calendar_plans")
         val onDemandInStreams = booleanPreferencesKey("on_demand_in_streams")
@@ -274,13 +278,56 @@ class LiveTvPreferences @Inject constructor(
         Keys.hiddenChannels, Keys.hiddenGroups, Keys.vodHiddenCategories
     )
 
+    /**
+     * Where profile [id] keeps [key]. A matched profile keeps its matched choices in its group's one
+     * shared copy (under the group's lowest profile); its history and reminders stay its own.
+     */
     @JvmName("myString")
-    private fun my(key: Preferences.Key<String>, id: Int = currentProfile): Preferences.Key<String> =
-        if (id <= 1) key else stringPreferencesKey("${key.name}_p$id")
+    private fun my(key: Preferences.Key<String>, id: Int = currentProfile, g: MatchGroups = matchMemo): Preferences.Key<String> =
+        own(key, if (key.name in matchedKeyNames) g.owner(id) else id)
 
     @JvmName("mySet")
-    private fun my(key: Preferences.Key<Set<String>>, id: Int = currentProfile): Preferences.Key<Set<String>> =
+    private fun my(key: Preferences.Key<Set<String>>, id: Int = currentProfile, g: MatchGroups = matchMemo): Preferences.Key<Set<String>> =
+        own(key, if (key.name in matchedKeyNames) g.owner(id) else id)
+
+    /** Profile [id]'s own copy of [key], whatever it is matched with. */
+    @JvmName("ownString")
+    private fun own(key: Preferences.Key<String>, id: Int): Preferences.Key<String> =
+        if (id <= 1) key else stringPreferencesKey("${key.name}_p$id")
+
+    @JvmName("ownSet")
+    private fun own(key: Preferences.Key<Set<String>>, id: Int): Preferences.Key<Set<String>> =
         if (id <= 1) key else stringSetPreferencesKey("${key.name}_p$id")
+
+    /** Groups of matched profiles. A profile in no group is its own owner. */
+    private class MatchGroups(val groups: List<Set<Int>>) {
+        fun groupOf(id: Int): Set<Int>? = groups.firstOrNull { id in it }
+        fun owner(id: Int): Int = groupOf(id)?.minOrNull() ?: id
+    }
+
+    private val noMatches = MatchGroups(emptyList())
+    private var matchMemoRaw: Set<String>? = null
+    @Volatile private var matchMemo: MatchGroups = noMatches
+
+    private fun decodeMatch(raw: Set<String>?): MatchGroups = MatchGroups(
+        raw.orEmpty().mapNotNull { e ->
+            e.split(',').mapNotNull { it.trim().toIntOrNull() }.toSet().takeIf { it.size >= 2 }
+        }
+    )
+
+    private fun groupsOf(p: Preferences): MatchGroups {
+        val raw = p[Keys.profileMatch]
+        synchronized(this) {
+            if (raw == matchMemoRaw) return matchMemo
+            val g = if (raw.isNullOrEmpty()) noMatches else decodeMatch(raw)
+            matchMemoRaw = raw
+            matchMemo = g
+            return g
+        }
+    }
+
+    private fun encodeMatch(groups: List<Set<Int>>): Set<String> =
+        groups.filter { it.size >= 2 }.map { g -> g.sorted().joinToString(",") }.toSet()
 
     private fun seededKey(id: Int) = booleanPreferencesKey("profile_seeded_p$id")
     private val SEEDED = Regex("""^profile_seeded_p(\d+)$""")
@@ -291,14 +338,15 @@ class LiveTvPreferences @Inject constructor(
      */
     private fun profileView(p: Preferences, id: Int): Preferences {
         if (id <= 1) return p
-        val seeded = p[seededKey(id)] == true
+        val g = groupsOf(p)
+        val seeded = p[seededKey(id)] == true || g.groupOf(id) != null
         val m = p.toMutablePreferences()
         personalStringKeys.forEach { k ->
-            val own = p[my(k, id)]
+            val own = p[my(k, id, g)]
             if (own != null) m[k] = own else if (seeded) m.remove(k)
         }
         personalSetKeys.forEach { k ->
-            val own = p[my(k, id)]
+            val own = p[my(k, id, g)]
             if (own != null) m[k] = own else if (seeded) m.remove(k)
         }
         return m
@@ -312,9 +360,123 @@ class LiveTvPreferences @Inject constructor(
         if (id <= 1) return
         store.edit { p ->
             if (p[seededKey(id)] == true) return@edit
+            if (groupsOf(p).groupOf(id) != null) return@edit
             personalStringKeys.forEach { k -> if (p[my(k, id)] == null) p[k]?.let { p[my(k, id)] = it } }
             personalSetKeys.forEach { k -> if (p[my(k, id)] == null) p[k]?.let { p[my(k, id)] = it } }
             p[seededKey(id)] = true
+        }
+    }
+
+    /** What "Copy Settings" carries from one profile to another (history and reminders stay). */
+    private val copiedStringKeys: List<Preferences.Key<String>> = listOf(
+        Keys.favorites, Keys.groupOrder, Keys.customGroups, Keys.channelOrder, Keys.channelCopies,
+        Keys.vodGroupOrder, Keys.vodSorts, Keys.sportsMine
+    )
+    private val copiedCalendarKeys: List<Preferences.Key<String>> = listOf(
+        Keys.calendarFollows, Keys.calendarHiddenShows
+    )
+
+    /** The choices matched profiles share (one copy per group). */
+    private val matchedKeyNames: Set<String> =
+        (copiedStringKeys + copiedCalendarKeys + Keys.sideMenuHidden).map { it.name }.toSet() +
+            personalSetKeys.map { it.name }
+
+    /**
+     * Writes profile [from]'s Live TV choices (as [before] shows them to it) into profile [to]'s own
+     * copy: favorites, custom groups, group and channel order, hidden groups and channels, On
+     * Demand's order and hidden categories, Sports follows, Calendar shows and side-menu pages.
+     */
+    private fun writeChoices(p: MutablePreferences, before: Preferences, from: Int, to: Int) {
+        val src = profileView(before, from)
+        copiedStringKeys.forEach { k ->
+            val v = src[k]
+            if (v != null) p[own(k, to)] = v else p.remove(own(k, to))
+        }
+        personalSetKeys.forEach { k ->
+            val v = src[k]
+            if (v != null) p[own(k, to)] = v else p.remove(own(k, to))
+        }
+        copiedCalendarKeys.forEach { k ->
+            val v = mineOrShared(before, k, from)
+            if (v.isNotEmpty()) p[own(k, to)] = v else p.remove(own(k, to))
+        }
+        val menu = withMyMenu(before, from)[Keys.sideMenuHidden]
+        if (menu != null) p[own(Keys.sideMenuHidden, to)] = menu
+        else p.remove(own(Keys.sideMenuHidden, to))
+        if (to > 1) p[seededKey(to)] = true
+    }
+
+    /** The Live TV home row shows for each of [targets] exactly when it shows for [sourceId]. */
+    private fun followHomeRow(p: MutablePreferences, sourceId: Int, targets: Set<Int>) {
+        val rowHidden = p[Keys.homeRowHiddenProfiles].orEmpty()
+        val names = targets.map { it.toString() }.toSet()
+        p[Keys.homeRowHiddenProfiles] =
+            if (sourceId.toString() in rowHidden) rowHidden + names else rowHidden - names
+    }
+
+    /**
+     * Profile [targetId] gets profile [sourceId]'s Live TV choices and home row, once. Watch history
+     * and reminders are kept. Playlists, guides and settings are already shared by every profile.
+     * A matched target changes its whole group's shared copy.
+     */
+    suspend fun copyProfileChoices(sourceId: Int, targetId: Int) {
+        if (sourceId == targetId) return
+        store.edit { p ->
+            val before = p.toPreferences()
+            val g = groupsOf(before)
+            if (g.owner(sourceId) == g.owner(targetId)) return@edit
+            writeChoices(p, before, sourceId, g.owner(targetId))
+            followHomeRow(p, sourceId, g.groupOf(targetId) ?: setOf(targetId))
+        }
+    }
+
+    /** Groups of profiles kept matched (each set has two or more profiles). */
+    val profileMatchGroups: Flow<List<Set<Int>>> = store.data
+        .map { groupsOf(it).groups }
+        .distinctUntilChanged()
+
+    /**
+     * [targetId] takes [sourceId]'s Live TV choices and stays matched with it (and with anyone
+     * either was already matched with) from now on. The group keeps one copy of its choices;
+     * the other members' old copies are removed. History and reminders stay each profile's own.
+     */
+    suspend fun matchProfiles(sourceId: Int, targetId: Int) {
+        if (sourceId == targetId) return
+        store.edit { p ->
+            val before = p.toPreferences()
+            val g = groupsOf(before)
+            val a = g.groupOf(sourceId) ?: setOf(sourceId)
+            val b = g.groupOf(targetId) ?: setOf(targetId)
+            val merged = a + b
+            val owner = merged.min()
+            writeChoices(p, before, sourceId, owner)
+            (merged - owner).forEach { m ->
+                (copiedStringKeys + copiedCalendarKeys + Keys.sideMenuHidden).forEach { k -> p.remove(own(k, m)) }
+                personalSetKeys.forEach { k -> p.remove(own(k, m)) }
+                if (m > 1) p[seededKey(m)] = true
+            }
+            followHomeRow(p, sourceId, merged)
+            p[Keys.profileMatch] = encodeMatch(g.groups.filterNot { it == a || it == b } + listOf(merged))
+        }
+    }
+
+    /**
+     * Profile [id] stops matching. With [keepCopy] it keeps a copy of the group's current choices
+     * (nothing is lost); a deleted profile doesn't. The rest of the group stays matched.
+     */
+    suspend fun stopMatching(id: Int, keepCopy: Boolean = true) {
+        store.edit { p ->
+            val before = p.toPreferences()
+            val g = groupsOf(before)
+            val group = g.groupOf(id) ?: return@edit
+            val owner = group.min()
+            val rest = group - id
+            if (rest.isNotEmpty()) {
+                val newOwner = rest.min()
+                if (newOwner != owner) writeChoices(p, before, owner, newOwner)
+            }
+            if (keepCopy && id != owner) writeChoices(p, before, owner, id)
+            p[Keys.profileMatch] = encodeMatch(g.groups.filterNot { it == group } + listOf(rest))
         }
     }
 
@@ -324,6 +486,10 @@ class LiveTvPreferences @Inject constructor(
         }
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             profileManager.activeProfileId.collect { id -> runCatching { seedProfile(id) } }
+        }
+        // Keeps the matched-profiles list current (it also arrives with a cloud restore).
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            runCatching { store.data.collect { groupsOf(it) } }
         }
     }
 
@@ -381,8 +547,9 @@ class LiveTvPreferences @Inject constructor(
      * profile's, so nothing changes for people who already turned a page off.
      */
     private fun withMyMenu(p: Preferences, id: Int): Preferences {
-        if (id <= 1) return p
-        val own = p[my(Keys.sideMenuHidden, id)] ?: return p
+        val g = groupsOf(p)
+        if (g.owner(id) <= 1) return p
+        val own = p[my(Keys.sideMenuHidden, id, g)] ?: return p
         val m = p.toMutablePreferences()
         m[Keys.sideMenuHidden] = own
         return m
@@ -397,6 +564,7 @@ class LiveTvPreferences @Inject constructor(
         return LiveTvSettings(
             showInSidebar = p[Keys.showInSidebar] ?: d.showInSidebar,
             showChannelNames = p[Keys.showNames] ?: d.showChannelNames,
+            twoLineChannelNames = p[Keys.twoLineNames] ?: d.twoLineChannelNames,
             showChannelNumbers = p[Keys.showNumbers] ?: d.showChannelNumbers,
             markPlayingChannel = p[Keys.markPlaying] ?: d.markPlayingChannel,
             showChannelLogos = p[Keys.showLogos] ?: d.showChannelLogos,
@@ -422,6 +590,7 @@ class LiveTvPreferences @Inject constructor(
             use24HourClock = p[Keys.clock24] ?: d.use24HourClock,
             autoReconnect = p[Keys.autoReconnect] ?: d.autoReconnect,
             autoBackupChannel = p[Keys.autoBackupChannel] ?: d.autoBackupChannel,
+            hideStrayEntries = p[Keys.hideStrayEntries] ?: d.hideStrayEntries,
             catchupCache = p[Keys.catchupCache] ?: d.catchupCache,
             channelSort = p[Keys.channelSort]?.let { runCatching { ChannelSort.valueOf(it) }.getOrNull() } ?: d.channelSort,
             solidHighlight = p[Keys.solidHighlight] ?: d.solidHighlight,
@@ -684,7 +853,7 @@ class LiveTvPreferences @Inject constructor(
     // Each Nuvio profile has its own followed and hidden shows, and a profile starts with none.
     // The first profile keeps the original keys; the others use the same names with "_p<id>".
     private fun mineOrShared(p: Preferences, key: Preferences.Key<String>, id: Int): String =
-        (if (id <= 1) p[key] else p[my(key, id)]) ?: ""
+        p[my(key, id, groupsOf(p))] ?: ""
 
     private suspend fun editMine(key: Preferences.Key<String>, transform: (String) -> String) {
         val me = currentProfile
@@ -729,6 +898,7 @@ class LiveTvPreferences @Inject constructor(
     private fun writeSettings(p: MutablePreferences, s: LiveTvSettings) {
         p[Keys.showInSidebar] = s.showInSidebar
         p[Keys.showNames] = s.showChannelNames
+        p[Keys.twoLineNames] = s.twoLineChannelNames
         p[Keys.showNumbers] = s.showChannelNumbers
         p[Keys.markPlaying] = s.markPlayingChannel
         p[Keys.showLogos] = s.showChannelLogos
@@ -754,6 +924,7 @@ class LiveTvPreferences @Inject constructor(
         p[Keys.clock24] = s.use24HourClock
         p[Keys.autoReconnect] = s.autoReconnect
         p[Keys.autoBackupChannel] = s.autoBackupChannel
+        p[Keys.hideStrayEntries] = s.hideStrayEntries
         p[Keys.catchupCache] = s.catchupCache
         p[Keys.channelSort] = s.channelSort.name
         p[Keys.solidHighlight] = s.solidHighlight
@@ -790,12 +961,12 @@ class LiveTvPreferences @Inject constructor(
         p[Keys.onDemandEnabled] = s.onDemandEnabled
         p[Keys.recordingsInSidebar] = s.recordingsInSidebar
         p[Keys.sideMenuOrder] = s.sideMenuOrder
-        val me = currentProfile
+        val me = groupsOf(p).owner(currentProfile)
         if (me <= 1) {
             p[Keys.sideMenuHidden] = s.sideMenuHidden
         } else {
-            val seen = p[my(Keys.sideMenuHidden, me)] ?: p[Keys.sideMenuHidden] ?: ""
-            if (s.sideMenuHidden != seen) p[my(Keys.sideMenuHidden, me)] = s.sideMenuHidden
+            val seen = p[own(Keys.sideMenuHidden, me)] ?: p[Keys.sideMenuHidden] ?: ""
+            if (s.sideMenuHidden != seen) p[own(Keys.sideMenuHidden, me)] = s.sideMenuHidden
         }
         p[Keys.calendarInMenu] = s.calendarInMenu
         p[Keys.sideMenuLine] = s.sideMenuLine
@@ -833,6 +1004,8 @@ class LiveTvPreferences @Inject constructor(
         p[Keys.recordPost] = s.recordPostMinutes
         p[Keys.homeRowEnabled] = s.homeRowEnabled
         p[Keys.homeRowHiddenProfiles] = s.homeRowHiddenProfiles.map { it.toString() }.toSet()
+        // Matched profiles show or hide the Live TV home row together.
+        groupsOf(p).groupOf(currentProfile)?.let { group -> followHomeRow(p, currentProfile, group - currentProfile) }
         p[Keys.homeRowAboveContinueWatching] = s.homeRowAboveContinueWatching
         p[Keys.homeRowSource] = s.homeRowSource
         p[Keys.homeRowTitle] = s.homeRowTitle
@@ -927,6 +1100,25 @@ class LiveTvPreferences @Inject constructor(
 
     suspend fun addToCustomGroup(groupId: String, key: String) = updateCustomGroups { list ->
         list.map { if (it.id == groupId && key !in it.channelKeys) it.copy(channelKeys = it.channelKeys + key) else it }
+    }
+
+    /** Adds all [keys] to one of your own groups in a single save (the ones already there are skipped). */
+    suspend fun addManyToCustomGroup(groupId: String, keys: List<String>) = updateCustomGroups { list ->
+        list.map { g ->
+            if (g.id != groupId) g
+            else g.copy(channelKeys = g.channelKeys + keys.filter { it !in g.channelKeys }.distinct())
+        }
+    }
+
+    /** Copies all [keys] into a playlist group in a single save (the ones already copied there are skipped). */
+    suspend fun copyChannels(groupId: String, keys: List<String>) {
+        store.edit { p ->
+            val m = decodeListMap(p[my(Keys.channelCopies)]).toMutableMap()
+            val cur = m[groupId].orEmpty()
+            val add = keys.filter { it !in cur }.distinct()
+            if (add.isNotEmpty()) m[groupId] = cur + add
+            p[my(Keys.channelCopies)] = encodeListMap(m)
+        }
     }
 
     suspend fun removeFromCustomGroup(groupId: String, key: String) = updateCustomGroups { list ->
@@ -1146,6 +1338,97 @@ class LiveTvPreferences @Inject constructor(
         val arr = JSONArray()
         list.forEach { arr.put(JSONObject().put("k", it.channelKey).put("c", it.channelName).put("t", it.title).put("s", it.startMs)) }
         return arr.toString()
+    }
+
+    /**
+     * Takes out everything kept for channels and groups of playlists that no longer exist: hidden
+     * groups and channels, favorites, recents, custom groups' channels, channel copies and orders,
+     * group order, reminders, renames and per-channel choices, for every profile. Deleting a
+     * playlist used to leave all of it behind (hundreds of hidden groups still listed in
+     * Settings, custom groups counting channels that were gone).
+     *
+     * Only what clearly belongs to a deleted playlist goes: channel keys start with the
+     * playlist's id ("<id>|…") and its group ids with "<id>::" when there is more than one
+     * playlist. Group names without a playlist id (a single playlist's) can't be told apart and
+     * are left alone. Returns how many entries were taken out.
+     */
+    suspend fun forgetDeletedPlaylists(existingIds: Set<String>): Int {
+        var removed = 0
+        fun deadOwner(owner: String) = owner.isNotEmpty() && owner !in existingIds && PLAYLIST_ID.matches(owner)
+        fun deadChannel(key: String) = deadOwner(key.substringBefore('|', ""))
+        fun deadGroup(id: String) = deadOwner(id.substringBefore("::", ""))
+        fun <T> keep(list: List<T>, dead: (T) -> Boolean): List<T> = list.filterNot(dead).also { removed += list.size - it.size }
+        store.edit { p ->
+            for ((key, value) in p.asMap().toList()) {
+                val name = key.name
+                val base = name.replace(PROFILE_SUFFIX, "")
+                if (value is Set<*>) {
+                    val dead: ((String) -> Boolean) = when (base) {
+                        "hidden_channels" -> ::deadChannel
+                        "hidden_groups", "locked_groups" -> ::deadGroup
+                        "collapsed_playlists" -> ::deadOwner
+                        else -> continue
+                    }
+                    val set = value.filterIsInstance<String>()
+                    val kept = keep(set, dead)
+                    if (kept.size != set.size) p[stringSetPreferencesKey(name)] = kept.toSet()
+                    continue
+                }
+                val raw = value as? String ?: continue
+                val strKey = stringPreferencesKey(name)
+                when (base) {
+                    "favorites", "recent" -> {
+                        val list = decodeStringList(raw)
+                        val kept = keep(list, ::deadChannel)
+                        if (kept.size != list.size) p[strKey] = encodeStringList(kept)
+                    }
+                    "group_order" -> {
+                        val list = decodeStringList(raw)
+                        val kept = keep(list, ::deadGroup)
+                        if (kept.size != list.size) p[strKey] = encodeStringList(kept)
+                    }
+                    "last_channel", "previous_channel" -> if (deadChannel(raw)) { p.remove(strKey); removed++ }
+                    "last_group" -> if (deadGroup(raw)) { p.remove(strKey); removed++ }
+                    "custom_groups" -> {
+                        val groups = decodeCustomGroups(raw)
+                        val before = removed
+                        val kept = groups.map { g -> g.copy(channelKeys = keep(g.channelKeys, ::deadChannel)) }
+                        if (removed != before) p[strKey] = encodeCustomGroups(kept)
+                    }
+                    "channel_order", "channel_copies" -> {
+                        val map = decodeListMap(raw)
+                        val before = removed
+                        val kept = LinkedHashMap<String, List<String>>()
+                        map.forEach { (groupId, keys) ->
+                            if (deadGroup(groupId)) removed++ else kept[groupId] = keep(keys, ::deadChannel)
+                        }
+                        if (removed != before) p[strKey] = encodeListMap(kept)
+                    }
+                    "recent_groups" -> {
+                        val map = decodeStringMap(raw)
+                        val kept = map.filterNot { (k, v) -> deadChannel(k) || deadGroup(v) }
+                        if (kept.size != map.size) { removed += map.size - kept.size; p[strKey] = encodeStringMap(kept) }
+                    }
+                    "group_names" -> {
+                        val map = decodeStringMap(raw)
+                        val kept = map.filterKeys { !deadGroup(it) }
+                        if (kept.size != map.size) { removed += map.size - kept.size; p[strKey] = encodeStringMap(kept) }
+                    }
+                    "channel_names", "channel_logos", "channel_numbers", "epg_overrides", "picture_shapes",
+                    "channel_quality", "channel_audio", "channel_captions" -> {
+                        val map = decodeStringMap(raw)
+                        val kept = map.filterKeys { !deadChannel(it) }
+                        if (kept.size != map.size) { removed += map.size - kept.size; p[strKey] = encodeStringMap(kept) }
+                    }
+                    "reminders" -> {
+                        val list = decodeReminders(raw)
+                        val kept = keep(list) { deadChannel(it.channelKey) }
+                        if (kept.size != list.size) p[strKey] = encodeReminders(kept)
+                    }
+                }
+            }
+        }
+        return removed
     }
 
     /** Saves the order of a playlist group or All channels (Reorder channels). */
@@ -1570,10 +1853,15 @@ class LiveTvPreferences @Inject constructor(
                     logoSource = o.optString("logoSource").ifBlank { "playlist" },
                     guideShiftMinutes = o.optInt("guideShiftMinutes", 0),
                     catchupShiftMinutes = o.optInt("catchupShiftMinutes", 0),
+                    guidesOff = o.optJSONArray("guidesOff")?.let { a -> (0 until a.length()).mapNotNullTo(HashSet()) { a.optString(it).ifBlank { null } } }.orEmpty(),
                     sourceType = o.optString("sourceType").ifBlank { o.optString("providerKind").ifBlank { if (o.optJSONObject("stalkerConfig") != null || o.optJSONObject("stalker") != null) "stalker" else "" } },
                     stalkerConfig = (o.optJSONObject("stalkerConfig") ?: o.optJSONObject("stalker"))?.let { value ->
                         runCatching { com.nuvio.stalker.StalkerConfig.fromJson(kotlinx.serialization.json.Json.parseToJsonElement(value.toString()) as kotlinx.serialization.json.JsonObject) }.getOrNull()
-                    }
+                    },
+                    linkServer = o.optString("linkServer"),
+                    linkUsername = o.optString("linkUsername"),
+                    linkPassword = o.optString("linkPassword"),
+                    vodInPlaylist = o.optBoolean("vodInPlaylist", false)
                 )
             }
         }.getOrDefault(emptyList())
@@ -1590,6 +1878,8 @@ class LiveTvPreferences @Inject constructor(
                     .put("useEmbeddedEpg", s.useEmbeddedEpg)
                     .put("xtreamServer", s.xtreamServer).put("xtreamUsername", s.xtreamUsername)
                     .put("xtreamPassword", s.xtreamPassword)
+                    .put("linkServer", s.linkServer).put("linkUsername", s.linkUsername)
+                    .put("linkPassword", s.linkPassword).put("vodInPlaylist", s.vodInPlaylist)
                     .put("lastUpdatedMs", s.lastUpdatedMs).put("lastError", s.lastError ?: "")
                     .put("channelCount", s.channelCount)
                     .put("importVod", s.importVod)
@@ -1602,6 +1892,7 @@ class LiveTvPreferences @Inject constructor(
                     .put("guideShiftMinutes", s.guideShiftMinutes)
                     .put("catchupShiftMinutes", s.catchupShiftMinutes)
                     .apply {
+                        if (s.guidesOff.isNotEmpty()) put("guidesOff", JSONArray(s.guidesOff.sorted()))
                         val type = if (s.isStalker) "stalker" else s.sourceType
                         if (type.isNotBlank()) put("sourceType", type)
                         s.stalkerConfig?.let { put("stalkerConfig", JSONObject(it.toJson().toString())) }
@@ -1660,6 +1951,8 @@ class LiveTvPreferences @Inject constructor(
         /** Per-TV keys that Google Drive sync never copies. */
         private val SYNC_EXCLUDED_BASE = setOf("last_channel", "previous_channel", "last_group", "recent", "on_demand_imports", "channel_quality", "developer_tools", "recording_storage")
         private val PROFILE_SUFFIX = Regex("""_p\d+$""")
+        /** A playlist id (they are random UUIDs). */
+        private val PLAYLIST_ID = Regex("""[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}""")
         /** Also matches each profile's own copy ("recent_p2"). */
         val SYNC_EXCLUDED = object : AbstractSet<String>() {
             override val size get() = SYNC_EXCLUDED_BASE.size

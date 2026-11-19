@@ -27,8 +27,32 @@ class MultiviewUiPolicyTest {
                     assertTrue(overlapWidth <= 0f || overlapHeight <= 0f)
                 }
             }
-            assertEquals(1f, area, 0f)
+            assertEquals(1f, area, 1e-5f)
         }
+    }
+
+    @Test
+    fun `new layouts move between panes the way the picture shows`() {
+        assertEquals(1, multiviewNextPane(MultiviewLayout.TWO_STACKED, 0, MultiviewDirection.DOWN))
+        assertEquals(0, multiviewNextPane(MultiviewLayout.TWO_STACKED, 1, MultiviewDirection.UP))
+        assertEquals(1, multiviewNextPane(MultiviewLayout.THREE_WIDE_TOP, 0, MultiviewDirection.DOWN))
+        assertEquals(2, multiviewNextPane(MultiviewLayout.THREE_WIDE_TOP, 1, MultiviewDirection.RIGHT))
+        assertEquals(0, multiviewNextPane(MultiviewLayout.THREE_WIDE_TOP, 2, MultiviewDirection.UP))
+        assertEquals(1, multiviewNextPane(MultiviewLayout.THREE_BIG_LEFT, 0, MultiviewDirection.RIGHT))
+        assertEquals(0, multiviewNextPane(MultiviewLayout.THREE_BIG_LEFT, 2, MultiviewDirection.LEFT))
+        assertEquals(2, multiviewNextPane(MultiviewLayout.THREE_BIG_LEFT, 1, MultiviewDirection.DOWN))
+        assertEquals(2, multiviewNextPane(MultiviewLayout.FOUR_WIDE_TOP, 0, MultiviewDirection.DOWN))
+        assertEquals(3, multiviewNextPane(MultiviewLayout.FOUR_WIDE_TOP, 2, MultiviewDirection.RIGHT))
+        assertEquals(1, multiviewNextPane(MultiviewLayout.FOUR_WIDE_TOP, 2, MultiviewDirection.LEFT))
+        assertEquals(0, multiviewNextPane(MultiviewLayout.FOUR_WIDE_TOP, 3, MultiviewDirection.UP))
+    }
+
+    @Test
+    fun `the pane count picks the original layouts`() {
+        for (count in 1..4) assertEquals(count, MultiviewLayout.entries.first { it.paneCount == count }.paneCount)
+        assertEquals(MultiviewLayout.TWO, MultiviewLayout.entries.first { it.paneCount == 2 })
+        assertEquals(MultiviewLayout.THREE, MultiviewLayout.entries.first { it.paneCount == 3 })
+        assertEquals(MultiviewLayout.FOUR, MultiviewLayout.entries.first { it.paneCount == 4 })
     }
 
     @Test
@@ -111,5 +135,34 @@ class MultiviewUiPolicyTest {
         } catch (_: CancellationException) {
             assertTrue("Search should stop at the next cancellation check", reads.get() in 301..320)
         }
+    }
+
+    @Test
+    fun `overlays stay up on the bar or a picker and Back hides them before leaving`() {
+        assertTrue(multiviewOverlaysStay(barFocused = true, pickerOpen = false))
+        assertTrue(multiviewOverlaysStay(barFocused = false, pickerOpen = true))
+        assertTrue(!multiviewOverlaysStay(barFocused = false, pickerOpen = false))
+        assertEquals(MultiviewBack.CLOSE_PICKER, multiviewBackAction(pickerOpen = true, overlaysShown = true))
+        assertEquals(MultiviewBack.HIDE_OVERLAYS, multiviewBackAction(pickerOpen = false, overlaysShown = true))
+        assertEquals(MultiviewBack.LEAVE, multiviewBackAction(pickerOpen = false, overlaysShown = false))
+    }
+
+    @Test
+    fun `a loading or failed pane keeps its name`() {
+        assertTrue(multiviewPaneKeepsLabel(isBuffering = true, hasError = false))
+        assertTrue(multiviewPaneKeepsLabel(isBuffering = false, hasError = true))
+        assertTrue(!multiviewPaneKeepsLabel(isBuffering = false, hasError = false))
+    }
+
+    @Test
+    fun `Back from a full-screen pane returns to all panes and Left Right go round the filled panes`() {
+        assertEquals(MultiviewBack.CLOSE_PICKER, multiviewBackAction(pickerOpen = true, overlaysShown = true, fullScreen = true))
+        assertEquals(MultiviewBack.ALL_PANES, multiviewBackAction(pickerOpen = false, overlaysShown = true, fullScreen = true))
+        assertEquals(MultiviewBack.ALL_PANES, multiviewBackAction(pickerOpen = false, overlaysShown = false, fullScreen = true))
+        assertEquals(3, multiviewNextFullPane(listOf(0, 1, 3), 1, forward = true))
+        assertEquals(0, multiviewNextFullPane(listOf(0, 1, 3), 3, forward = true))
+        assertEquals(3, multiviewNextFullPane(listOf(0, 1, 3), 0, forward = false))
+        assertEquals(2, multiviewNextFullPane(listOf(2), 2, forward = true))
+        assertEquals(1, multiviewNextFullPane(emptyList(), 1, forward = true))
     }
 }

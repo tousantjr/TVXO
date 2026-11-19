@@ -208,6 +208,7 @@ object SportsCatalog {
         soc("fifa.worldq.caf", "World Cup Qualifying (Africa)", "WCQ AF", listOf("World Cup Qualifier", "World Cup Qualifying"), color = 0xFF006233, national = true),
         soc("fifa.worldq.ofc", "World Cup Qualifying (Oceania)", "WCQ OC", listOf("World Cup Qualifier", "World Cup Qualifying"), color = 0xFF1B4F72, national = true),
         soc("caf.nations", "Africa Cup of Nations", "AFCON", listOf("Africa Cup of Nations", "AFCON"), color = 0xFF006233, national = true),
+        soc("caf.nations_qual", "AFCON Qualifying", "AFCON Q", listOf("AFCON Qualifier", "AFCON Qualifying", "Africa Cup of Nations Qualifier", "Africa Cup of Nations Qualifying"), color = 0xFF006233, national = true),
         soc("afc.asian.cup", "AFC Asian Cup", "ASIAN", listOf("Asian Cup"), color = 0xFF1A3C6E, national = true),
         soc("fifa.olympics", "Olympic Football", "OLY", listOf("Olympic Football", "Olympics Football"), color = 0xFF0081C8),
         soc("club.friendly", "Club Friendlies", "FRIENDLY", listOf("Club Friendly", "Pre-Season Friendly", "Friendly"), color = 0xFF33415C),
@@ -591,9 +592,7 @@ object SportsCatalog {
         // and Sports runs this for every show in the guide.
         if (s.all { it.code < 128 }) return asciiNorm(s)
         val plain = Normalizer.normalize(plainSmall(s), Normalizer.Form.NFD).replace(MARKS, "")
-        // Unicode mapping/casing is unchanged; finish with the same ASCII word rules without
-        // building the ampersand, punctuation and whitespace replacement strings for each show.
-        return asciiNorm(plain.lowercase(Locale.ROOT))
+        return " " + plain.lowercase(Locale.ROOT).replace("&", " and ").replace(NOT_WORD, " ").trim().replace(SPACES, " ") + " "
     }
 
     /** [norm] for text with no letters outside plain ASCII: the same result, without the slow steps. */
@@ -636,9 +635,24 @@ object SportsCatalog {
     )
 
     /** [term] (already normalized, no padding) as whole words in [normText] (from [norm]). */
-    fun hasWord(normText: String, term: String): Boolean = term.isNotBlank() && normText.contains(" $term ")
+    fun hasWord(normText: String, term: String): Boolean {
+        if (term.isBlank()) return false
+        // Check the same literal space boundaries without allocating a padded term on every lookup.
+        var at = normText.indexOf(term)
+        while (at >= 0) {
+            val end = at + term.length
+            if (at > 0 && end < normText.length && normText[at - 1] == ' ' && normText[end] == ' ') return true
+            // A later whole-word match must begin after an ASCII space.
+            val boundary = normText.indexOf(' ', at)
+            if (boundary < 0) return false
+            at = normText.indexOf(term, boundary + 1)
+        }
+        return false
+    }
 
     private val MARKS = Regex("\\p{M}+")
+    private val NOT_WORD = Regex("[^a-z0-9]+")
+    private val SPACES = Regex(" +")
 
     /** Words that make a show a replay or a highlights show rather than the game itself. */
     val NOT_LIVE_WORDS = listOf(

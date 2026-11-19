@@ -1,5 +1,7 @@
 package com.nuvio.tv.livetv.multiview
 
+import android.os.SystemClock
+import com.nuvio.tv.livetv.model.LiveTvLoadReport
 import android.content.Context
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -10,6 +12,7 @@ import androidx.annotation.MainThread
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
@@ -22,6 +25,7 @@ import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.nuvio.tv.livetv.model.LiveChannel
+import com.nuvio.tv.livetv.player.LiveStreamFormats
 import com.nuvio.tv.livetv.stalker.StalkerGateway
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -35,6 +39,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -48,6 +53,10 @@ data class MultiviewPaneState(
     val isBuffering: Boolean = false,
     val isPlaying: Boolean = false,
     val error: String? = null,
+    /** Reconnecting after a drop: the last picture stays up, with only a quiet mark if it takes a while. */
+    val isReconnecting: Boolean = false,
+    /** A protected (DRM) channel: its picture can only be shown through the TV's video window. */
+    val isProtected: Boolean = false,
 )
 
 data class MultiviewState(
@@ -68,7 +77,14 @@ data class MultiviewState(
 class MultiviewPlaybackSession(
     context: Context,
     initialLayout: MultiviewLayout = MultiviewLayout.TWO,
-    mayPlayChannel: (LiveChannel) -> Boolean = { true },
+    private val mayPlayChannel: (LiveChannel) -> Boolean = { true },
+    /** The Live TV "Auto-reconnect" setting: a pane whose stream drops reconnects on its own. */
+    autoReconnect: () -> Boolean = { true },
+    /**
+     * Another channel for a pane whose stream keeps failing: a copy of the same channel from
+     * another playlist, or another stream of the same game. [tried] holds keys already tried.
+     */
+    private val findBackup: (paneId: Int, failed: LiveChannel, tried: Set<String>) -> LiveChannel? = { _, _, _ -> null },
 ) {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -76,16 +92,43 @@ class MultiviewPlaybackSession(
     private val _state = MutableStateFlow(MultiviewState(layout = initialLayout))
     val state: StateFlow<MultiviewState> = _state.asStateFlow()
 
+    /** Backups switched to on their own: they load quietly (no "Loading…") over the last picture. */
+    private val quietUntilPlaying = HashSet<String>()
+
+    /** Channel key -> the channels already tried before switching to it (a run of backups). */
+    private val backupTried = HashMap<String, Set<String>>()
+
     private val core = MultiviewSessionCore(
         initialLayout = initialLayout,
         totalBufferBytes = MultiviewBufferBudget.totalBytes(MemoryBudget.heapMb),
         audioFocus = AndroidMultiviewAudioFocus(appContext),
         createPlayer = { _, bufferBytes, changed ->
-            AndroidMultiviewPanePlayer(appContext, bufferBytes, changed)
+            AndroidMultiviewPanePlayer(appContext, bufferBytes, changed, autoReconnect, ::switchToBackup)
         },
         onChanged = ::publishState,
         mayPlayChannel = mayPlayChannel,
+        onSetupFailed = ::reportSetupFailure,
     )
+
+    /**
+     * A pane that failed before its stream started used to show "Stream unavailable" with nothing
+     * in the report. Says what failed and where; only our own messages are written out, never a
+     * provider's, and the link is masked.
+     */
+    private fun reportSetupFailure(paneId: Int, channel: LiveChannel, failure: Exception) {
+        fun name(t: Throwable) = t.javaClass.simpleName.ifEmpty { t.javaClass.name }
+        val ours = failure is IllegalArgumentException || failure is IllegalStateException
+        val where = failure.stackTrace.take(3).joinToString(" < ") {
+            "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}"
+        }
+        val cause = failure.cause?.takeIf { it !== failure }?.let { ", caused by ${name(it)}" }.orEmpty()
+        LiveTvLoadReport.add(
+            "Multiview: ${channel.name} couldn't start in P${paneId + 1} (${name(failure)}" +
+                (if (ours) failure.message?.let { ": $it" }.orEmpty() else "") + cause + ")" +
+                (if (where.isNotEmpty()) " at $where" else "") +
+                (if (channel.stalkerRef == null) " · ${LiveStreamFormats.redact(channel.url)}" else "")
+        )
+    }
 
     // Closing this subscription matters: sessions are short lived, unlike the single player.
     private val vpnSubscription = VpnPlaybackProtection.observeSettings {
@@ -101,6 +144,31 @@ class MultiviewPlaybackSession(
     fun validateAllowedChannels(allowed: List<LiveChannel>) = onMain { core.validateAllowedChannels(allowed) }
     fun onForeground() = onMain { core.onForeground() }
     fun onBackground() = onMain { core.onBackground() }
+
+    /** Called by a pane whose stream keeps failing: play a backup there; false when there is none. */
+    private fun switchToBackup(player: MultiviewPanePlayer, failed: LiveChannel): Boolean {
+        if (released) return false
+        val paneId = (0 until core.layout.paneCount).firstOrNull { core.playerAt(it) === player } ?: return false
+        val tried = HashSet(backupTried[failed.key].orEmpty()).apply { add(failed.key) }
+        var pick: LiveChannel? = null
+        repeat(8) {
+            if (pick != null) return@repeat
+            val next = runCatching { findBackup(paneId, failed, tried) }.getOrNull() ?: return@repeat
+            if (next.key in tried) return@repeat
+            if (mayPlayChannel(next)) pick = next else tried += next.key
+        }
+        val backup = pick ?: return false
+        backupTried[backup.key] = tried
+        quietUntilPlaying += backup.key
+        LiveTvLoadReport.add("Multiview: ${failed.name} won't play: switched P${paneId + 1} to ${backup.name} (${backup.group})")
+        // Not from inside the failing player's own callback: it is released by the switch.
+        mainHandler.post {
+            if (!released && core.playerAt(paneId) === player && core.channelAt(paneId)?.key == failed.key) {
+                core.assignChannel(paneId, backup)
+            }
+        }
+        return true
+    }
 
     fun release() {
         checkMainThread()
@@ -128,7 +196,11 @@ class MultiviewPlaybackSession(
             hasAudioFocus = core.hasAudioFocus,
             panes = List(core.layout.paneCount) { id ->
                 val channel = core.channelAt(id)
-                val playback = core.playbackAt(id)
+                var playback = core.playbackAt(id)
+                if (channel != null && channel.key in quietUntilPlaying) {
+                    if (playback.isPlaying || playback.error != null) quietUntilPlaying -= channel.key
+                    else if (playback.isBuffering) playback = playback.copy(isBuffering = false, isReconnecting = true)
+                }
                 MultiviewPaneState(
                     id = id,
                     channelKey = channel?.key,
@@ -137,17 +209,25 @@ class MultiviewPlaybackSession(
                     isBuffering = playback.isBuffering,
                     isPlaying = playback.isPlaying,
                     error = playback.error,
+                    isReconnecting = playback.isReconnecting,
+                    isProtected = channel?.drm != null,
                 )
             },
         )
     }
 }
 
+/** How many Multiview panes currently have a video decoder (for the report's decoder lines). */
+@OptIn(UnstableApi::class)
+private fun decodersOpen(): Int = MultiviewDecoderReport.openPlayers.count { it.videoDecoderCounters != null }
+
 @OptIn(UnstableApi::class)
 private class AndroidMultiviewPanePlayer(
     context: Context,
     bufferBytes: Int,
     private val onChanged: () -> Unit,
+    private val autoReconnect: () -> Boolean,
+    private val switchToBackup: (MultiviewPanePlayer, LiveChannel) -> Boolean,
 ) : MultiviewPanePlayer {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -157,27 +237,155 @@ private class AndroidMultiviewPanePlayer(
     private var mediaPolicy: com.nuvio.tv.livetv.stalker.StalkerMediaPolicy? = null
     private var released = false
     private var error: String? = null
+    /** The channel this pane is showing, kept so a dropped stream can be reconnected. */
+    private var channel: LiveChannel? = null
+    private var wantPlaying = false
+    private var reconnectJob: Job? = null
+    private var reconnectAttempt = 0
+    /** When the stream last started playing; a stream that keeps going a while earns fresh tries. */
+    private var playingSince = 0L
+    private var reconnecting = false
+    /** The link and format this pane is trying (they change when the full-screen player's fallbacks apply). */
+    private var streamUrl: String? = null
+    private var streamMime: String? = null
+    private var formatGuess = 0
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             if (!released) onChanged()
         }
 
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (released) return
+            if (isPlaying) {
+                playingSince = SystemClock.elapsedRealtime()
+                if (reconnecting) { reconnecting = false; onChanged() }
+            }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             if (released) return
-            this@AndroidMultiviewPanePlayer.error = MultiviewPlaybackErrors.describe(error)
-            player.volume = 0f
-            player.playWhenReady = false
+            val message = MultiviewPlaybackErrors.describe(error)
             // A failed pane must not retain an adaptive manifest refresh or provider connection.
             player.stop()
             player.clearMediaItems()
-            onChanged()
+            if (tryOtherFormat(error)) return
+            if (MultiviewPlaybackErrors.isRetryable(error) && scheduleReconnect(error.errorCodeName)) return
+            fail(message, error.errorCodeName)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (!released && playbackState == Player.STATE_ENDED) {
-                error = "This stream has ended. Retry or choose another channel."
-                onChanged()
+                // A live stream never really ends: the provider closed the connection (a network
+                // blip, or its connection limit). Reconnect like the main player does.
+                player.stop()
+                player.clearMediaItems()
+                if (scheduleReconnect("stream ended")) return
+                fail(LOST_MESSAGE)
             }
+        }
+    }
+
+    /**
+     * The full-screen player's format fallbacks: a link that doesn't say what it is is tried as
+     * HLS, then DASH; an HLS playlist that can't be read moves to the provider's TS link, then is
+     * read as plain TS. True when another try was started.
+     */
+    private fun tryOtherFormat(error: PlaybackException): Boolean {
+        val ch = channel ?: return false
+        if (ch.stalkerRef != null) return false
+        val url = streamUrl ?: ch.url
+        if (LiveStreamFormats.isUnrecognizedFormat(error) && formatGuess < LiveStreamFormats.FORMAT_GUESSES.size) {
+            streamMime = LiveStreamFormats.FORMAT_GUESSES[formatGuess++]
+            LiveTvLoadReport.add("Multiview: ${ch.name} failed (${error.errorCodeName}); trying it as ${streamMime?.substringAfter('/')}")
+        } else if (LiveStreamFormats.isMalformedManifest(error) && ch.key !in LiveStreamFormats.tsInstead &&
+            LiveStreamFormats.tsLinkFor(url)?.takeIf { it != url } != null
+        ) {
+            LiveStreamFormats.tsInstead += ch.key
+            streamUrl = LiveStreamFormats.tsLinkFor(url)
+            streamMime = null
+            LiveTvLoadReport.add("Multiview: ${ch.name}: its HLS playlist couldn't be read (${error.errorCodeName}); playing it as TS instead")
+        } else if (LiveStreamFormats.isMalformedManifest(error) && ch.key !in LiveStreamFormats.plainTs) {
+            LiveStreamFormats.plainTs += ch.key
+            streamMime = MimeTypes.VIDEO_MP2T
+            LiveTvLoadReport.add("Multiview: ${ch.name}: still no readable HLS playlist (${error.errorCodeName}); reading the stream as plain TS")
+        } else return false
+        connect(ch)
+        player.playWhenReady = wantPlaying
+        onChanged()
+        return true
+    }
+
+    private fun fail(message: String, code: String? = null) {
+        reconnectJob?.cancel()
+        reconnectJob = null
+        reconnecting = false
+        // Out of tries on this channel: a backup copy (or another stream of the game) if there is one.
+        channel?.let { if (switchToBackup(this, it)) return }
+        channel?.let { ch ->
+            LiveTvLoadReport.add(
+                "Multiview: ${ch.name} couldn't play" + (code?.let { " ($it)" } ?: "") + ": $message" +
+                    (if (ch.stalkerRef == null) " · ${LiveStreamFormats.redact(streamUrl ?: ch.url)}" else "")
+            )
+        }
+        error = message
+        player.volume = 0f
+        player.playWhenReady = false
+        onChanged()
+    }
+
+    /** Try the channel again after a short wait; false when out of tries (or reconnect is off). */
+    private fun scheduleReconnect(reason: String): Boolean {
+        val ch = channel ?: return false
+        if (!autoReconnect()) return false
+        // Playing for a while since the last drop counts as recovered: start the tries over.
+        if (playingSince > 0L && SystemClock.elapsedRealtime() - playingSince >= RECOVERED_AFTER_MS) reconnectAttempt = 0
+        playingSince = 0L
+        if (reconnectAttempt >= MAX_RECONNECTS) {
+            LiveTvLoadReport.add("Multiview: ${ch.name} gave up after $MAX_RECONNECTS reconnects ($reason)")
+            return false
+        }
+        val attempt = ++reconnectAttempt
+        LiveTvLoadReport.add("Multiview: ${ch.name} dropped ($reason), reconnecting (try $attempt)")
+        // Second drop in a row, like the full-screen player: move to a backup copy if there is one.
+        if (attempt == 2 && switchToBackup(this, ch)) return true
+        val expected = generation
+        reconnectJob?.cancel()
+        // The last picture stays up meanwhile (not "Loading…"); the pane shows a quiet mark if it drags on.
+        reconnecting = true
+        onChanged()
+        reconnectJob = scope.launch {
+            delay((attempt * 2_000L).coerceAtMost(10_000L))
+            if (released || expected != generation) return@launch
+            connect(ch)
+            player.playWhenReady = wantPlaying
+            onChanged()
+        }
+        return true
+    }
+
+    /** Channels whose decoder line is already in the report, so a reconnect doesn't repeat it. */
+    private val decoderReported = mutableSetOf<String>()
+
+    /**
+     * Which video decoder the box gave this pane and the picture's colour format, once per
+     * channel, so a pane whose picture looks wrong (e.g. tinted) can be told apart from one that's fine.
+     */
+    private val decoderReport = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+        override fun onVideoDecoderInitialized(
+            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+            decoderName: String,
+            initializedTimestampMs: Long,
+            initializationDurationMs: Long,
+        ) {
+            if (released) return
+            val ch = channel ?: return
+            val f = player.videoFormat
+            val key = "${ch.key}|$decoderName|${f?.sampleMimeType}|${f?.width}x${f?.height}|${f?.colorInfo}"
+            if (!decoderReported.add(key)) return
+            LiveTvLoadReport.add(
+                "Multiview: ${ch.name} video decoder $decoderName (${decodersOpen()} Multiview decoders open); " +
+                    MultiviewDecoderReport.describe(f)
+            )
         }
     }
 
@@ -191,8 +399,9 @@ private class AndroidMultiviewPanePlayer(
             .setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+            // Offload is already off unless asked for. Don't switch it off here: that call only
+            // exists on Android 10 and up, and on older TVs it stopped every pane from starting.
             .build()
-            .apply { setOffloadMode(AudioSink.OFFLOAD_MODE_DISABLED) }
     }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         .setEnableDecoderFallback(true)
 
@@ -227,16 +436,33 @@ private class AndroidMultiviewPanePlayer(
                 )
                 .build()
             addListener(listener)
+            addAnalyticsListener(decoderReport)
+            MultiviewDecoderReport.openPlayers += this
         }
 
     override val playback: MultiviewPanePlayback
         get() = MultiviewPanePlayback(
-            isBuffering = !released && error == null && (resolving || player.playbackState == Player.STATE_BUFFERING),
+            isBuffering = !released && error == null && !reconnecting && (resolving || player.playbackState == Player.STATE_BUFFERING),
             isPlaying = !released && error == null && player.isPlaying,
             error = error,
+            isReconnecting = !released && error == null && reconnecting,
         )
 
     override fun prepare(channel: LiveChannel) {
+        this.channel = channel
+        reconnectJob?.cancel()
+        reconnectJob = null
+        reconnectAttempt = 0
+        playingSince = 0L
+        reconnecting = false
+        // What the full-screen player already learned about this channel's link.
+        streamUrl = if (channel.key in LiveStreamFormats.tsInstead) LiveStreamFormats.tsLinkFor(channel.url) ?: channel.url else channel.url
+        streamMime = if (channel.key in LiveStreamFormats.plainTs) MimeTypes.VIDEO_MP2T else null
+        formatGuess = 0
+        connect(channel)
+    }
+
+    private fun connect(channel: LiveChannel) {
         resolveJob?.cancel()
         mediaPolicy?.retire()
         mediaPolicy = null
@@ -261,13 +487,12 @@ private class AndroidMultiviewPanePlayer(
                 } catch (failure: Exception) {
                     if (released || expected != generation) return@launch
                     resolving = false
-                    error = StalkerGateway.failureMessage(failure)
-                    player.volume = 0f
-                    player.playWhenReady = false
-                    onChanged()
+                    if (!scheduleReconnect("couldn't open the portal stream")) {
+                        fail(StalkerGateway.failureMessage(failure))
+                    }
                 }
             }
-        } else prepareResolved(channel)
+        } else prepareResolved(channel.copy(url = streamUrl ?: channel.url), mimeType = streamMime)
     }
 
     private fun prepareResolved(channel: LiveChannel, policy: com.nuvio.tv.livetv.stalker.StalkerMediaPolicy? = null, mimeType: String? = null) {
@@ -297,13 +522,18 @@ private class AndroidMultiviewPanePlayer(
     }
 
     override fun setPlaying(playing: Boolean) {
-        if (!released) player.playWhenReady = playing && error == null
+        if (released) return
+        wantPlaying = playing
+        player.playWhenReady = playing && error == null
     }
 
     override fun release() {
         if (released) return
         released = true
+        player.removeAnalyticsListener(decoderReport)
+        MultiviewDecoderReport.openPlayers -= player
         generation++
+        reconnectJob?.cancel()
         scope.cancel()
         mediaPolicy?.retire()
         mediaPolicy = null
@@ -372,8 +602,43 @@ private class AndroidMultiviewAudioFocus(context: Context) : MultiviewAudioFocus
     }
 }
 
+private const val MAX_RECONNECTS = 6
+private const val RECOVERED_AFTER_MS = 60_000L
+private const val LOST_MESSAGE = "Lost the connection to this stream. Retry or choose another channel."
+
 /** Provider failures are deliberately described using codes only, never exception messages. */
 internal object MultiviewPlaybackErrors {
+    /**
+     * Worth reconnecting: dropped connections, timeouts, provider hiccups and connection limits
+     * (another stream may free up). Not refused/missing streams, protected channels or decoders.
+     */
+    fun isRetryable(error: PlaybackException): Boolean {
+        var cause: Throwable? = error
+        repeat(12) {
+            val current = cause ?: return@repeat
+            if (current is HttpDataSource.InvalidResponseCodeException) {
+                return when (current.responseCode) {
+                    401, 403, 404, 410 -> false
+                    else -> true
+                }
+            }
+            cause = current.cause
+        }
+        return when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE,
+            PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW,
+            PlaybackException.ERROR_CODE_TIMEOUT,
+            PlaybackException.ERROR_CODE_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED -> true
+            else -> false
+        }
+    }
+
+
     fun describe(error: PlaybackException): String {
         var cause: Throwable? = error
         repeat(12) {

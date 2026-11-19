@@ -1,6 +1,9 @@
 package com.nuvio.tv.livetv.sync
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.nuvio.tv.R
+import com.nuvio.tv.core.util.withAppLocale
 import android.os.Build
 import android.util.Base64
 import android.util.Log
@@ -66,13 +69,15 @@ class LiveTvDriveSync @Inject constructor(
     private val prefs: LiveTvPreferences,
     private val repository: LiveTvRepository
 ) {
+    private fun text(@StringRes id: Int, vararg args: Any): String = context.withAppLocale().getString(id, *args)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val store = context.applicationContext.getSharedPreferences("livetv_drive_sync", Context.MODE_PRIVATE)
     private val mutex = Mutex()
     private val http = ForkHttp.builder()
         // IPv4 first, like Nuvio's own connections: many VPNs (and some routers) leave IPv6
         // half working, and each Google address then hung until it timed out.
-        .dns(com.nuvio.tv.core.network.IPv4FirstDns())
+        .dns(com.nuvio.tv.core.network.IPv4FirstDns(com.nuvio.tv.livetv.data.ForkDns.app))
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -172,7 +177,7 @@ class LiveTvDriveSync @Inject constructor(
                 codes = runCatching {
                     postForm("https://oauth2.googleapis.com/device/code", mapOf("client_id" to clientId, "scope" to scopes))
                 }.getOrElse {
-                    _state.value = _state.value.copy(busy = false, message = "Couldn't reach Google. Try again.")
+                    _state.value = _state.value.copy(busy = false, message = text(R.string.iptv_status_google_unreachable))
                     return@launch
                 }
                 mode = m
@@ -213,7 +218,7 @@ class LiveTvDriveSync @Inject constructor(
                     "authorization_pending" -> Unit
                     "slow_down" -> interval += 5
                     "access_denied" -> {
-                        _state.value = _state.value.copy(signIn = null, message = "Sign-in was declined.")
+                        _state.value = _state.value.copy(signIn = null, message = text(R.string.iptv_status_sign_in_declined))
                         return@launch
                     }
                     else -> {
@@ -222,7 +227,7 @@ class LiveTvDriveSync @Inject constructor(
                     }
                 }
             }
-            _state.value = _state.value.copy(signIn = null, message = "The code expired. Try again.")
+            _state.value = _state.value.copy(signIn = null, message = text(R.string.iptv_status_sign_in_code_expired))
         }
     }
 
@@ -235,7 +240,7 @@ class LiveTvDriveSync @Inject constructor(
     private suspend fun onSignedIn(token: JSONObject) {
         val refresh = token.optString("refresh_token")
         if (refresh.isBlank()) {
-            _state.value = _state.value.copy(signIn = null, message = "Google didn't return a sign-in. Try again.")
+            _state.value = _state.value.copy(signIn = null, message = text(R.string.iptv_status_google_no_sign_in))
             return
         }
         accessToken = token.optString("access_token")
@@ -258,7 +263,7 @@ class LiveTvDriveSync @Inject constructor(
         store.edit().remove(KEY_REFRESH).remove(KEY_EMAIL).remove(KEY_FILE_ID).remove(KEY_LAST_HASH).remove(KEY_MODE).apply()
         runCatching { baseFile().delete() }
         accessToken = null
-        _state.value = _state.value.copy(connected = false, email = null, message = "Disconnected. Your backup stays in your Google Drive.")
+        _state.value = _state.value.copy(connected = false, email = null, message = text(R.string.iptv_status_drive_disconnected))
         if (refresh != null) scope.launch {
             runCatching { postForm("https://oauth2.googleapis.com/revoke", mapOf("token" to refresh)) }
         }
@@ -279,7 +284,7 @@ class LiveTvDriveSync @Inject constructor(
     private suspend fun push(force: Boolean) = mutex.withLock {
         val token = token() ?: return@withLock
         emptyRefused = false
-        _state.value = _state.value.copy(busy = true, message = if (force) "Backing up…" else null)
+        _state.value = _state.value.copy(busy = true, message = if (force) text(R.string.iptv_status_backing_up) else null)
         val result = runCatching {
             var data = prefs.exportForSync()
             val removedHere = prefs.removedSourceIds()
@@ -349,9 +354,9 @@ class LiveTvDriveSync @Inject constructor(
             busy = false,
             lastSyncMs = store.getLong(KEY_LAST_SYNC, 0L),
             message = when {
-                result.isFailure -> "Backup failed: ${result.exceptionOrNull()?.message ?: "network error"}"
-                emptyRefused -> "Nothing backed up: add a playlist or guide first. Your saved copy in Google Drive was left as it was."
-                force -> "Backed up to Google Drive."
+                result.isFailure -> text(R.string.iptv_status_backup_failed, result.exceptionOrNull()?.message ?: text(R.string.iptv_status_network_error))
+                emptyRefused -> text(R.string.iptv_status_backup_empty)
+                force -> text(R.string.iptv_status_drive_backed_up)
                 else -> _state.value.message
             }
         )
@@ -363,7 +368,7 @@ class LiveTvDriveSync @Inject constructor(
      */
     private suspend fun pull(force: Boolean, onlyIfExists: Boolean = false): Boolean = mutex.withLock {
         val token = token() ?: return@withLock false
-        _state.value = _state.value.copy(busy = true, message = if (force && !onlyIfExists) "Restoring…" else null)
+        _state.value = _state.value.copy(busy = true, message = if (force && !onlyIfExists) text(R.string.iptv_status_restoring) else null)
         val result = runCatching {
             val fileId = fileId(token) ?: return@runCatching null
             val text = execute(
@@ -404,10 +409,10 @@ class LiveTvDriveSync @Inject constructor(
             busy = false,
             lastSyncMs = store.getLong(KEY_LAST_SYNC, 0L),
             message = when {
-                result.isFailure -> "Restore failed: ${result.exceptionOrNull()?.message ?: "network error"}"
-                result.getOrNull() == null && force && !onlyIfExists -> "No backup found in Google Drive yet."
-                applied && force -> "Restored from Google Drive."
-                applied -> "Updated from your other TV."
+                result.isFailure -> text(R.string.iptv_status_restore_failed, result.exceptionOrNull()?.message ?: text(R.string.iptv_status_network_error))
+                result.getOrNull() == null && force && !onlyIfExists -> text(R.string.iptv_status_drive_no_backup)
+                applied && force -> text(R.string.iptv_status_drive_restored)
+                applied -> text(R.string.iptv_status_updated_other_tv)
                 else -> _state.value.message
             }
         )
@@ -421,8 +426,11 @@ class LiveTvDriveSync @Inject constructor(
         appliedAtMs = System.currentTimeMillis()
         try {
             val before = prefs.exportForSync()
+            val playlistsBefore = prefs.currentPlaylists()
             val changed = prefs.importFromSync(data)
             val after = prefs.exportForSync()
+            com.nuvio.tv.livetv.model.PlaylistServerChanges.lines(playlistsBefore, prefs.currentPlaylists())
+                .forEach { com.nuvio.tv.livetv.model.LiveTvLoadReport.add(it) }
             // What really changed here. Nothing: no reload at all (it used to reload Live TV,
             // reading the guide again, on every sync, often twice at start-up).
             val keys = (before.keys().asSequence() + after.keys().asSequence()).toSet()
@@ -515,7 +523,13 @@ class LiveTvDriveSync @Inject constructor(
                     }.getOrNull()
                 } else null
                 val shell = (local.optJSONObject(k) ?: remote.optJSONObject(k))
+                // Favorites, hidden channels and groups, your own groups: combined item by item, so
+                // a favorite added on the phone and another added on a TV are both kept.
+                val itemsMerged = if (listMerged == null) runCatching {
+                    mergeItems(k, base.optJSONObject(k), local.optJSONObject(k), remote.optJSONObject(k))
+                }.getOrNull() else null
                 when {
+                    itemsMerged != null -> out.put(k, itemsMerged)
                     listMerged != null && shell != null -> out.put(k, JSONObject(shell.toString()).put("v", listMerged))
                     local.has(k) -> out.put(k, local.get(k))
                     else -> out.remove(k)
@@ -535,7 +549,7 @@ class LiveTvDriveSync @Inject constructor(
         val base = read(baseRaw)
         val local = read(localRaw)
         val remote = read(remoteRaw)
-        val result = org.json.JSONArray()
+        val merged = LinkedHashMap<String, JSONObject>()
         // The other TV's order, with its additions and edits.
         for ((id, r) in remote) {
             val l = local[id]
@@ -545,22 +559,114 @@ class LiveTvDriveSync @Inject constructor(
                 l == null && id in removedHere -> continue
                 // Missing here but never removed here (this TV didn't get it yet, or lost it):
                 // kept. Only a removal someone actually made takes a source off the other TVs.
-                l == null -> result.put(r)
-                b == null -> result.put(r) // On both TVs but new to the last sync: the other TV's.
+                l == null -> merged[id] = r
+                b == null -> merged[id] = r // On both TVs but new to the last sync: the other TV's.
                 else -> {
-                    val merged = JSONObject(r.toString())
+                    val m = JSONObject(r.toString())
                     l.keys().forEach { f ->
-                        if (l.opt(f)?.toString() != b.opt(f)?.toString()) merged.put(f, l.get(f))
+                        if (l.opt(f)?.toString() != b.opt(f)?.toString()) m.put(f, l.get(f))
                     }
-                    result.put(merged)
+                    // A setting cleared on this TV since the last sync. Some are only saved while
+                    // they're set (a playlist's switched-off guides: turning the last one back on
+                    // leaves nothing saved), so the other TV's old value kept coming back.
+                    b.keys().forEach { f -> if (!l.has(f)) m.remove(f) }
+                    merged[id] = m
                 }
             }
         }
         // Added on this TV since the last sync.
         for ((id, l) in local) {
-            if (id !in remote && id !in base) result.put(l)
+            if (id !in remote && id !in base) merged[id] = l
         }
-        return result.toString()
+        // Moved on this TV since the last sync: that order is kept (it used to be dropped, so a
+        // reorder came back undone and was never saved). Sources only the other TV has follow after.
+        val baseOrder = base.keys.filter { it in local }
+        val localOrder = local.keys.filter { it in base }
+        val out = org.json.JSONArray()
+        if (baseOrder != localOrder) {
+            local.keys.forEach { id -> merged.remove(id)?.let { out.put(it) } }
+            merged.values.forEach { out.put(it) }
+        } else {
+            merged.values.forEach { out.put(it) }
+        }
+        return out.toString()
+    }
+
+    /**
+     * Three-way merge of one of the item lists in [ITEM_KEYS] (per profile too, "favorites_p2"):
+     * items added or removed on this device since the last sync are added or removed, everything
+     * else comes from the other device. Null (whole-value rules apply) for any other key, or when
+     * the other device has no value for it.
+     */
+    private fun mergeItems(k: String, b: JSONObject?, l: JSONObject?, r: JSONObject?): JSONObject? {
+        val name = k.replace(PROFILE_SUFFIX, "")
+        if (name !in ITEM_KEYS || r == null) return null
+        val shell = JSONObject((l ?: r).toString())
+        return when (name) {
+            in SET_ITEM_KEYS -> {
+                fun set(e: JSONObject?) = e?.optJSONArray("v")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+                shell.put("t", "s").put("v", org.json.JSONArray(mergeList(set(b), set(l), set(r))))
+            }
+            "favorites" -> {
+                fun list(e: JSONObject?) = strings(e?.optString("v"))
+                shell.put("v", org.json.JSONArray(mergeList(list(b), list(l), list(r))).toString())
+            }
+            "channel_copies" -> {
+                fun map(e: JSONObject?): Map<String, List<String>> {
+                    val raw = e?.optString("v"); if (raw.isNullOrBlank()) return emptyMap()
+                    val o = JSONObject(raw)
+                    return o.keys().asSequence().associateWith { g -> o.optJSONArray(g)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty() }
+                }
+                val bm = map(b); val lm = map(l); val rm = map(r)
+                val out = JSONObject()
+                mergeList(bm.keys.toList(), lm.keys.toList(), rm.keys.toList()).forEach { g ->
+                    val v = mergeList(bm[g].orEmpty(), lm[g].orEmpty(), rm[g].orEmpty())
+                    if (v.isNotEmpty()) out.put(g, org.json.JSONArray(v))
+                }
+                shell.put("v", out.toString())
+            }
+            "custom_groups" -> {
+                fun groups(e: JSONObject?) = readSources(e?.optString("v"))
+                fun keys(o: JSONObject?) = o?.optJSONArray("keys")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+                val bg = groups(b); val lg = groups(l); val rg = groups(r)
+                val out = org.json.JSONArray()
+                mergeList(bg.keys.toList(), lg.keys.toList(), rg.keys.toList()).forEach { id ->
+                    val lo = lg[id]; val bo = bg[id]; val ro = rg[id]
+                    val g = JSONObject((ro ?: lo)!!.toString())
+                    if (lo != null && bo != null && ro != null) {
+                        if (lo.optString("name") != bo.optString("name")) g.put("name", lo.optString("name"))
+                        g.put("keys", org.json.JSONArray(mergeList(keys(bo), keys(lo), keys(ro))))
+                    }
+                    out.put(g)
+                }
+                shell.put("v", out.toString())
+            }
+            else -> null
+        }
+    }
+
+    private fun strings(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        val a = org.json.JSONArray(raw)
+        return (0 until a.length()).map { a.getString(it) }
+    }
+
+    /**
+     * [remote] without what this device removed since [base], plus what it added. If this device
+     * also reordered the items, its order is kept (the other device's additions go after).
+     */
+    internal fun mergeList(base: List<String>, local: List<String>, remote: List<String>): List<String> {
+        val baseSet = base.toHashSet(); val localSet = local.toHashSet()
+        val removedHere = base.filterTo(HashSet()) { it !in localSet }
+        val kept = LinkedHashSet<String>()
+        remote.forEach { if (it !in removedHere) kept += it }
+        local.forEach { if (it !in baseSet) kept += it }
+        val movedHere = base.filter { it in localSet } != local.filter { it in baseSet }
+        if (!movedHere) return kept.toList()
+        val out = LinkedHashSet<String>()
+        local.forEach { if (it in kept) out += it }
+        out += kept
+        return out.toList()
     }
 
     private fun readSources(raw: String?): LinkedHashMap<String, JSONObject> {
@@ -616,18 +722,18 @@ class LiveTvDriveSync @Inject constructor(
         }.getOrElse { e ->
             // The reason too (timeout, blocked, no route…), so a VPN or network problem shows.
             val why = when (e) {
-                is java.net.SocketTimeoutException -> "timed out"
-                is java.net.UnknownHostException -> "couldn't look up Google's address"
-                is javax.net.ssl.SSLException -> "secure connection refused"
-                is java.net.ConnectException -> "connection refused"
+                is java.net.SocketTimeoutException -> text(R.string.iptv_status_timed_out)
+                is java.net.UnknownHostException -> text(R.string.iptv_status_google_lookup_failed)
+                is javax.net.ssl.SSLException -> text(R.string.iptv_status_secure_connection_refused)
+                is java.net.ConnectException -> text(R.string.iptv_status_connection_refused)
                 else -> e.javaClass.simpleName
             }
-            _state.value = _state.value.copy(message = "Couldn't reach Google Drive ($why).")
+            _state.value = _state.value.copy(message = text(R.string.iptv_status_drive_unreachable, why))
             return null
         }
         if (res.optString("error") == "invalid_grant") {
             store.edit().remove(KEY_REFRESH).apply()
-            _state.value = _state.value.copy(connected = false, message = "Google Drive access was removed. Connect again to keep syncing.")
+            _state.value = _state.value.copy(connected = false, message = text(R.string.iptv_status_drive_access_removed))
             return null
         }
         val access = res.optString("access_token").ifBlank { return null }
@@ -676,17 +782,17 @@ class LiveTvDriveSync @Inject constructor(
     private val isAppDataMode: Boolean
         get() = store.getString(KEY_MODE, MODE_APPDATA) == MODE_APPDATA
 
-    /** Plain-English reason, plus Google's own wording so problems can be tracked down. */
+    /** Localized reason, plus Google's own wording so problems can be tracked down. */
     private fun googleError(json: JSONObject): String {
         val e = json.optString("error").ifBlank { json.optString("error_code") }
-        val detail = json.optString("error_description").takeIf { it.isNotBlank() }?.let { " Google says: $it" }.orEmpty()
+        val detail = json.optString("error_description").takeIf { it.isNotBlank() }?.let { text(R.string.iptv_status_google_detail, it) }.orEmpty()
         return when (e) {
-            "invalid_client" -> "Google doesn't recognize this build's sign-in client. Check that the client ID and secret are right, and that its type is \"TVs and Limited Input devices\".$detail"
-            "unauthorized_client" -> "This sign-in client isn't allowed to use TV sign-in. Create one of type \"TVs and Limited Input devices\".$detail"
-            "invalid_scope" -> "Google refused the Drive permission for this app.$detail"
-            "org_internal" -> "This app is limited to one organization. Set the audience to External in Google Cloud.$detail"
-            "rate_limit_exceeded" -> "Too many attempts. Wait a minute and try again."
-            else -> "Google sign-in failed ($e).$detail"
+            "invalid_client" -> text(R.string.iptv_status_google_invalid_client, detail)
+            "unauthorized_client" -> text(R.string.iptv_status_google_unauthorized_client, detail)
+            "invalid_scope" -> text(R.string.iptv_status_google_invalid_scope, detail)
+            "org_internal" -> text(R.string.iptv_status_google_org_internal, detail)
+            "rate_limit_exceeded" -> text(R.string.iptv_status_google_rate_limited)
+            else -> text(R.string.iptv_status_google_sign_in_failed, e, detail)
         }
     }
 
@@ -703,6 +809,9 @@ class LiveTvDriveSync @Inject constructor(
         const val TAG = "LiveTvDriveSync"
         /** Settings that are lists of sources, merged source by source. */
         val SOURCE_LISTS = setOf("playlists", "epg_sources")
+        val SET_ITEM_KEYS = setOf("hidden_channels", "hidden_groups", "vod_hidden_categories")
+        val ITEM_KEYS = SET_ITEM_KEYS + setOf("favorites", "custom_groups", "channel_copies")
+        val PROFILE_SUFFIX = Regex("""_p\d+$""")
         const val MODE_APPDATA = "appdata"
         const val MODE_FILE = "file"
         /** Tried in order until Google accepts one. */
