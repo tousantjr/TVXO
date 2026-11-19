@@ -31,7 +31,7 @@ class SportsWatchViewModel @Inject constructor(
     preferences: LiveTvPreferences,
     addons: AddonRepository,
     private val profiles: ProfileManager,
-    selection: SportsWatchSelection,
+    private val selection: SportsWatchSelection,
 ) : ViewModel() {
     val settings = repo.settings
     val currentProfile: StateFlow<Int> = profiles.activeProfileId
@@ -87,6 +87,10 @@ class SportsWatchViewModel @Inject constructor(
         while (true) { emit(System.currentTimeMillis()); delay(15_000L) }
     }
 
+    /** Scores or channel matching are being worked on right now (Multiview shows "Loading games" meanwhile). */
+    val busy: StateFlow<Boolean> = combine(repo.loading, repo.matching) { a, b -> a || b }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     internal val games: StateFlow<List<SportsWatchGame>> = combine(
         repo.events, permissions, clock, currentProfile,
     ) { events, snapshot, now, profile ->
@@ -115,6 +119,21 @@ class SportsWatchViewModel @Inject constructor(
             SportsWatchPolicy.rows(page, input.events, snapshot.matches, snapshot.allowed, input.settings, now)
         }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Multiview's filter chips, from the games that are on now or about to start. */
+    internal val filters: StateFlow<List<SportsWatchFilter>> = combine(games, repo.follows, settings) { list, follows, sports ->
+        SportsWatchPolicy.filters(list, follows, sports)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The chip that matches what the list shows now (the Sports page's filter, or the last chip picked). */
+    internal val filterKey: StateFlow<String?> = combine(selection.current, currentProfile, repo.follows) { selected, profile, follows ->
+        SportsWatchPolicy.filterKey(SportsWatchPolicy.pageQuery(selected, profile, follows))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Picking a chip: the list follows it until a filter is chosen on the Sports page again. */
+    internal fun pickFilter(key: String) {
+        if (profileStillCurrent()) selection.select(SportsWatchPolicy.filterQuery(key))
+    }
 
     /** Resolve the requested broadcast at the press, or Sports' best allowed source when omitted. */
     fun resolve(eventId: String, channelKey: String? = null): ChannelMatch? {

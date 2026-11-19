@@ -81,6 +81,7 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import com.nuvio.tv.livetv.ui.leftJumpsToTop
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -112,14 +113,16 @@ object SportsLaunch {
     /** A replay from the start, for Live TV to start when it opens. */
     data class Catchup(val channelKey: String, val program: com.nuvio.tv.livetv.model.EpgProgram)
 
+    /** A network channel can return to Sports without having an associated game. */
+    private data class SportsReturn(val eventId: String?)
     /** Live TV was opened from the Sports page (Back goes back there), and on which game. */
-    @Volatile private var returnTo: String? = null
+    @Volatile private var returnTo: SportsReturn? = null
     @Volatile private var focusEvent: String? = null
     @Volatile private var returnSetAt = 0L
-    fun openedFromSports(eventId: String) { returnTo = eventId; focusEvent = eventId; returnSetAt = System.currentTimeMillis() }
+    fun openedFromSports(eventId: String? = null) { returnTo = SportsReturn(eventId); focusEvent = eventId; returnSetAt = System.currentTimeMillis() }
     fun takeReturnToSports(): Boolean = (returnTo != null).also { returnTo = null }
     val isWatchingFromSports: Boolean get() = returnTo != null
-    val watchingEventId: String? get() = returnTo
+    val watchingEventId: String? get() = returnTo?.eventId
     fun clearReturn() { returnTo = null; focusEvent = null }
     /** Live TV closed some other way: Back there no longer goes to Sports. */
     fun dropReturn() {
@@ -127,6 +130,10 @@ object SportsLaunch {
         if (System.currentTimeMillis() - returnSetAt > 5_000) returnTo = null
     }
     fun takeFocusEvent(): String? = focusEvent.also { focusEvent = null }
+    /** The replay or highlight last played from a game page: the highlight goes back on it. */
+    @Volatile private var lastReplay: String? = null
+    fun watchedReplay(channelKey: String) { lastReplay = channelKey }
+    fun takeLastReplay(): String? = lastReplay.also { lastReplay = null }
 
     @Volatile private var catchup: Catchup? = null
     fun catchup(c: Catchup) { catchup = c }
@@ -225,6 +232,11 @@ fun SportsScreen(
     // The card last highlighted (not page state: moving the highlight mustn't redraw the page).
     val rowFocus = remember { arrayOfNulls<String>(1) }
     var rowsReturning by remember { mutableStateOf(false) }
+    // Left from the page's left edge: up to the top bar's first button (see leftJumpsToTop).
+    val sportsFirstChip = remember { FocusRequester() }
+    var topBarFocused by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val openSidebar = com.nuvio.tv.LocalOpenSidebar.current
 
     // ---- the video window: the shared player, shown where the page puts its slot
     val videoOn = settings.videoWindow && hasChannels
@@ -295,7 +307,7 @@ fun SportsScreen(
     var backStartedHere by remember { mutableStateOf(false) }
     fun backToFullscreen() {
         val key = playingKey ?: return
-        events.firstOrNull { ev -> matches[ev.id]?.any { it.channel.key == key } == true }?.let { SportsLaunch.openedFromSports(it.id) }
+        SportsLaunch.openedFromSports(events.firstOrNull { ev -> matches[ev.id]?.any { it.channel.key == key } == true }?.id)
         onOpenLive()
     }
     // Multiview from Sports: opens the app's Multiview with one pane per live game (up to 4),
@@ -308,6 +320,12 @@ fun SportsScreen(
         onOpenMultiviewPanes(chans.size.coerceIn(2, 4), chans.first().key)
     }
     com.nuvio.tv.livetv.ui.FrameMeter("Sports")
+    // A finished game's replays are looked for as soon as its card is highlighted.
+    DisposableEffect(viewModel) {
+        val warm: (SportsEvent) -> Unit = { viewModel.repo.warmGame(it) }
+        GameFocus.onGame = warm
+        onDispose { if (GameFocus.onGame === warm) GameFocus.onGame = null }
+    }
     androidx.compose.runtime.CompositionLocalProvider(LocalSportsAnim provides SportsAnimLevel.from(settings.animations)) {
     Box(
         Modifier
@@ -382,7 +400,7 @@ fun SportsScreen(
                 videoSlot = videoSlot,
                 viewModel = viewModel,
                 onChoose = { m -> choose(opened, m) },
-                onPlayReplay = { m -> SportsLaunch.openedFromSports(opened.id); viewModel.watch(m); onOpenLive() },
+                onPlayReplay = { m -> viewModel.playReplay(m) { SportsLaunch.openedFromSports(opened.id); SportsLaunch.watchedReplay(m.channel.key); onOpenLive() } },
                 onFromStart = { m -> fromStart(opened, m) },
                 onFix = { fixFor = opened },
                 onTable = { tableReq = TableRequest(opened.leagueId, opened.sides.map { it.team.id }.toSet()) },
@@ -402,7 +420,22 @@ fun SportsScreen(
                     }
                 }
             )
-            else -> SportsHub(
+            else -> Box(
+                Modifier.fillMaxSize().leftJumpsToTop(
+                    atTop = { topBarFocused },
+                    toTop = {
+                        // Back up to the top bar (its first button, so one more Left opens Nuvio's menu).
+                        scope.launch {
+                            runCatching { listState.scrollToItem(0) }
+                            runCatching { rowsState.scrollToItem(0) }
+                            repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+                            if (runCatching { sportsFirstChip.requestFocus() }.isFailure) openSidebar()
+                        }
+                    }
+                )
+            ) { SportsHub(
+                firstChip = sportsFirstChip,
+                onTopBarFocus = { topBarFocused = it },
                 events = events,
                 known = known,
                 rowsState = rowsState,
@@ -439,10 +472,10 @@ fun SportsScreen(
                 onQuickWatch = ::quickWatch,
                 onPick = { picker = true },
                 onOpenMultiview = { onOpenMultiview(playingKey) },
-                onWatchChannel = { ch -> viewModel.watchChannel(ch); onOpenLive() },
+                onWatchChannel = { ch -> SportsLaunch.openedFromSports(); viewModel.watchChannel(ch); onOpenLive() },
                 onMultiview = { mine -> openMultiview(mine) },
                 onMultiviewFrom = { ev -> openMultiview(mineOnly = false, first = ev) }
-            )
+            ) }
         }
         // The picture, on top of the page where its slot is (one view for every page, so it
         // never restarts), then the rounded corners and the "nothing playing" note over it.
@@ -525,6 +558,9 @@ private fun SportsHub(
     onRowFocus: (String) -> Unit,
     rowsReturning: Boolean,
     onRowsReturned: () -> Unit,
+    /** The top bar's first button (Left from the page's left edge comes up to it). */
+    firstChip: FocusRequester,
+    onTopBarFocus: (Boolean) -> Unit,
     matches: Map<String, List<ChannelMatch>>,
     follows: SportsFollows,
     settings: SportsSettings,
@@ -638,7 +674,6 @@ private fun SportsHub(
     }
 
     val firstContent = remember { FocusRequester() }
-    val firstChip = remember { FocusRequester() }
     var focusedOnce by remember { mutableStateOf(false) }
     val hasContent = sections.live.isNotEmpty() || sections.upcoming.isNotEmpty() || sections.finished.isNotEmpty() || sections.weekLong.isNotEmpty()
     LaunchedEffect(hasContent, day, effectiveChip, pageReady) {
@@ -688,7 +723,7 @@ private fun SportsHub(
     val dayBar: @Composable (Modifier) -> Unit = { dm ->
         val lv = leagueView?.let { SportsCatalog.league(it) }
         if (lv != null) {
-            LiveText("${lv.name} · the next 7 days", color = SportsLook.Dim, size = 12.sp, weight = FontWeight.Bold, modifier = dm)
+            LiveText("${lv.name} · the next 7 days", color = SportsLook.Dim, size = 12.sp, weight = FontWeight.Bold, modifier = dm.padding(start = 4.dp, top = SportsSpace.RowPad, bottom = SportsSpace.RowPad))
         } else {
             // A week back to a week ahead; opens on Yesterday and Today, and scrolls.
             val dayFmt = remember { SimpleDateFormat("EEE d", Locale.getDefault()) }
@@ -703,7 +738,7 @@ private fun SportsHub(
                 state = tabsState,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                contentPadding = PaddingValues(end = 12.dp)
+                contentPadding = PaddingValues(end = 12.dp, top = SportsSpace.RowPad, bottom = SportsSpace.RowPad)
             ) {
                 items((-SportsRepository.DAYS_BACK..SportsRepository.DAYS_AHEAD).toList(), key = { it }) { offset ->
                     val label = when (offset) {
@@ -720,11 +755,12 @@ private fun SportsHub(
     }
     val sportBar: @Composable () -> Unit = {
         if (effectiveChip == CHIP_ALL && leagueView == null && allSports.size > 1) {
+            Spacer(Modifier.height(SportsSpace.RowGap))
             LazyRow(
                 Modifier.fillMaxWidth().keepFocusWhileHeld(vertical = false),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = SportsSpace.RowPad)
             ) {
                 item(key = "sport_all") { FilterIcon("▦", "All", allSport == null, withLabel = true) { onAllSportPick(null); contentJump++ } }
                 items(allSports, key = { "sport_" + it.name }) { sp ->
@@ -738,7 +774,7 @@ private fun SportsHub(
     val mvAll = remember(events, matches, follows) { SportsMultiview.liveGames(events, matches, follows, mineOnly = false).size }
     val mvMine = remember(events, matches, follows) { SportsMultiview.liveGames(events, matches, follows, mineOnly = true).size }
     val filters: @Composable (Modifier) -> Unit = { m ->
-        LazyRow(m.keepFocusWhileHeld(vertical = false), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+        LazyRow(m.keepFocusWhileHeld(vertical = false).onFocusChanged { onTopBarFocus(it.hasFocus) }, horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, contentPadding = PaddingValues(horizontal = 4.dp, vertical = SportsSpace.RowPad)) {
             val upTo: Modifier = Modifier
             item(key = CHIP_MINE) { FilterIcon("★", "My Sports", effectiveChip == CHIP_MINE, Modifier.focusRequester(firstChip).then(upTo), withLabel = true) { pickChip(CHIP_MINE) } }
             // My Teams This Week: a calendar of your teams' games.
@@ -927,20 +963,22 @@ private fun SportsHub(
     if (videoOn) {
         // The same top bar as every Sports page, then the list with the video window beside it.
         // Stops above the hint line at the bottom, so no game sits behind it.
-        Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 28.dp, top = 20.dp, bottom = 26.dp)) {
+        Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 28.dp, top = 20.dp, bottom = SportsSpace.Bottom)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LiveText("Sports", size = 26.sp, weight = FontWeight.Black)
                 Spacer(Modifier.width(14.dp))
                 filters(Modifier.weight(1f))
             }
+            Spacer(Modifier.height(SportsSpace.RowGap))
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 Column(Modifier.width(LIST_WIDTH).fillMaxHeight()) {
                     dayBar(Modifier.fillMaxWidth())
                     sportBar()
+                    Spacer(Modifier.height(SportsSpace.RowGap))
                     list(Modifier.weight(1f))
                 }
                 Spacer(Modifier.width(18.dp))
-                Column(Modifier.weight(1f).fillMaxHeight().padding(top = 4.dp)) {
+                Column(Modifier.weight(1f).fillMaxHeight().padding(top = SportsSpace.RowPad)) {
                     videoSlot(Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                     Spacer(Modifier.height(10.dp))
                     NowPlayingPanel(events, matches, settings, now, use24h, playingKey, viewModel)
@@ -948,15 +986,16 @@ private fun SportsHub(
             }
         }
     } else {
-        Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 36.dp, top = 20.dp, bottom = 26.dp)) {
+        Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 36.dp, top = 20.dp, bottom = SportsSpace.Bottom)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LiveText("Sports", size = 26.sp, weight = FontWeight.Black)
                 Spacer(Modifier.width(14.dp))
                 filters(Modifier.weight(1f))
             }
+            Spacer(Modifier.height(SportsSpace.RowGap))
             dayBar(Modifier.fillMaxWidth())
             sportBar()
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(SportsSpace.RowGap))
             list(Modifier.weight(1f))
         }
     }
@@ -1014,8 +1053,8 @@ private fun GameList(
         // instead of jumping up to the day tabs.
         modifier = modifier.keepFocusWhileHeld(neverRight = true),
         // Room for the highlight's glow and bigger size at the edges.
-        contentPadding = PaddingValues(start = 8.dp, end = 10.dp, top = 2.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(start = 8.dp, end = 10.dp, top = SportsSpace.RowPad, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(SportsSpace.Card)
     ) {
         if (leaguesLine != null) item(key = "leagues_bar") {
             LeaguesBar(leaguesLine, if (leaguesBarReq != null) Modifier.focusRequester(leaguesBarReq) else Modifier, onClick = onChooseLeagues)
@@ -1027,7 +1066,7 @@ private fun GameList(
             )
         }
         if (loading) {
-            item(key = "ph_label") { SectionHeader("LIVE NOW", live = true) }
+            item(key = "ph_label") { SectionHeader("LIVE NOW", live = true, bottom = 0.dp) }
             items(3, key = { "ph_$it" }) { PlaceholderCard() }
             return@LazyColumn
         }
@@ -1037,7 +1076,7 @@ private fun GameList(
             list.chunked(columns).forEachIndexed { ri, row ->
                 val rowFirst = if (ri == 0) firstMod() else Modifier
                 item(key = prefix + row.first().id) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SportsSpace.Card)) {
                         row.forEachIndexed { i, ev ->
                             // Live games with a channel: a Multiview button under the card (Down from it).
                             val mv = ev.state == GameState.LIVE && matches[ev.id].orEmpty().isNotEmpty()
@@ -1065,7 +1104,7 @@ private fun GameList(
             }
         }
         if (sections.live.isNotEmpty()) {
-            item(key = "live_label") { SectionHeader("LIVE NOW", live = true, count = sections.live.size) }
+            item(key = "live_label") { SectionHeader("LIVE NOW", live = true, count = sections.live.size, bottom = 0.dp) }
             cardRows("live_", sections.live)
         }
         if (sections.upcoming.isNotEmpty()) {
@@ -1074,11 +1113,11 @@ private fun GameList(
                 if (byDate) sections.upcoming.groupBy { dayWord(it.startMs, now) }.toList()
                 else listOf((if (day == 0) "COMING UP" else if (day > 0) "SCHEDULE" else "DIDN'T START") to sections.upcoming)
             groups.forEach { (label, groupList) ->
-            item(key = "up_label_$label") { SectionHeader(label.uppercase(), count = groupList.size) }
+            item(key = "up_label_$label") { SectionHeader(label.uppercase(), count = groupList.size, bottom = 0.dp) }
             groupList.chunked(columns).forEachIndexed { ri, row ->
                 val rowFirst = if (ri == 0) firstMod() else Modifier
                 item(key = "up_" + row.first().id) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SportsSpace.Card)) {
                         row.forEachIndexed { i, ev ->
                             val ms = matches[ev.id].orEmpty()
                             UpcomingRow(
@@ -1100,11 +1139,11 @@ private fun GameList(
             }
         }
         if (sections.weekLong.isNotEmpty()) {
-            item(key = "week_label") { SectionHeader("THIS WEEK", count = sections.weekLong.size) }
+            item(key = "week_label") { SectionHeader("THIS WEEK", count = sections.weekLong.size, bottom = 0.dp) }
             cardRows("week_", sections.weekLong)
         }
         if (sections.finished.isNotEmpty()) {
-            item(key = "done_label") { SectionHeader(if (day < 0 || byDate) "RESULTS" else "FINISHED", count = sections.finished.size) }
+            item(key = "done_label") { SectionHeader(if (day < 0 || byDate) "RESULTS" else "FINISHED", count = sections.finished.size, bottom = 0.dp) }
             cardRows("done_", sections.finished)
         }
         val hasContent = sections.live.isNotEmpty() || sections.upcoming.isNotEmpty() || sections.finished.isNotEmpty() || sections.weekLong.isNotEmpty()
@@ -1126,7 +1165,8 @@ private fun LeaguesBar(line: String, modifier: Modifier = Modifier, onClick: () 
             .border(if (focused) NuvioTheme.focusRing.border(2.dp) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), SportsLook.SmallShape)
             .onFocusChanged { focused = it.isFocused }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .height(SportsSpace.Control)
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         LiveText(line, color = SportsLook.Dim, size = 12.sp, weight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -1412,14 +1452,29 @@ private fun GamePage(
         onDispose { viewModel.repo.closeGame(ev.id) }
     }
     val vodLooked = viewModel.repo.vodMatches.collectAsStateWithLifecycle().value[ev.id]
-    val replays = vodLooked.orEmpty()
+    // Official highlights and condensed games (ESPN, NHL, MLB, YouTube) go in the same list.
+    val official = viewModel.repo.videoMatches.collectAsStateWithLifecycle().value[ev.id]
+    val replays = remember(vodLooked, official) { SportsVideos.merge(vodLooked.orEmpty(), official.orEmpty()) }
     val vodAddons = viewModel.repo.vodAddons.collectAsStateWithLifecycle().value[ev.id]
+    val suggestNuvioSports by viewModel.repo.suggestNuvioSports.collectAsStateWithLifecycle()
+    val nuvioSportsTip = if (suggestNuvioSports)
+        " Tip: ${SportsAddonSource.NUVIO_SPORTS_NAME} (${SportsAddonSource.NUVIO_SPORTS_SITE}) has replays of most games: add it in Add-ons." else ""
     // A finished game: once replays turn up, put the highlight on the first one (once per visit).
     val firstReplay = remember(ev.id) { FocusRequester() }
+    // Back from watching one of them (or it finished): the highlight goes back on that one.
+    val backReplayKey = remember(ev.id) { SportsLaunch.takeLastReplay() }
+    val backReplay = remember(ev.id) { FocusRequester() }
+    val replayList = rememberLazyListState()
     var replayFocused by remember(ev.id) { mutableStateOf(false) }
     LaunchedEffect(ev.id, replays.isNotEmpty()) {
         if (ev.state == GameState.POST && replays.isNotEmpty() && !replayFocused) {
             delay(150)
+            val back = replays.indexOfFirst { it.channel.key == backReplayKey }
+            if (back > 0) {
+                runCatching { replayList.scrollToItem(back) }
+                delay(50)
+                if (runCatching { backReplay.requestFocus() }.isSuccess) { replayFocused = true; return@LaunchedEffect }
+            }
             if (runCatching { firstReplay.requestFocus() }.isSuccess) replayFocused = true
         }
     }
@@ -1484,33 +1539,38 @@ private fun GamePage(
             onDismiss = { pickRegion = false }
         )
     }
-    // Finished games: replays and highlights come only from sports addons, so this list goes first
-    // and says where they come from when there are none.
+    // Finished games: replays from your sports addons and the leagues' own highlights, so this
+    // list goes first and says where they come from when there are none.
     val replaysBlock: @Composable () -> Unit = {
         SectionHeader("REPLAYS & HIGHLIGHTS")
         when {
             replays.isNotEmpty() -> LazyColumn(
                 Modifier.heightIn(max = 126.dp).keepFocusWhileHeld(horizontal = false),
+                state = replayList,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
             ) {
                 itemsIndexed(replays, key = { _, m -> m.channel.key }) { i, m ->
-                    ChannelLine(m.channel, m.how, modifier = if (i == 0) Modifier.focusRequester(firstReplay) else Modifier,
+                    ChannelLine(m.channel, m.how, modifier = when {
+                        i == 0 -> Modifier.focusRequester(firstReplay)
+                        m.channel.key == backReplayKey -> Modifier.focusRequester(backReplay)
+                        else -> Modifier
+                    },
                         onClick = { onPlayReplay(m) })
                 }
             }
-            vodLooked == null -> LiveText("Looking in your sports add-ons…", color = SportsLook.Dim, size = 12.sp,
+            vodLooked == null || official == null -> LiveText("Looking for replays and highlights…", color = SportsLook.Dim, size = 12.sp,
                 modifier = Modifier.padding(start = 6.dp, bottom = 4.dp))
             vodAddons != null && vodAddons.isEmpty() -> LiveText(
                 "Replays and highlights come from sports add-ons that offer them (HighFly Premium, StremVerse…). " +
-                    "None of your add-ons do yet: install one in Add-ons and they'll show here.",
-                color = SportsLook.Dim, size = 12.sp, maxLines = 3, modifier = Modifier.padding(start = 6.dp, bottom = 4.dp)
+                    "None of your add-ons do yet: install one in Add-ons and they'll show here." + nuvioSportsTip,
+                color = SportsLook.Dim, size = 12.sp, maxLines = 4, modifier = Modifier.padding(start = 6.dp, bottom = 4.dp)
             )
             else -> LiveText(
                 (vodAddons?.takeIf { it.isNotEmpty() }?.let { "No replay of this game in ${it.joinToString(", ")} yet. " }
                     ?: "No replay of this game in your sports add-ons yet. ") +
-                    "They're often added a few hours after the game ends.",
-                color = SportsLook.Dim, size = 12.sp, maxLines = 3, modifier = Modifier.padding(start = 6.dp, bottom = 4.dp)
+                    "They're often added a few hours after the game ends." + nuvioSportsTip,
+                color = SportsLook.Dim, size = 12.sp, maxLines = 4, modifier = Modifier.padding(start = 6.dp, bottom = 4.dp)
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -1531,7 +1591,8 @@ private fun GamePage(
         when {
             matches.isNotEmpty() -> LazyColumn(
                 // Two channels showing (the rest scroll), so the panels underneath stay on screen.
-                Modifier.heightIn(max = 126.dp).keepFocusWhileHeld(horizontal = false),
+                // Target the group: row 0 can be recycled after scrolling or returning from playback.
+                Modifier.heightIn(max = 126.dp).focusRequester(first).keepFocusWhileHeld(horizontal = false),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
             ) {
@@ -1545,7 +1606,7 @@ private fun GamePage(
                         eventStartMs = ev.startMs,
                         use24h = use24h,
                         copies = g.drop(1),
-                        modifier = if (i == 0) Modifier.focusRequester(first).then(if (regionButton) Modifier.focusProperties { up = regionFocus } else Modifier) else Modifier,
+                        modifier = if (i == 0 && regionButton) Modifier.focusProperties { up = regionFocus } else Modifier,
                         onClick = { onChoose(m) }
                     )
                 }
@@ -1605,6 +1666,19 @@ private fun GamePage(
                             LiveTvNotice.show(if (auto) "It'll ask before switching" else "It'll switch to the game a minute before it starts")
                         })
                     }
+                }
+            }
+            // Score alerts for just this game (its scores and the final result), when its teams aren't followed.
+            if ((ev.state == GameState.PRE || ev.state == GameState.LIVE) && sides.size == 2 && !settings.hideScores &&
+                !viewModel.repo.alertsFromFollows(ev, follows)
+            ) {
+                val m = f()
+                item {
+                    val on = follows.alertGames.any { it.eventId == ev.id }
+                    SportsAction(if (on) "📣  Score alerts on" else "📣  Score alerts", modifier = m, selected = on, onClick = {
+                        viewModel.repo.toggleGameAlerts(ev)
+                        LiveTvNotice.show(if (on) "Score alerts off for this game" else "You'll see this game's scores and the final result wherever you are")
+                    })
                 }
             }
             // Record: pick the channel and how long.

@@ -34,6 +34,29 @@ fun multiviewPaneBounds(layout: MultiviewLayout): List<MultiviewPaneBounds> = wh
         MultiviewPaneBounds(2, 0f, .5f, .5f, 1f),
         MultiviewPaneBounds(3, .5f, .5f, 1f, 1f)
     )
+    MultiviewLayout.TWO_STACKED -> listOf(
+        MultiviewPaneBounds(0, 0f, 0f, 1f, .5f),
+        MultiviewPaneBounds(1, 0f, .5f, 1f, 1f)
+    )
+    // One wide pane on top, two below.
+    MultiviewLayout.THREE_WIDE_TOP -> listOf(
+        MultiviewPaneBounds(0, 0f, 0f, 1f, .6f),
+        MultiviewPaneBounds(1, 0f, .6f, .5f, 1f),
+        MultiviewPaneBounds(2, .5f, .6f, 1f, 1f)
+    )
+    // One big pane on the left, two stacked on the right.
+    MultiviewLayout.THREE_BIG_LEFT -> listOf(
+        MultiviewPaneBounds(0, 0f, 0f, .6f, 1f),
+        MultiviewPaneBounds(1, .6f, 0f, 1f, .5f),
+        MultiviewPaneBounds(2, .6f, .5f, 1f, 1f)
+    )
+    // One wide pane on top, three in a row below.
+    MultiviewLayout.FOUR_WIDE_TOP -> listOf(
+        MultiviewPaneBounds(0, 0f, 0f, 1f, .6f),
+        MultiviewPaneBounds(1, 0f, .6f, 1f / 3f, 1f),
+        MultiviewPaneBounds(2, 1f / 3f, .6f, 2f / 3f, 1f),
+        MultiviewPaneBounds(3, 2f / 3f, .6f, 1f, 1f)
+    )
 }
 
 /** Focus stays on a visible pane when a smaller layout removes the current pane. */
@@ -62,7 +85,60 @@ fun multiviewNextPane(layout: MultiviewLayout, fromPane: Int, direction: Multivi
             MultiviewDirection.UP -> if (pane >= 2) pane - 2 else pane
             MultiviewDirection.DOWN -> if (pane < 2) pane + 2 else pane
         }
+        MultiviewLayout.TWO_STACKED -> when (direction) {
+            MultiviewDirection.UP -> 0
+            MultiviewDirection.DOWN -> 1
+            else -> pane
+        }
+        MultiviewLayout.THREE_WIDE_TOP -> when (direction) {
+            MultiviewDirection.LEFT -> if (pane == 2) 1 else pane
+            MultiviewDirection.RIGHT -> if (pane == 1) 2 else pane
+            MultiviewDirection.UP -> 0
+            MultiviewDirection.DOWN -> if (pane == 0) 1 else pane
+        }
+        MultiviewLayout.THREE_BIG_LEFT -> when (direction) {
+            MultiviewDirection.LEFT -> 0
+            MultiviewDirection.RIGHT -> if (pane == 0) 1 else pane
+            MultiviewDirection.UP -> if (pane == 2) 1 else pane
+            MultiviewDirection.DOWN -> if (pane == 1) 2 else pane
+        }
+        MultiviewLayout.FOUR_WIDE_TOP -> when (direction) {
+            MultiviewDirection.LEFT -> if (pane >= 2) pane - 1 else pane
+            MultiviewDirection.RIGHT -> if (pane in 1..2) pane + 1 else pane
+            MultiviewDirection.UP -> 0
+            MultiviewDirection.DOWN -> if (pane == 0) 2 else pane
+        }
     }
+}
+
+/** How long the top bar, pane names and pane edges stay up after the last button press. */
+const val MULTIVIEW_OVERLAY_MS = 5_000L
+
+/** The overlays never fade while the highlight is on the top bar or a picker is open. */
+fun multiviewOverlaysStay(barFocused: Boolean, pickerOpen: Boolean): Boolean = barFocused || pickerOpen
+
+/** A pane that is still loading or has failed keeps its name and edge, so it is never an unnamed black box. */
+fun multiviewPaneKeepsLabel(isBuffering: Boolean, hasError: Boolean): Boolean = isBuffering || hasError
+
+enum class MultiviewBack { CLOSE_PICKER, ALL_PANES, HIDE_OVERLAYS, LEAVE }
+
+/**
+ * Back steps out one level at a time: the picker, then a full-screen pane back to all panes, then
+ * the overlays, and only leaves Multiview once they are hidden.
+ */
+fun multiviewBackAction(pickerOpen: Boolean, overlaysShown: Boolean, fullScreen: Boolean = false): MultiviewBack = when {
+    pickerOpen -> MultiviewBack.CLOSE_PICKER
+    fullScreen -> MultiviewBack.ALL_PANES
+    overlaysShown -> MultiviewBack.HIDE_OVERLAYS
+    else -> MultiviewBack.LEAVE
+}
+
+/** Left/Right in full screen: the next pane that has something in it, going round; [from] if there is no other. */
+fun multiviewNextFullPane(filled: List<Int>, from: Int, forward: Boolean): Int {
+    if (filled.isEmpty()) return from
+    val at = filled.indexOf(from)
+    if (at < 0) return filled.first()
+    return filled[(at + (if (forward) 1 else -1) + filled.size) % filled.size]
 }
 
 /** Picker data deliberately has no stream URL, provider headers, or credentials. */
@@ -101,47 +177,12 @@ suspend fun searchMultiviewChannels(
     matches
 }
 
-/** Picker groups: the viewer's Favorites and Recently Watched first, then the playlist's own groups in order. */
-data class MultiviewGroup(val id: String, val title: String, val count: Int)
-
-const val MULTIVIEW_GROUP_FAVORITES = "\u0000favorites"
-const val MULTIVIEW_GROUP_RECENT = "\u0000recent"
-
-fun multiviewGroupTitle(id: String): String = when (id) {
-    MULTIVIEW_GROUP_FAVORITES -> "Favorites"
-    MULTIVIEW_GROUP_RECENT -> "Recently Watched"
-    else -> id.ifBlank { "Other" }
-}
-
-fun multiviewGroups(
-    options: List<MultiviewChannelOption>,
-    favorites: Set<String>,
-    recent: List<String>
-): List<MultiviewGroup> {
-    val keys = options.mapTo(HashSet(options.size)) { it.key }
-    val groups = ArrayList<MultiviewGroup>()
-    favorites.count { it in keys }.takeIf { it > 0 }
-        ?.let { groups.add(MultiviewGroup(MULTIVIEW_GROUP_FAVORITES, "Favorites", it)) }
-    recent.count { it in keys }.takeIf { it > 0 }
-        ?.let { groups.add(MultiviewGroup(MULTIVIEW_GROUP_RECENT, "Recently Watched", it)) }
-    val counts = LinkedHashMap<String, Int>()
-    for (option in options) counts[option.group] = (counts[option.group] ?: 0) + 1
-    counts.forEach { (group, count) -> groups.add(MultiviewGroup(group, multiviewGroupTitle(group), count)) }
-    return groups
-}
-
-/** The channels of one group (null = all of them). Recently Watched keeps its most-recent-first order. */
-fun multiviewInGroup(
-    options: List<MultiviewChannelOption>,
-    groupId: String?,
-    favorites: Set<String>,
-    recent: List<String>
-): List<MultiviewChannelOption> = when (groupId) {
-    null -> options
-    MULTIVIEW_GROUP_FAVORITES -> options.filter { it.key in favorites }
-    MULTIVIEW_GROUP_RECENT -> {
-        val byKey = options.associateBy { it.key }
-        recent.mapNotNull { byKey[it] }
-    }
-    else -> options.filter { it.group == groupId }
-}
+/** A group in the channel picker, in the guide's order (see MultiviewViewModel.pickerGroups). */
+data class MultiviewGroup(
+    val id: String,
+    val title: String,
+    val count: Int,
+    /** The playlist this group comes from, and its name (null for Favorites, Recent and your own groups). */
+    val sourceId: String? = null,
+    val sourceName: String? = null,
+)

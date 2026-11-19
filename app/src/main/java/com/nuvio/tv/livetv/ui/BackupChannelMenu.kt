@@ -74,13 +74,6 @@ internal fun BackupChannelMenu(
             onDismiss = onDismiss,
             onConfirm = { name -> viewModel.createGroupWith(name, channel); onDismiss() }
         )
-        "group" -> GroupPickerDialog(
-            channel = channel,
-            groups = viewModel.uiState.value.customGroups,
-            onDismiss = onDismiss,
-            onPick = { g -> viewModel.addToGroup(g.id, channel); onDismiss() },
-            onNewGroup = { step = "newgroup" }
-        )
         "copy" -> GroupPickerDialog(
             channel = channel,
             groups = viewModel.copyTargets(channel),
@@ -92,8 +85,8 @@ internal fun BackupChannelMenu(
         "manual" -> com.nuvio.tv.livetv.record.ManualRecordingDialog(
             channel = channel,
             use24h = settings.use24HourClock,
-            onSchedule = { title, start, stop ->
-                LiveTvNotice.show(viewModel.scheduler.addManual(channel, title, start, stop))
+            onSchedule = { title, start, stop, days ->
+                LiveTvNotice.show(viewModel.scheduler.addManual(channel, title, start, stop, days))
                 onDismiss()
             },
             onDismiss = onDismiss
@@ -155,6 +148,12 @@ internal fun BackupChannelMenu(
                             onDismiss()
                         }
                     }
+                    if (program != null && seriesLabel == "Record series") item {
+                        MenuItem("Record new episodes only") {
+                            LiveTvNotice.show(viewModel.toggleSeries(channel, program, newOnly = true))
+                            onDismiss()
+                        }
+                    }
                     item { MenuItem("Schedule a recording…", onClick = { step = "manual" }) }
                     item { MenuHeader("Favorites & groups") }
                     item {
@@ -163,11 +162,10 @@ internal fun BackupChannelMenu(
                             onDismiss()
                         }
                     }
-                    item { MenuItem("Add to group…", onClick = { step = "group" }) }
-                    item { MenuItem("Copy channel…", onClick = { step = "copy" }) }
+                    item { MenuItem("Copy to group…", onClick = { step = "copy" }) }
                     item { MenuHeader("Edit channel") }
-                    item { MenuItem("Rename channel", onClick = { step = "rename" }) }
-                    item { MenuItem("Change channel number", onClick = { step = "number" }) }
+                    item { MenuItem("Rename channel…", onClick = { step = "rename" }) }
+                    item { MenuItem("Change channel number…", onClick = { step = "number" }) }
                     item {
                         MenuItem("Hide channel") {
                             viewModel.hideChannel(channel)

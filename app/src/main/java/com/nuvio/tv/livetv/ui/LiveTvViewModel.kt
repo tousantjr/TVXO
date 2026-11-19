@@ -82,6 +82,9 @@ data class LiveTvUiState(
         if (groups.any { it.id == ChannelGroup.ALL }) ChannelGroup.ALL else channel.groupId
 }
 
+/** "Until I stop it" recordings still end after this long, so a forgotten one can't fill the drive. */
+private const val UNTIL_STOPPED_MAX_MS = 12 * 60 * 60_000L
+
 @HiltViewModel
 class LiveTvViewModel @Inject constructor(
     private val repository: LiveTvRepository,
@@ -269,13 +272,7 @@ class LiveTvViewModel @Inject constructor(
         }
     }
 
-    /** The parts of the saved user state that [buildUi] reads; keep in step with it. */
-    private fun sameForLists(a: LiveUserState, b: LiveUserState): Boolean =
-        a.favorites == b.favorites && a.recent == b.recent &&
-            a.hiddenChannels == b.hiddenChannels && a.hiddenGroups == b.hiddenGroups &&
-            a.lockedGroups == b.lockedGroups && a.customGroups == b.customGroups &&
-            a.channelOrder == b.channelOrder && a.groupOrder == b.groupOrder &&
-            a.channelCopies == b.channelCopies
+    private fun sameForLists(a: LiveUserState, b: LiveUserState): Boolean = sameForLiveTvLists(a, b)
 
     // ------------------------------------------------------------ actions
 
@@ -980,11 +977,13 @@ class LiveTvViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             combine(
-                uiState.map { it.channels.map { c -> c.key } }.distinctUntilChanged(),
+                // Only the first 400 are used: don't list every channel of a huge playlist.
+                uiState.map { it.channels.take(400).map { c -> c.key } }.distinctUntilChanged(),
                 userState.map { it.favorites }.distinctUntilChanged(),
                 homeRowKeys
-            ) { a, b, c -> c + b + a.take(400) }
+            ) { a, b, c -> c + b + a }
                 .distinctUntilChanged()
+                .flowOn(Dispatchers.Default)
                 .collectLatest { keys ->
                     delay(1_500)
                     if (keys.isNotEmpty()) repository.rememberPriority(keys)
@@ -992,7 +991,8 @@ class LiveTvViewModel @Inject constructor(
         }
         // The group you open: its listings straight away, if they aren't loaded yet.
         viewModelScope.launch {
-            uiState.map { it.channels.take(400).map { c -> c.key } }.distinctUntilChanged().collect { keys ->
+            uiState.map { it.channels.take(400).map { c -> c.key } }.distinctUntilChanged()
+                .flowOn(Dispatchers.Default).collect { keys ->
                 repository.loadChannelsNow(keys)
             }
         }
@@ -1366,6 +1366,33 @@ class LiveTvViewModel @Inject constructor(
         channel?.let { prefs.addToCustomGroup(id, it.key) }
     }
 
+    /** Groups that several channels can be copied to: yours and the playlist's, not the special ones. */
+    fun bulkCopyTargets(): List<ChannelGroup> = uiState.value.groups.filter { !it.special }
+
+    /**
+     * Copies all of [channels] into [groupId] (one of yours, or a playlist group) in one go.
+     * Channels already in that group are skipped. Returns how many were added.
+     */
+    fun copyChannelsToGroup(groupId: String, channels: List<LiveChannel>): Int {
+        val user = userState.value
+        val isCustom = groupId.startsWith(ChannelGroup.CUSTOM_PREFIX)
+        val already: Set<String> = if (isCustom) user.customGroups.firstOrNull { it.id == groupId }?.channelKeys.orEmpty().toSet()
+            else user.channelCopies[groupId].orEmpty().toSet()
+        val fresh = channels.filter { it.key !in already && (isCustom || it.groupId != groupId) }.distinctBy { it.key }
+        if (fresh.isEmpty()) return 0
+        viewModelScope.launch {
+            if (isCustom) prefs.addManyToCustomGroup(groupId, fresh.map { it.key })
+            else prefs.copyChannels(groupId, fresh.map { it.key })
+        }
+        return fresh.size
+    }
+
+    /** Makes a new group of your own holding all of [channels]. */
+    fun createGroupWithChannels(name: String, channels: List<LiveChannel>) = viewModelScope.launch {
+        val id = prefs.createCustomGroup(name)
+        prefs.addManyToCustomGroup(id, channels.map { it.key })
+    }
+
     fun addToGroup(groupId: String, channel: LiveChannel) = viewModelScope.launch { prefs.addToCustomGroup(groupId, channel.key) }
     fun removeFromGroup(groupId: String, channel: LiveChannel) = viewModelScope.launch { prefs.removeFromCustomGroup(groupId, channel.key) }
     fun moveInGroup(groupId: String, channel: LiveChannel, delta: Int) = viewModelScope.launch {
@@ -1401,12 +1428,12 @@ class LiveTvViewModel @Inject constructor(
     }
 
     /** Record every airing of this show on this channel (or stop that). Returns a message. */
-    fun toggleSeries(channel: LiveChannel, program: EpgProgram): String {
+    fun toggleSeries(channel: LiveChannel, program: EpgProgram, newOnly: Boolean = false): String {
         scheduler.seriesFor(channel.key, titleMarks(program.title).title)?.let {
             scheduler.removeSeries(it.id)
             return "Stopped recording \"${it.title}\""
         }
-        return scheduler.addSeries(channel, program)
+        return scheduler.addSeries(channel, program, newOnly)
     }
 
     fun isSeries(channel: LiveChannel, program: EpgProgram): Boolean =
@@ -1426,12 +1453,31 @@ class LiveTvViewModel @Inject constructor(
             recorder.stop(running.id)
             return "Recording stopped. It's in Recordings."
         }
+        return startRecording(channel, showEndStopMs(channel) ?: (System.currentTimeMillis() + 60 * 60_000L))
+    }
+
+    /** When "until the show ends" stops: the show on now's end plus Keep Recording After. Null with no listing. */
+    fun showEndStopMs(channel: LiveChannel): Long? {
+        val now = System.currentTimeMillis()
+        val show = currentProgram(channel.key, now)?.takeIf { !LiveTvRepository.isPlaceholderTitle(it.title) } ?: return null
+        if (show.stopMs <= now) return null
+        return show.stopMs + settings.value.recordPostMinutes.coerceAtLeast(0) * 60_000L
+    }
+
+    /**
+     * Starts recording the channel from now, stopping at [stopAtMs]; null records until it's
+     * stopped by hand (with a safety stop after [UNTIL_STOPPED_MAX_MS], so a forgotten one can't
+     * fill the drive). Returns a message to show.
+     */
+    fun startRecording(channel: LiveChannel, stopAtMs: Long?): String {
+        recorder.activeFor(channel.key)?.let { return "This channel is already recording" }
         val now = System.currentTimeMillis()
         val show = currentProgram(channel.key, now)?.takeIf { !LiveTvRepository.isPlaceholderTitle(it.title) }
-        val stopAt = if (show != null && show.stopMs > now) show.stopMs + 5 * 60_000L else now + 60 * 60_000L
+        val untilStopped = stopAtMs == null
+        val stopAt = (stopAtMs ?: (now + UNTIL_STOPPED_MAX_MS)).coerceAtLeast(now + 60_000L)
         val title = show?.title?.let { titleMarks(it).title } ?: channel.name
-        // Roughly 2 GB an hour in HD: say so if it may not fit.
-        val needed = (stopAt - now) / 3_600_000.0 * 2.0 * 1024 * 1024 * 1024
+        // Roughly 2 GB an hour in HD: say so if it may not fit (an hour's worth when it has no end).
+        val needed = ((if (untilStopped) 60 * 60_000L else stopAt - now) / 3_600_000.0) * 2.0 * 1024 * 1024 * 1024
         val watching = playback.playingChannel?.key == channel.key && playback.state.value.catchupTitle == null
         val url = playback.liveUrlFor(channel)
         if (watching) playback.handOverForRecording()
@@ -1447,7 +1493,7 @@ class LiveTvViewModel @Inject constructor(
             startDelayMs = if (watching) 1_500L else 0L
         )
         if (watching) playback.playFromRecording(recorder.playlistFile(rec))
-        val until = formatClock(stopAt, settings.value.use24HourClock)
+        val until = if (untilStopped) "you stop it" else formatClock(stopAt, settings.value.use24HourClock)
         return if (recorder.freeBytes() < needed) "Recording \"$title\" until $until. Storage is low, so it may stop early."
         else "Recording \"$title\" until $until"
     }
@@ -1631,6 +1677,14 @@ private val STATION_NOTE = Regex("""[\[(]([^\])]*)[\])]""")
 internal fun stationNote(name: String): String? =
     STATION_NOTE.findAll(name.lowercase()).map { it.groupValues[1].trim() }
         .firstOrNull { it.isNotBlank() && backupName(it).isNotBlank() }
+
+/** The parts of the saved user state that [buildUi] reads; keep in step with it. */
+internal fun sameForLiveTvLists(a: LiveUserState, b: LiveUserState): Boolean =
+    a.favorites == b.favorites && a.recent == b.recent &&
+        a.hiddenChannels == b.hiddenChannels && a.hiddenGroups == b.hiddenGroups &&
+        a.lockedGroups == b.lockedGroups && a.customGroups == b.customGroups &&
+        a.channelOrder == b.channelOrder && a.groupOrder == b.groupOrder &&
+        a.channelCopies == b.channelCopies
 
 /** The guide's groups and the channels of [groupIdRaw], from your saved choices (also used by Home's row). */
 internal fun buildUi(

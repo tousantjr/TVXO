@@ -112,6 +112,9 @@ enum class GameState { PRE, LIVE, POST, OFF }
 /** One line of a race result or leaderboard: "1", "Kyle Larson", "-12" (golf) or null. */
 data class Standing(val pos: String, val name: String, val detail: String?)
 
+/** One session of a race weekend ("Practice 1", "Qualifying", "Race"), with its own time. */
+data class EventSession(val label: String, val startMs: Long, val minutes: Int, val race: Boolean)
+
 enum class EventSource { ESPN, GUIDE, FIXTURES }
 
 data class SportsEvent(
@@ -146,7 +149,9 @@ data class SportsEvent(
     /** A race's finishing (or running) order, a golf leaderboard: position, name, detail. */
     val standings: List<Standing> = emptyList(),
     /** A few lines about the event (wrestling shows, from TheSportsDB). */
-    val about: String? = null
+    val about: String? = null,
+    /** A race weekend's sessions, in time order (the event itself is the next or live one). */
+    val sessions: List<EventSession> = emptyList()
 ) {
     val sides: List<Side> get() = listOfNotNull(away, home)
     val hasScore: Boolean get() = (state == GameState.LIVE || state == GameState.POST) && sides.size == 2 && sides.all { !it.score.isNullOrBlank() }
@@ -294,6 +299,9 @@ data class FollowedTeam(
 /** [autoSwitch]: switch to the game when it starts (null: as Sports settings say). */
 data class SportsReminder(val eventId: String, val title: String, val startMs: Long, val autoSwitch: Boolean? = null)
 
+/** A single game you asked score alerts for (its scores and the final result), without following its teams. */
+data class GameAlertPick(val eventId: String, val leagueId: String, val startMs: Long)
+
 data class SportsFollows(
     val teams: List<FollowedTeam> = emptyList(),
     /** Whole leagues (every game), by league id. */
@@ -311,7 +319,9 @@ data class SportsFollows(
      * The order of My Sports' rows (Arrange My Sports): "t:" + a team's key, "l:" + a league id,
      * "w:" + a name. Rows not in it (followed since) go after, in the order they were followed.
      */
-    val order: List<String> = emptyList()
+    val order: List<String> = emptyList(),
+    /** Single games with score alerts on (Score alerts on the game page). */
+    val alertGames: List<GameAlertPick> = emptyList()
 ) {
     val isEmpty: Boolean get() = teams.isEmpty() && leagues.isEmpty() && words.isEmpty() && pins.isEmpty()
 
@@ -348,6 +358,9 @@ data class SportsFollows(
         .put("pins", JSONArray(pins))
         .put("unpinned", JSONArray(unpinned.toList()))
         .put("order", JSONArray(order))
+        .put("alertGames", JSONArray().also { a ->
+            alertGames.forEach { g -> a.put(JSONObject().put("e", g.eventId).put("l", g.leagueId).put("s", g.startMs)) }
+        })
         .toString()
 
     companion object {
@@ -381,7 +394,13 @@ data class SportsFollows(
                     // "Every game" leagues (from before there was one Follow) are followed leagues now.
                     pins = (o.optJSONArray("pins").strings() + o.optJSONArray("leagues").strings()).distinct(),
                     unpinned = o.optJSONArray("unpinned").strings().toSet(),
-                    order = o.optJSONArray("order").strings()
+                    order = o.optJSONArray("order").strings(),
+                    alertGames = o.optJSONArray("alertGames")?.let { a ->
+                        (0 until a.length()).mapNotNull { i ->
+                            val g = a.optJSONObject(i) ?: return@mapNotNull null
+                            GameAlertPick(g.optString("e").ifBlank { return@mapNotNull null }, g.optString("l"), g.optLong("s"))
+                        }
+                    }.orEmpty()
                 )
             }.getOrDefault(SportsFollows())
         }

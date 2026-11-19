@@ -157,8 +157,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1076
-        versionName = "1.1.0-beta.13"
+        versionCode = 1079
+        versionName = "1.2.0-beta.2"
 
         buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${localProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
         buildConfigField("String", "INTRODB_API_URL", "\"${localProperties.getProperty("INTRODB_API_URL", "")}\"")
@@ -428,6 +428,11 @@ val livetvIsTestBuild = (findProperty("livetvTestBuild") as String?)?.toBoolean(
 val livetvTesterKey = if (livetvIsTestBuild) {
     (System.getenv("LIVETV_TESTER_KEY") ?: localProperties.getProperty("LIVETV_TESTER_KEY", "")).trim()
 } else ""
+// Our own builds carry the app key (GitHub secret LIVETV_APP_KEY, never in the code), which our
+// livetv-cloud service asks for before it hands out cloud sync and the sports files. Builds
+// without it fall back to the old public addresses.
+val livetvAppKey = (System.getenv("LIVETV_APP_KEY") ?: localProperties.getProperty("LIVETV_APP_KEY", "")).trim()
+android.defaultConfig.buildConfigField("String", "LIVETV_APP_KEY", buildConfigString(livetvAppKey))
 android.defaultConfig.buildConfigField("String", "NUVIO_CHANNEL", "\"${if (livetvIsTestBuild) "test" else "stable"}\"")
 // TVXO: upstream's tester-only update service (a homelessbrian Cloudflare Worker) is not used.
 android.defaultConfig.buildConfigField("String", "TEST_UPDATES_URL", "\"\"")
@@ -642,7 +647,7 @@ dependencies {
     implementation(files("libs/nuvio-libass-release.aar"))
     // Local nextlib-mediainfo fork (static FFmpeg; no libav*.so in final AAR)
     implementation(files("libs/nextlib-mediainfo-local.aar"))
-    implementation("io.github.abdallahmehiz:mpv-android-lib:0.1.12")
+    implementation("io.github.abdallahmehiz:mpv-android-lib:0.2.1")
     implementation("dev.chrisbanes.haze:haze-android:1.7.2") {
         exclude(group = "org.jetbrains.compose.ui")
         exclude(group = "org.jetbrains.compose.foundation")
@@ -696,6 +701,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
     testImplementation(kotlin("test-junit"))
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

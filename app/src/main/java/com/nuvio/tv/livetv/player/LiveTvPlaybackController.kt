@@ -300,6 +300,13 @@ class LiveTvPlaybackController @Inject constructor(
         return start + timeshift.trimmedMs + if (shiftPrepared) p.currentPosition.coerceAtLeast(0) else 0L
     }
 
+    /** Seek thumbnails: the rewind buffer's list of pieces on this box, while playing from it. */
+    val shiftPlaylistFile: java.io.File?
+        get() {
+            if (_shiftStartedAt.value == null || !shiftPrepared) return null
+            return timeshift.session?.playUri?.path?.let { java.io.File(it) }?.takeIf { it.exists() }
+        }
+
     /** Skipping back and forward works on every recording (TS ones are saved in pieces too now). */
     fun shiftCanSeek(): Boolean = (timeshift.session != null && shiftPrepared) || _recordingPlayback.value != null || _ownTimeline.value
 
@@ -323,10 +330,35 @@ class LiveTvPlaybackController @Inject constructor(
         return OwnTimeline(p.currentPosition.coerceIn(0L, d), d, p.isCurrentMediaItemDynamic)
     }
 
+    /** The stream playing now has shown itself as live at some point (a live game, not a replay). */
+    @Volatile private var sawLive = false
+
+    private val _videoFinished = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** A replay or highlight from Sports played to its end (full screen goes back where it was opened). */
+    val videoFinished: kotlinx.coroutines.flow.SharedFlow<Unit> = _videoFinished
+
+    /**
+     * True when what just ended is a sports addon replay or an official highlight that played
+     * through: a fixed length, and never live. A live game that drops (even one whose provider
+     * closes its list) keeps retrying as before.
+     */
+    private fun clipFinished(): Boolean {
+        val p = _player ?: return false
+        val ch = currentChannel ?: return false
+        if (ch.sourceId != com.nuvio.tv.livetv.sports.SportsVideos.SOURCE_ID &&
+            ch.sourceId != com.nuvio.tv.livetv.sports.SportsAddonSource.SOURCE_ID) return false
+        if (sawLive || p.isCurrentMediaItemDynamic) return false
+        val d = p.duration
+        return d != C.TIME_UNSET && d > 0
+    }
+
     private fun updateOwnTimeline() {
         val p = _player
         val ch = currentChannel
-        _ownTimeline.value = p != null && ch?.sourceId == com.nuvio.tv.livetv.sports.SportsAddonSource.SOURCE_ID &&
+        if (p != null && p.isCurrentMediaItemDynamic) sawLive = true
+        _ownTimeline.value = p != null &&
+            (ch?.sourceId == com.nuvio.tv.livetv.sports.SportsAddonSource.SOURCE_ID ||
+                ch?.sourceId == com.nuvio.tv.livetv.sports.SportsVideos.SOURCE_ID) &&
             _state.value.catchupTitle == null && _shiftStartedAt.value == null && _recordingPlayback.value == null &&
             p.isCurrentMediaItemSeekable && p.duration != C.TIME_UNSET &&
             // Live: only with a real rewind window (a short one would run out while paused, so
@@ -362,6 +394,9 @@ class LiveTvPlaybackController @Inject constructor(
     /** The recording playing as a show of its own ([playSavedRecording]), or null. */
     @Volatile var savedRecordingId: String? = null
         private set
+    /** That recording's playlist of pieces on this box (for its seek thumbnails), or null. */
+    @Volatile var savedRecordingPlaylist: java.io.File? = null
+        private set
 
     /**
      * Plays a recording from Recordings like a replay that's all on this box: the catch-up seek
@@ -371,6 +406,7 @@ class LiveTvPlaybackController @Inject constructor(
         play(channel, overrideUrl = android.net.Uri.fromFile(playlist).toString(), catchupTitle = title)
         val p = _player ?: return
         savedRecordingId = recordingId
+        savedRecordingPlaylist = playlist
         replayLocal = true
         archiveStartPending = false
         leadSeekMs = 0L
@@ -590,6 +626,8 @@ class LiveTvPlaybackController @Inject constructor(
     /** The channel the player is on (as it was when playback started). */
     val playingChannel: LiveChannel? get() = currentChannel
     private var currentUrl: String? = null
+    /** The link playing now (a backup or catch-up link when one is in use), or null. */
+    val playingUrl: String? get() = currentUrl
     private var attachCount = 0
     private var releaseJob: Job? = null
     private var reconnectJob: Job? = null
@@ -763,6 +801,7 @@ class LiveTvPlaybackController @Inject constructor(
         if (previousChannelKey != channel.key) recentStalls.clear()
         shiftStartPending = false
         savedRecordingId = null
+        savedRecordingPlaylist = null
         _ownTimeline.value = false
         if (_shiftStartedAt.value != null) stopShift()
         if (_recordingPlayback.value != null) { _recordingPlayback.value = null; shiftJob?.cancel() }
@@ -773,6 +812,7 @@ class LiveTvPlaybackController @Inject constructor(
         wallCheckedFor = null
         if (previousChannelKey != channel.key) {
             neverStartedCount = 0
+            sawLive = false
             audioHandled = false
             audioPrefPending = true
             captionsHandled = false
@@ -1033,6 +1073,7 @@ class LiveTvPlaybackController @Inject constructor(
         stalkerGeneration++
         activeStalkerRef = null
         savedRecordingId = null
+        savedRecordingPlaylist = null
         clearStarting()
         reconnectJob?.cancel()
         stopReplayCache()
@@ -1046,6 +1087,7 @@ class LiveTvPlaybackController @Inject constructor(
         LiveWatching.sourceId = null
         currentUrl = null
         _ownTimeline.value = false
+        sawLive = false
         _state.value = LivePlaybackState()
     }
 
@@ -1159,7 +1201,7 @@ class LiveTvPlaybackController @Inject constructor(
                 "; reloading · ${redact(currentUrl ?: ch.url)}"
         )
         val url = currentUrl ?: ch.url
-        val resumeAt = if (archive) pos else C_TIME_UNSET
+        val resumeAt = if (archive) pos else ownReplayResumeAt(p)
         if (activeStalkerRef != null) {
             restartStalker(resumeAt)
             return
@@ -1861,6 +1903,13 @@ class LiveTvPlaybackController @Inject constructor(
                 return
             }
             if (playbackState == Player.STATE_ENDED && _state.value.catchupTitle == null) {
+                // A replay or highlight from Sports that played to its end: done, not a dropout.
+                if (clipFinished()) {
+                    com.nuvio.tv.livetv.model.LiveTvLoadReport.add("Video ${currentChannel?.name} finished")
+                    _videoFinished.tryEmit(Unit)
+                    stop()
+                    return
+                }
                 // A live stream should never end; treat it as a dropped connection.
                 scheduleReconnect("Stream ended")
             }
@@ -2031,6 +2080,17 @@ class LiveTvPlaybackController @Inject constructor(
     fun replaySavedMs(): Long? =
         if (replayLocal && savedRecordingId == null && replayCache.session != null) replayCache.savedMs else null
 
+    /** Seek thumbnails: the list of pieces of the catch-up being saved on this box (null if none). */
+    val replayPlaylistFile: java.io.File?
+        get() = if (replayLocal && savedRecordingId == null) replayCache.session?.playUri?.path?.let { java.io.File(it) } else null
+
+    /** Seek thumbnails: what the provider needs on each stream request (Stalker portals). */
+    val thumbnailPolicy: StalkerMediaPolicy? get() = stalkerMediaPolicy
+
+    /** Seek thumbnails: the replay is a streamed (HLS) link that plays straight from the provider. */
+    fun catchupIsHls(): Boolean =
+        !replayLocal && (stalkerMimeType == StalkerMimeProbe.HLS || currentUrl?.substringBefore('?')?.contains("m3u8", ignoreCase = true) == true)
+
     /** A TS catch-up link tried after another failed: saved while it plays (false if it can't be). */
     private fun saveFallback(ch: LiveChannel, url: String): Boolean =
         catchupCache && ch.drm == null && !url.substringBefore('?').contains("m3u8", ignoreCase = true) &&
@@ -2065,33 +2125,19 @@ class LiveTvPlaybackController @Inject constructor(
     /** Called with the playlist id when that provider's catch-up plays as HLS. */
     var onCatchupHlsWorks: ((String) -> Unit)? = null
 
-    /** Live channels whose HLS playlist couldn't be read: played as TS instead (until the app restarts). */
-    private val tsInstead: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
-    /** Live channels whose link looks like HLS but sends plain TS: read as TS (until the app restarts). */
-    private val plainTs: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
+    /** Live channels whose HLS playlist couldn't be read: played as TS instead (shared with Multiview). */
+    private val tsInstead: MutableSet<String> = LiveStreamFormats.tsInstead
+    /** Live channels whose link looks like HLS but sends plain TS: read as TS (shared with Multiview). */
+    private val plainTs: MutableSet<String> = LiveStreamFormats.plainTs
 
     /**
      * The TS version of an Xtream live link: ".../123.m3u8" -> ".../123.ts", and a link with no
      * ending at all (".../user/pass/123", which the server answers as HLS) -> ".../123.ts".
      * Null if it isn't one.
      */
-    private fun tsLinkFor(url: String): String? {
-        val base = url.substringBefore('?')
-        if (base.endsWith(".m3u8", ignoreCase = true) && XTREAM_HLS.containsMatchIn(base))
-            return base.dropLast(5) + ".ts" + url.substring(base.length)
-        if (XTREAM_BARE.containsMatchIn(base)) return base + ".ts" + url.substring(base.length)
-        return null
-    }
+    private fun tsLinkFor(url: String): String? = LiveStreamFormats.tsLinkFor(url)
 
-    private fun isMalformedManifest(error: PlaybackException): Boolean {
-        if (error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED) return true
-        var c: Throwable? = error
-        while (c != null) {
-            if (c is androidx.media3.common.ParserException && c.message?.contains("malformed", true) == true) return true
-            c = c.cause
-        }
-        return false
-    }
+    private fun isMalformedManifest(error: PlaybackException): Boolean = LiveStreamFormats.isMalformedManifest(error)
 
     // ---- start-up guard: a channel that made the app close while it was starting isn't
     // started by itself again next time (it used to close the app again, over and over).
@@ -2119,15 +2165,7 @@ class LiveTvPlaybackController @Inject constructor(
     @Volatile private var forcedMime: String? = null
     @Volatile private var formatGuess = 0
 
-    private fun isUnrecognizedFormat(error: PlaybackException): Boolean {
-        var c: Throwable? = error
-        while (c != null) {
-            if (c is androidx.media3.exoplayer.source.UnrecognizedInputFormatException) return true
-            if (c is androidx.media3.common.ParserException && c.message?.contains("ontainer", true) == true) return true
-            c = c.cause
-        }
-        return error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
-    }
+    private fun isUnrecognizedFormat(error: PlaybackException): Boolean = LiveStreamFormats.isUnrecognizedFormat(error)
 
     /** A link for the start-up report, with the username and password hidden. */
     private fun redact(url: String): String =
@@ -2201,19 +2239,40 @@ class LiveTvPlaybackController @Inject constructor(
             }
             val url = currentUrl ?: return@launch
             val p = _player ?: return@launch
+            val resumeAt = ownReplayResumeAt(p)
             p.setMediaSource(buildMediaSource(url, ch.headers, isLive = _state.value.catchupTitle == null))
             p.prepare()
+            if (resumeAt > 0) p.seekTo(resumeAt)
             p.playWhenReady = true
         }
     }
 
-    private fun buildMediaSource(url: String, headers: Map<String, String>, isLive: Boolean): androidx.media3.exoplayer.source.MediaSource =
-        com.nuvio.tv.livetv.multiview.LiveTvMediaSourceBuilder(
+    private fun buildMediaSource(url: String, headers: Map<String, String>, isLive: Boolean): androidx.media3.exoplayer.source.MediaSource {
+        // A YouTube highlight from Sports: its picture and sound are two files, played together
+        // the way trailers are (read in pieces, as YouTube slows down whole-file downloads).
+        if (currentChannel?.sourceId == com.nuvio.tv.livetv.sports.SportsVideos.SOURCE_ID) {
+            com.nuvio.tv.livetv.sports.SportsVideos.soundFor(url)?.let { sound ->
+                val factory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(com.nuvio.tv.data.trailer.YoutubeChunkedDataSourceFactory())
+                return androidx.media3.exoplayer.source.MergingMediaSource(
+                    factory.createMediaSource(MediaItem.fromUri(url)),
+                    factory.createMediaSource(MediaItem.fromUri(sound))
+                )
+            }
+        }
+        return com.nuvio.tv.livetv.multiview.LiveTvMediaSourceBuilder(
             drm = currentChannel?.drm,
             forcedMime = forcedMime,
             bufferSize = bufferSize,
             stalkerPolicy = stalkerMediaPolicy,
         ).build(url, headers, isLive)
+    }
+
+    /**
+     * Where a replay with its own timeline (an addon replay, a highlight) had got to, so reloading
+     * it after a freeze or an error carries on there instead of starting over. Unset otherwise.
+     */
+    private fun ownReplayResumeAt(p: ExoPlayer): Long =
+        if (_ownTimeline.value && !p.isCurrentMediaItemDynamic) p.currentPosition.coerceAtLeast(0L) else C_TIME_UNSET
 
     /**
      * Lets go of the player (and its hold on the audio output) right away. Called when Nuvio's
@@ -2285,11 +2344,7 @@ class LiveTvPlaybackController @Inject constructor(
         private const val WRONG_SHOW_SLACK_MS = 10 * 60_000L
         /** Two freezes within this long: the channel counts as failing (live games only). */
         private const val FREEZE_WINDOW_MS = 3 * 60_000L
-        private val FORMAT_GUESSES = listOf(MimeTypes.APPLICATION_M3U8, MimeTypes.APPLICATION_MPD)
-        /** Xtream live links: ".../live/user/pass/123.m3u8" or "host/user/pass/123.m3u8". */
-        private val XTREAM_HLS = Regex("""/(?:live/)?[^/]+/[^/]+/\d+\.m3u8$""", RegexOption.IGNORE_CASE)
-        /** An Xtream live link with no ending: ".../live/user/pass/123" or ".../user/pass/123". */
-        private val XTREAM_BARE = Regex("""/(?:live/)?[^/]+/[^/]+/\d+$""")
+        private val FORMAT_GUESSES = LiveStreamFormats.FORMAT_GUESSES
         /** No picture this long after the video moved to a new screen = stuck. */
         private const val FRAME_TIMEOUT_MS = 2_500L
         /** Still loading this long after the video moved to a new screen = stuck. */

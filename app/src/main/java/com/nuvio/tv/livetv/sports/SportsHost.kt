@@ -58,15 +58,16 @@ interface SportsEntryPoint {
 
 /** Opens Live TV full screen on whatever it's now playing (or about to replay). */
 fun openLiveTvFullscreen(navController: NavController) {
-    // Said before the guide comes up, so a guide with its preview window off doesn't stop the
-    // game on its way to full screen.
+    // The shared video view starts full screen on its first frame. Going through the player
+    // alias as well would open this destination twice and briefly expose the guide.
     com.nuvio.tv.livetv.ui.LiveTvFullscreen.request()
     navController.navigate(Screen.LiveTv.route) {
         popUpTo(navController.graph.startDestinationId) { saveState = true }
         launchSingleTop = true
-        restoreState = true
+        // A saved Live TV stack may end in Multiview; start only the single-player destination.
+        // Sports is still saved above and restored by the return callback.
+        restoreState = false
     }
-    navController.navigate(Screen.LiveTvPlayer.route) { launchSingleTop = true }
 }
 
 /**
@@ -211,7 +212,7 @@ fun SportsHost(navController: NavController) {
     LaunchedEffect(alert) {
         val a = alert ?: return@LaunchedEffect
         delay(7_000)
-        if (SportsLive.alerts.value == a) SportsLive.alerts.value = null
+        SportsLive.done(a)
     }
     androidx.compose.runtime.CompositionLocalProvider(LocalSportsAnim provides SportsAnimLevel.from(settings.animations)) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
@@ -355,7 +356,7 @@ private fun SwitchCountdown(ev: SportsEvent, match: ChannelMatch, onSwitch: () -
     LaunchedEffect(ev.id) { delay(80); runCatching { first.requestFocus() } }
 }
 
-/** "Bears score!": the game's two bands with the new score, in the corner for a few seconds. */
+/** "Bears score!" (or "Full time"): the game's two bands with the score, in the corner for a few seconds. */
 @Composable
 private fun ScoringAlertCard(a: SportsAlert) {
     val ev = a.event
@@ -367,9 +368,10 @@ private fun ScoringAlertCard(a: SportsAlert) {
             .sportsFrame(focused = false, playing = true, accent = SportsLook.Flash)
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            SportsBadge("${a.team.name.uppercase()} SCORE!", SportsLook.Flash, SportsLook.Ink)
+            if (a.final) SportsBadge(if (a.league.sport == Sport.FOOTBALL) "FULL TIME" else "FINAL", Color.White, SportsLook.Ink)
+            else SportsBadge("${a.team.name.uppercase()} SCORE!", SportsLook.Flash, SportsLook.Ink)
             Spacer(Modifier.weight(1f))
-            ev.status?.let { LiveText(it, color = Color.White, size = 11.sp, weight = FontWeight.Black) }
+            if (!a.final) ev.status?.let { LiveText(it, color = Color.White, size = 11.sp, weight = FontWeight.Black) }
         }
         if (sides.size == 2) {
             val lead = sides.maxByOrNull { it.score?.toDoubleOrNull() ?: 0.0 }

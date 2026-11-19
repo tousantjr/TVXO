@@ -211,6 +211,8 @@ private fun OverlayModeContent(
         val ch = scheduleChannel ?: return@remember emptyList()
         val out = ArrayList<ScheduleRow>()
         var lastDay = Long.MIN_VALUE
+        // Real listings only: the guide's empty catch-up hours filled the top of this list with
+        // days of "No Program Guide Available" on channels with no past listings.
         programs[ch.key].orEmpty().forEach { p ->
             val day = startOfDay(p.startMs)
             if (day != lastDay) {
@@ -387,7 +389,8 @@ private fun OverlayModeContent(
                         // OK on a playlist heading: fold or unfold it (the highlight stays on it).
                         isOk && headingAt != null -> headingAt?.let { viewModel.togglePlaylistCollapsed(it) }
                         e.key == Key.DirectionRight || isOk || e.key == Key.Back -> { applyPendingGroup(); headingAt = null; level = OverlayLevel.CHANNELS }
-                        e.key == Key.DirectionLeft -> Unit
+                        // Left: straight back to the top of the group list.
+                        e.key == Key.DirectionLeft -> if (e.nativeKeyEvent.repeatCount == 0) moveGroup(-groupRows.size)
                     }
                     OverlayLevel.SCHEDULE -> when {
                         e.key == Key.DirectionUp -> moveShow(-1)
@@ -566,6 +569,11 @@ private fun OverlayModeContent(
                 }
                 if (seriesLabel != null) MenuItem(seriesLabel, if (recordLabel == null) Modifier.focusRequester(first) else Modifier) {
                     com.nuvio.tv.livetv.record.LiveTvNotice.show(viewModel.toggleSeries(ch, p))
+                    recordMenu = null
+                    activity++
+                }
+                if (seriesLabel == "Record series") MenuItem("Record new episodes only") {
+                    com.nuvio.tv.livetv.record.LiveTvNotice.show(viewModel.toggleSeries(ch, p, newOnly = true))
                     recordMenu = null
                     activity++
                 }
@@ -848,13 +856,28 @@ private fun SchedulePreview(channel: LiveChannel, list: List<EpgProgram>, now: L
             val live = now >= p.startMs && now < p.stopMs
             val color = when {
                 live -> NuvioTheme.colors.Secondary
-                p.stopMs <= now -> NuvioTheme.colors.TextSecondary
+                // Past shows: a clearly darker grey, so they stand apart from what's coming up.
+                p.stopMs <= now -> NuvioTheme.colors.TextTertiary
                 else -> NuvioTheme.colors.TextPrimary
             }
+            // The show on now is bold with a LIVE tag, so it stays easy to spot whatever the highlight color.
+            val weight = if (live) FontWeight.Bold else FontWeight.Normal
             Row(modifier = Modifier.fillMaxWidth().height(orow(36f)).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                LiveText(formatClock(p.startMs, use24h), color = color, size = osp(14f), modifier = Modifier.widthIn(min = odp(if (use24h) 40f else 60f)))
+                LiveText(formatClock(p.startMs, use24h), color = color, size = osp(14f), weight = weight, modifier = Modifier.widthIn(min = odp(if (use24h) 40f else 60f)))
                 Spacer(Modifier.width(10.dp))
-                LiveText(p.title, color = color, size = osp(14f), modifier = Modifier.weight(1f))
+                LiveText(p.title, color = color, size = osp(14f), weight = weight, modifier = Modifier.weight(1f))
+                if (live) {
+                    Spacer(Modifier.width(6.dp))
+                    LiveText(
+                        "LIVE",
+                        modifier = Modifier
+                            .border(1.dp, color.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                        color = color,
+                        size = osp(10f),
+                        weight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -904,7 +927,7 @@ private fun SchedulePanel(
                         val colors = liveCellColors(
                             focused = isFocused && focused,
                             idle = if (isFocused) Color.White.copy(alpha = 0.08f) else Color.Transparent,
-                            idleText = if (past) NuvioTheme.colors.TextSecondary else NuvioTheme.colors.TextPrimary
+                            idleText = if (past) NuvioTheme.colors.TextTertiary else NuvioTheme.colors.TextPrimary
                         )
                         val shape = RoundedCornerShape(8.dp)
                         Row(
@@ -918,9 +941,9 @@ private fun SchedulePanel(
                                 .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            LiveText(formatClock(p.startMs, use24h), color = colors.text, size = osp(14f), modifier = Modifier.widthIn(min = odp(if (use24h) 40f else 60f)))
+                            LiveText(formatClock(p.startMs, use24h), color = colors.text, size = osp(14f), weight = if (live) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.widthIn(min = odp(if (use24h) 40f else 60f)))
                             Spacer(Modifier.width(10.dp))
-                            LiveText(p.title, color = colors.text, size = osp(14f), modifier = Modifier.weight(1f), marquee = isFocused)
+                            LiveText(p.title, color = colors.text, size = osp(14f), weight = if (live) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f), marquee = isFocused)
                             if (live && channel.key == playingKey) {
                                 val onSolid = isFocused && focused && LocalLiveSolidHighlight.current
                                 Icon(
@@ -1166,9 +1189,12 @@ private fun BackupFlyoutContent(
                             }
                         }
                         val from = playlistNames[ch.sourceId] ?: ch.sourceName
+                        // The group always shows here (even when hidden on the play bar): it's what tells
+                        // same-named copies apart (UK, World, another language).
                         LiveText(
-                            listOfNotNull(from.takeIf { it.isNotBlank() }, ch.group.takeIf { it.isNotBlank() && BarPart.GROUP !in BarPart.hiddenOf(settings.barHidden) }, if (ch.key == playingKey) "Watching" else null).joinToString(" · "),
-                            color = dim, size = osp(12f), maxLines = 1
+                            listOfNotNull(from.takeIf { it.isNotBlank() }, ch.group.takeIf { it.isNotBlank() }, if (ch.key == playingKey) "Watching" else null).joinToString(" · "),
+                            color = dim, size = osp(12f), maxLines = 1,
+                            marquee = isFocused && i == restingIndex
                         )
                         LiveText(
                             p?.title ?: "No program information",
