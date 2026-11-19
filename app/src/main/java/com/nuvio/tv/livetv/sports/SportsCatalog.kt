@@ -591,9 +591,7 @@ object SportsCatalog {
         // and Sports runs this for every show in the guide.
         if (s.all { it.code < 128 }) return asciiNorm(s)
         val plain = Normalizer.normalize(plainSmall(s), Normalizer.Form.NFD).replace(MARKS, "")
-        // Unicode mapping/casing is unchanged; finish with the same ASCII word rules without
-        // building the ampersand, punctuation and whitespace replacement strings for each show.
-        return asciiNorm(plain.lowercase(Locale.ROOT))
+        return " " + plain.lowercase(Locale.ROOT).replace("&", " and ").replace(NOT_WORD, " ").trim().replace(SPACES, " ") + " "
     }
 
     /** [norm] for text with no letters outside plain ASCII: the same result, without the slow steps. */
@@ -639,6 +637,8 @@ object SportsCatalog {
     fun hasWord(normText: String, term: String): Boolean = term.isNotBlank() && normText.contains(" $term ")
 
     private val MARKS = Regex("\\p{M}+")
+    private val NOT_WORD = Regex("[^a-z0-9]+")
+    private val SPACES = Regex(" +")
 
     /** Words that make a show a replay or a highlights show rather than the game itself. */
     val NOT_LIVE_WORDS = listOf(

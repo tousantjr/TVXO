@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.tv.livetv.model.LiveChannel
-import com.nuvio.tv.livetv.model.EpgProgram
 import com.nuvio.tv.livetv.record.LiveTvNotice
 import com.nuvio.tv.ui.theme.NuvioTheme
 import kotlinx.coroutines.delay
@@ -35,7 +34,6 @@ import kotlinx.coroutines.delay
 internal fun BackupChannelMenu(
     channel: LiveChannel,
     viewModel: LiveTvViewModel,
-    programs: Map<String, List<EpgProgram>>,
     playing: Boolean,
     onSwitch: () -> Unit,
     onRestarted: () -> Unit,
@@ -101,7 +99,7 @@ internal fun BackupChannelMenu(
             onDismiss = onDismiss
         )
         else -> {
-            val program = programs[channel.key]?.firstOrNull { now >= it.startMs && now < it.stopMs }
+            val program = viewModel.currentProgram(channel.key, now)
             val isFavorite = channel.key in user.favorites
             val recordingNow = recordings.any { it.channelKey == channel.key && it.isRecording }
             val scheduled = program != null && schedules.any { it.channel.key == channel.key && it.startMs == program.startMs }
@@ -115,9 +113,7 @@ internal fun BackupChannelMenu(
                 if (series.any { it.channel.key == channel.key && it.norm == n }) "Stop recording series" else "Record series"
             }
             val canRestart = viewModel.canWatchFromStart(channel)
-            val bell = com.nuvio.tv.livetv.calendar.rememberLiveBell(program, channel) {
-                programs.retainGuideActionOwnership(program)
-            }
+            val bell = com.nuvio.tv.livetv.calendar.rememberLiveBell(program, channel)
             val from = playlistNames[channel.sourceId] ?: channel.sourceName
             LiveDialog(onDismiss = onDismiss, width = 460.dp) {
                 LiveText("${channel.number}  ${channel.name}", size = 20.sp, weight = FontWeight.Bold)
@@ -145,10 +141,7 @@ internal fun BackupChannelMenu(
                         MenuItem(recordLabel, if (playing && !canRestart) Modifier.focusRequester(first) else Modifier) {
                             val msg = when {
                                 recordingNow -> viewModel.toggleRecording(channel)
-                                program != null -> {
-                                    val ownership = programs.retainGuideActionOwnership(program) ?: return@MenuItem
-                                    viewModel.toggleScheduled(channel, program, ownership)
-                                }
+                                program != null -> viewModel.toggleScheduled(channel, program)
                                 // No listings: record from now (an hour, as the play bar's Record does).
                                 else -> viewModel.toggleRecording(channel)
                             }
@@ -158,8 +151,7 @@ internal fun BackupChannelMenu(
                     }
                     if (program != null && seriesLabel != null) item {
                         MenuItem(seriesLabel) {
-                            val ownership = programs.retainGuideActionOwnership(program) ?: return@MenuItem
-                            LiveTvNotice.show(viewModel.toggleSeries(channel, program, ownership))
+                            LiveTvNotice.show(viewModel.toggleSeries(channel, program))
                             onDismiss()
                         }
                     }

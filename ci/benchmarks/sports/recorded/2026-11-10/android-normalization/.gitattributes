@@ -1,4 +1,0 @@
-*.json text eol=lf
-*.csv -text
-*.txt -text
-*.java -text

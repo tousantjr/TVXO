@@ -7,13 +7,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.nuvio.tv.livetv.model.EpgProgram
 import com.nuvio.tv.livetv.model.LiveChannel
 import com.nuvio.tv.livetv.record.LiveTvNotice
-import com.nuvio.tv.livetv.ui.releaseGuideOwnershipOnCompletion
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
 
@@ -34,8 +32,7 @@ data class LiveBell(
 
 /** The bell for [program] on [channel], or null when there's nothing to ring it for. */
 @Composable
-fun rememberLiveBell(program: EpgProgram?, channel: LiveChannel?,
-                     acquireOwnership: (() -> AutoCloseable?)? = null): LiveBell? {
+fun rememberLiveBell(program: EpgProgram?, channel: LiveChannel?): LiveBell? {
     if (program == null) return null
     val context = LocalContext.current
     val repo = remember {
@@ -47,15 +44,9 @@ fun rememberLiveBell(program: EpgProgram?, channel: LiveChannel?,
     if (SideMenuPages.CALENDAR in SideMenuPages.hidden(settings.sideMenuHidden)) return null
     // Redrawn when a bell is rung anywhere.
     val follows by repo.follows.collectAsState()
-    val currentOwnership by rememberUpdatedState(acquireOwnership)
-    var found by remember(program, channel?.key) { mutableStateOf(repo.knownLiveTitle(program, channel)) }
-    LaunchedEffect(program, channel?.key) {
-        if (!found.second) {
-            val acquire = currentOwnership
-            val ownership = acquire?.invoke()
-            if (acquire != null && ownership == null) return@LaunchedEffect
-            try { found = repo.liveTitle(program, channel) to true } finally { ownership?.close() }
-        }
+    var found by remember(program.title, program.startMs, channel?.key) { mutableStateOf(repo.knownLiveTitle(program, channel)) }
+    LaunchedEffect(program.title, program.startMs, channel?.key) {
+        if (!found.second) found = repo.liveTitle(program, channel) to true
     }
     val scope = rememberCoroutineScope()
     val (title, known) = found
@@ -63,14 +54,11 @@ fun rememberLiveBell(program: EpgProgram?, channel: LiveChannel?,
     if (known && title == null) return null
     if (title == null) {
         // Still being worked out: ringing it works it out first.
-        return LiveBell(on = false, label = "Ring the bell", value = "Off", isMovie = false) toggle@ {
-            val acquire = currentOwnership
-            val ownership = acquire?.invoke()
-            if (acquire != null && ownership == null) return@toggle
+        return LiveBell(on = false, label = "Ring the bell", value = "Off", isMovie = false) {
             scope.launch {
                 val t = repo.liveTitle(program, channel)
                 LiveTvNotice.show(if (t == null) "Couldn't find \"${program.title}\" to follow" else repo.toggleLiveBell(t, program, channel))
-            }.releaseGuideOwnershipOnCompletion(ownership)
+            }
         }
     }
     val movie = title.kind != "series"
@@ -83,11 +71,7 @@ fun rememberLiveBell(program: EpgProgram?, channel: LiveChannel?,
         on -> "Turn off the bell for this show"
         else -> "Ring the bell: follow this show"
     }
-    return LiveBell(on = on, label = label, value = if (on) "On" else "Off", isMovie = movie) toggle@ {
-        val acquire = currentOwnership
-        val ownership = acquire?.invoke()
-        if (acquire != null && ownership == null) return@toggle
+    return LiveBell(on = on, label = label, value = if (on) "On" else "Off", isMovie = movie) {
         scope.launch { LiveTvNotice.show(repo.toggleLiveBell(title, program, channel)) }
-            .releaseGuideOwnershipOnCompletion(ownership)
     }
 }
